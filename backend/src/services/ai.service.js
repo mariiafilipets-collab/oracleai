@@ -387,6 +387,16 @@ Return: {"verdict":"YES"|"NO","reasoning":"specific fact"}`,
 // ═══════════════════════════════════════════════════════════════════════════
 
 export async function assessUserEventForListing({ title, category, deadlineMs, sourcePolicy }) {
+  const isLikelyBinaryQuestion = (text) => {
+    const t = String(text || "").trim();
+    if (!t) return false;
+    const hasQuestionMark = /\?\s*$/.test(t);
+    const hasBinaryCueEn = /\b(will|is|are|does|do|did|can|could|would|won't|will not|happen|occur|reach|close|open|resume|start|end|win|lose|arrive)\b/i.test(t);
+    const hasBinaryCueRu = /\b(ли|будет|будут|состоится|откроют|закроют|выиграет|произойдет|прилет|возобновят)\b/i.test(t);
+    const hasSubjectiveCue = /\b(best|better|worse|beautiful|interesting|popular|good|bad)\b/i.test(t);
+    return hasQuestionMark && (hasBinaryCueEn || hasBinaryCueRu) && !hasSubjectiveCue;
+  };
+
   const cleanTitle = String(title || "").trim().slice(0, 180);
   if (!cleanTitle) {
     return {
@@ -481,6 +491,19 @@ Original user title: "${cleanTitle}"`;
   if (!/[?]$/.test(parsed.normalizedTitle)) {
     parsed.normalizedTitle = `${parsed.normalizedTitle.replace(/\?*$/, "").trim()}?`.slice(0, 180);
   }
+
+  // Guardrail: sometimes validator model rejects clearly binary questions as "vague/non-binary".
+  // Accept such cases when local deterministic heuristic says the question is binary and verifiable.
+  if (!parsed.accepted) {
+    const rejectReason = String(parsed.reason || "").toLowerCase();
+    const looksLikeFalseNegative = /(not.*binary|non[- ]?binary|vague question|too vague|unclear)/i.test(rejectReason);
+    const candidate = parsed.normalizedTitle || cleanTitle;
+    if (looksLikeFalseNegative && isLikelyBinaryQuestion(candidate)) {
+      parsed.accepted = true;
+      parsed.reason = "Accepted by binary guard after AI false-negative";
+    }
+  }
+
   return parsed;
 }
 

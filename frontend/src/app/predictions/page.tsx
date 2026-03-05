@@ -105,6 +105,61 @@ export default function PredictionsPage() {
     const translated = t(key);
     return translated === key ? fallback : translated;
   }, [t]);
+  const localizeUserCreateMessage = useCallback((raw: string, kind: "error" | "warning" = "error") => {
+    const message = String(raw || "").trim();
+    const lower = message.toLowerCase();
+    if (!message) {
+      return kind === "warning"
+        ? tr("predictions.userCreateQualityHint", "Improve question clarity")
+        : tr("predictions.userCreateFailed", "Failed to create user event");
+    }
+
+    if (kind === "warning") {
+      if (lower.includes("question should end with")) {
+        return tr("predictions.userCreateWarnQuestionMark", "Question should end with '?' for clarity.");
+      }
+      if (lower.includes("clear binary wording")) {
+        return tr("predictions.userCreateWarnBinaryWording", "Use clear YES/NO wording.");
+      }
+      return message;
+    }
+
+    if (lower.includes("title must be")) {
+      return tr("predictions.userCreateErrTitleLength", "Title must be between 12 and 180 characters.");
+    }
+    if (lower.includes("unsupported category")) {
+      return tr("predictions.userCreateErrCategory", "Unsupported category.");
+    }
+    if (lower.includes("unsupported source policy")) {
+      return tr("predictions.userCreateErrSource", "Unsupported source policy.");
+    }
+    if (lower.includes("invalid deadline")) {
+      return tr("predictions.userCreateErrDeadline", "Invalid deadline.");
+    }
+    if (lower.includes("deadline must be in")) {
+      return tr("predictions.userCreateErrDeadlineRange", "Deadline must be within 10 minutes to 14 days.");
+    }
+    if (lower.includes("duplicate active event")) {
+      return tr("predictions.userCreateErrDuplicate", "A similar active event already exists.");
+    }
+    if (lower.includes("cooldown active")) {
+      return tr("predictions.cooldownActive", "Cooldown is active. Try later.");
+    }
+    if (lower.includes("not a prediction about a binary event")
+      || lower.includes("not binary")
+      || lower.includes("non-binary")
+      || lower.includes("vague question")) {
+      return tr("predictions.userCreateErrBinary", "Question is not clearly binary (YES/NO). Clarify conditions and deadline.");
+    }
+    if (lower.includes("requires clarification") || lower.includes("too vague") || lower.includes("unclear")) {
+      return tr("predictions.userCreateErrClarify", "Question is too vague. Add measurable condition and clear deadline.");
+    }
+    if (lower.includes("ai validation rejected")) {
+      return tr("predictions.userCreateErrAiRejected", "AI validation rejected this event. Please rephrase.");
+    }
+
+    return message;
+  }, [tr]);
   const predictionAddress = addresses?.Prediction as `0x${string}` | undefined;
   const checkInAddress = addresses?.CheckIn as `0x${string}` | undefined;
   const pointsAddress = addresses?.Points as `0x${string}` | undefined;
@@ -377,7 +432,7 @@ export default function PredictionsPage() {
 
       const warnings = validation?.data?.qualityWarnings || [];
       if (warnings.length) {
-        toast((warnings[0] as string) || tr("predictions.userCreateQualityHint", "Improve question clarity"));
+        toast(localizeUserCreateMessage((warnings[0] as string) || "", "warning"));
       }
 
       const currentEventCount = Number(eventCountRaw ?? BigInt(0));
@@ -398,7 +453,7 @@ export default function PredictionsPage() {
     } catch (err: any) {
       setCreatingEvent(false);
       setExpectedCreatedEventId(null);
-      toast.error(err?.message || tr("predictions.userCreateFailed", "Failed to create user event"));
+      toast.error(localizeUserCreateMessage(err?.message || tr("predictions.userCreateFailed", "Failed to create user event"), "error"));
     }
   };
 
@@ -419,15 +474,15 @@ export default function PredictionsPage() {
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Points info banner */}
-      <div className="glass rounded-xl p-4 border border-neon-purple/20 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+      <div className="glass rounded-xl p-3.5 sm:p-4 border border-neon-purple/20 flex flex-col sm:flex-row items-start sm:items-center gap-3">
         <span className="text-2xl"><AppIcon name="brain" className="w-7 h-7 text-neon-cyan" /></span>
         <div className="flex-1">
-          <p suppressHydrationWarning className="text-sm text-gray-200">
+          <p suppressHydrationWarning className="text-xs sm:text-sm text-gray-200">
             <strong suppressHydrationWarning className="text-neon-cyan">{t("predictions.howVoting")}</strong> {t("predictions.clickAgree")}
             <span className="text-neon-green font-bold"> {t("predictions.agree")}</span> {t("predictions.orDisagree")}
-            <span className="text-neon-red font-bold"> {t("predictions.disagree")}</span>.
+            <span className="text-neon-red font-bold"> {t("predictions.disagree")}</span>.{" "}
             {t("predictions.correctReward")}.
             <span className="text-neon-gold font-bold"> {t("predictions.beatAi")}</span>
           </p>
@@ -436,17 +491,16 @@ export default function PredictionsPage() {
       </div>
 
       {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 sm:gap-3">
         <div>
-          <h1 className="text-3xl font-heading font-bold">
-            <span className="gradient-cyan">AI</span>{" "}
+          <h1 className="text-[1.7rem] sm:text-3xl font-heading font-bold">
             <span className="text-white">{t("predictions.title")}</span>
           </h1>
           <p className="text-gray-400 text-sm mt-1">{t("predictions.subtitle")}</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {/* Scheduler Status Badge */}
-          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-dark-700 border border-dark-500 text-xs">
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-dark-700 border border-dark-500 text-xs w-fit">
             <span className="w-2 h-2 rounded-full bg-neon-green animate-pulse" />
             <span className="text-gray-400">{t("predictions.autoCycle")}</span>
             <span className="text-neon-cyan font-mono">{activePredictions.length} {t("common.active")}</span>
@@ -455,8 +509,8 @@ export default function PredictionsPage() {
       </div>
 
       {/* Active / Resolved Tabs */}
-      <GlassCard className="space-y-3" glow="purple" hover={false}>
-        <div className="flex items-center justify-between gap-3">
+      <GlassCard className="space-y-3 p-3.5 sm:p-6" glow="purple" hover={false}>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h3 className="text-base font-semibold text-white">
               {tr("predictions.userCreateTitle", "Create your own event")}
@@ -492,7 +546,7 @@ export default function PredictionsPage() {
           </div>
           <button
             onClick={() => setCreateOpen((v) => !v)}
-            className="px-4 py-2 rounded-xl bg-neon-purple/20 border border-neon-purple/40 text-neon-purple text-sm font-bold"
+            className="min-h-11 px-4 py-2 rounded-xl bg-neon-purple/20 border border-neon-purple/40 text-neon-purple text-sm font-bold w-full sm:w-auto"
           >
             {createOpen ? tr("common.close", "Close") : tr("predictions.openCreate", "Create Event")}
           </button>
@@ -504,16 +558,16 @@ export default function PredictionsPage() {
           </p>
         )}
         {createOpen && (
-          <div className="grid md:grid-cols-2 gap-3">
+          <div className="grid md:grid-cols-2 gap-2.5 sm:gap-3">
             <input
-              className="bg-dark-700 border border-dark-500 rounded-xl px-3 py-2 text-sm text-white"
+              className="bg-dark-700 border border-dark-500 rounded-xl px-3 py-2.5 text-sm text-white min-h-11"
               placeholder={tr("predictions.userCreateTitleInput", "Will BTC close above 80k by Friday?")}
               value={newEvent.title}
               onChange={(e) => setNewEvent((p) => ({ ...p, title: e.target.value }))}
               maxLength={180}
             />
             <select
-              className="bg-dark-700 border border-dark-500 rounded-xl px-3 py-2 text-sm text-white"
+              className="bg-dark-700 border border-dark-500 rounded-xl px-3 py-2.5 text-sm text-white min-h-11"
               value={newEvent.category}
               onChange={(e) => setNewEvent((p) => ({ ...p, category: e.target.value }))}
             >
@@ -522,7 +576,7 @@ export default function PredictionsPage() {
               ))}
             </select>
             <select
-              className="bg-dark-700 border border-dark-500 rounded-xl px-3 py-2 text-sm text-white"
+              className="bg-dark-700 border border-dark-500 rounded-xl px-3 py-2.5 text-sm text-white min-h-11"
               value={newEvent.hoursToDeadline}
               onChange={(e) => setNewEvent((p) => ({ ...p, hoursToDeadline: Number(e.target.value) }))}
             >
@@ -531,7 +585,7 @@ export default function PredictionsPage() {
               ))}
             </select>
             <select
-              className="bg-dark-700 border border-dark-500 rounded-xl px-3 py-2 text-sm text-white"
+              className="bg-dark-700 border border-dark-500 rounded-xl px-3 py-2.5 text-sm text-white min-h-11"
               value={newEvent.sourcePolicy}
               onChange={(e) => setNewEvent((p) => ({ ...p, sourcePolicy: e.target.value }))}
             >
@@ -543,7 +597,7 @@ export default function PredictionsPage() {
               <button
                 onClick={handleCreateUserEvent}
                 disabled={creatingEvent || isCreatePending || cooldownSeconds > 0}
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-neon-cyan to-neon-purple text-dark-900 font-bold disabled:opacity-50"
+                className="w-full min-h-11 py-3 rounded-xl bg-gradient-to-r from-neon-cyan to-neon-purple text-dark-900 font-bold disabled:opacity-50"
               >
                 {creatingEvent || isCreatePending
                   ? tr("predictions.creatingEvent", "Creating...")
@@ -557,10 +611,10 @@ export default function PredictionsPage() {
       </GlassCard>
 
       {/* Active / Resolved Tabs */}
-      <div className="flex gap-2">
+      <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
         <button
           onClick={() => setActiveTab("active")}
-          className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${
+          className={`shrink-0 min-h-11 px-4 sm:px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${
             activeTab === "active"
               ? "bg-neon-green/20 text-neon-green border border-neon-green/30"
               : "bg-dark-700 text-gray-400 border border-dark-500"
@@ -570,7 +624,7 @@ export default function PredictionsPage() {
         </button>
         <button
           onClick={() => setActiveTab("resolved")}
-          className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${
+          className={`shrink-0 min-h-11 px-4 sm:px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${
             activeTab === "resolved"
               ? "bg-neon-purple/20 text-neon-purple border border-neon-purple/30"
               : "bg-dark-700 text-gray-400 border border-dark-500"
@@ -580,7 +634,7 @@ export default function PredictionsPage() {
         </button>
         <button
           onClick={() => setActiveTab("voted")}
-          className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${
+          className={`shrink-0 min-h-11 px-4 sm:px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${
             activeTab === "voted"
               ? "bg-neon-cyan/20 text-neon-cyan border border-neon-cyan/30"
               : "bg-dark-700 text-gray-400 border border-dark-500"
@@ -591,7 +645,7 @@ export default function PredictionsPage() {
       </div>
 
       {/* Category Tabs */}
-      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+      <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
         {CAT_KEYS.map((cat) => (
           <button
             key={cat}
@@ -607,12 +661,12 @@ export default function PredictionsPage() {
         ))}
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
         {(["ALL", "AI", "USER"] as const).map((src) => (
           <button
             key={src}
             onClick={() => setSourceFilter(src)}
-            className={`px-3 py-2 rounded-xl text-xs font-semibold transition ${
+            className={`shrink-0 min-h-10 px-3 py-2 rounded-xl text-xs font-semibold transition ${
               sourceFilter === src
                 ? "bg-neon-purple/20 border border-neon-purple/40 text-neon-purple"
                 : "bg-dark-700 border border-dark-500 text-gray-400"
@@ -649,7 +703,7 @@ export default function PredictionsPage() {
           </p>
         </GlassCard>
       ) : (
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           <AnimatePresence mode="popLayout">
             {filtered.map((pred, i) => {
               const deadline = new Date(pred.deadline);
@@ -686,7 +740,7 @@ export default function PredictionsPage() {
                     )}
 
                     {/* Category + Countdown */}
-                    <div className="flex items-center justify-between mb-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                       <span className="text-xs px-2 py-1 rounded-full bg-dark-600 text-gray-400">
                         <span className="inline-flex items-center gap-1"><AppIcon name={CAT_ICONS[pred.category]} className="w-3.5 h-3.5" /> {t(`categories.${pred.category}`)}</span>
                       </span>
@@ -707,7 +761,7 @@ export default function PredictionsPage() {
                     </div>
 
                     {/* Title */}
-                    <h3 className="text-sm font-medium text-gray-100 mb-3 leading-snug min-h-[2.5rem] pr-6">
+                    <h3 className="text-sm font-medium text-gray-100 mb-3 leading-snug pr-2">
                       {pred.title}
                     </h3>
 
@@ -792,14 +846,14 @@ export default function PredictionsPage() {
                         <button
                           onClick={() => handleVote(pred.eventId, true)}
                           disabled={isVotePending || isCheckInPending || isCheckInConfirming}
-                          className="py-2.5 rounded-xl bg-neon-green/10 border border-neon-green/30 text-neon-green text-sm font-bold hover:bg-neon-green/20 transition disabled:opacity-50"
+                          className="min-h-11 py-2.5 rounded-xl bg-neon-green/10 border border-neon-green/30 text-neon-green text-sm font-bold hover:bg-neon-green/20 transition disabled:opacity-50"
                         >
                         👍 {t("predictions.agree")}
                       </button>
                       <button
                         onClick={() => handleVote(pred.eventId, false)}
                         disabled={isVotePending || isCheckInPending || isCheckInConfirming}
-                        className="py-2.5 rounded-xl bg-neon-red/10 border border-neon-red/30 text-neon-red text-sm font-bold hover:bg-neon-red/20 transition disabled:opacity-50"
+                        className="min-h-11 py-2.5 rounded-xl bg-neon-red/10 border border-neon-red/30 text-neon-red text-sm font-bold hover:bg-neon-red/20 transition disabled:opacity-50"
                       >
                         👎 {t("predictions.disagree")}
                         </button>
@@ -840,7 +894,7 @@ export default function PredictionsPage() {
               <p className="text-sm text-gray-400 mb-4">
                 {tr("predictions.checkInModalSubtitle", "You must complete today's check-in before voting. Choose a tier:")}
               </p>
-              <div className="grid grid-cols-3 gap-2 mb-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4">
                 {CHECKIN_TIERS.map((tier, idx) => (
                   <button
                     key={tier.key}
@@ -858,7 +912,7 @@ export default function PredictionsPage() {
               <button
                 onClick={handleCheckInFromModal}
                 disabled={isCheckInPending || isCheckInConfirming}
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-neon-cyan to-neon-purple text-dark-900 font-bold disabled:opacity-50"
+                className="w-full min-h-11 py-3 rounded-xl bg-gradient-to-r from-neon-cyan to-neon-purple text-dark-900 font-bold disabled:opacity-50"
               >
                 {isCheckInPending
                   ? tr("checkin.confirming", "Confirm in wallet...")
