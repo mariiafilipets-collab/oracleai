@@ -118,6 +118,12 @@ process.on("SIGTERM", () => {
   gracefulShutdown().finally(() => process.exit(0));
 });
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const isRateLimitError = (err) => {
+  const msg = String(err?.message || err || "").toLowerCase();
+  return msg.includes("rate limit") || msg.includes("too many requests") || msg.includes("-32005");
+};
+
 async function setupEventListeners() {
   if (!config.enableEventPolling) {
     console.log("[Events] Polling disabled by config.");
@@ -136,73 +142,68 @@ async function setupEventListeners() {
 
   const processRange = async (fromBlock, toBlock) => {
     if (toBlock < fromBlock) return;
-    try {
-      const checkInLogs = await checkIn.queryFilter(checkIn.filters.CheckedIn(), fromBlock, toBlock);
-      for (const log of checkInLogs) {
-        const txHash = log.transactionHash || "";
-        if (txHash) {
-          const alreadyIndexed = await CheckInRecord.exists({ txHash });
-          if (alreadyIndexed) continue;
-        }
+    const checkInLogs = await checkIn.queryFilter(checkIn.filters.CheckedIn(), fromBlock, toBlock);
+    for (const log of checkInLogs) {
+      const txHash = log.transactionHash || "";
+      if (txHash) {
+        const alreadyIndexed = await CheckInRecord.exists({ txHash });
+        if (alreadyIndexed) continue;
+      }
 
+      const args = log.args || [];
+      const user = (args.user ?? args[0])?.toLowerCase?.();
+      const amount = args.amount ?? args[1] ?? 0n;
+      const tier = Number(args.tier ?? args[2] ?? 0);
+      const points = Number(args.points ?? args[3] ?? 0);
+      const streak = Number(args.streak ?? args[4] ?? 0);
+      if (!user) continue;
+
+      const tierName = ["BASIC", "PRO", "WHALE"][tier] || "BASIC";
+      const bnbAmount = (Number(amount) / 1e18).toFixed(4);
+
+      await User.findOneAndUpdate(
+        { address: user },
+        {
+          $set: { streak, tier: tierName, lastCheckIn: new Date() },
+          $inc: { totalPoints: points, weeklyPoints: points, totalCheckIns: 1 },
+          $setOnInsert: { address: user, joinedAt: new Date() },
+        },
+        { upsert: true }
+      );
+
+      await CheckInRecord.create({
+        address: user,
+        amount: bnbAmount,
+        tier: tierName,
+        points,
+        streak,
+        txHash,
+      });
+
+      invalidateCache();
+      io.emit("user:checkin", {
+        address: user,
+        amount: bnbAmount,
+        tier: tierName,
+        points,
+        streak,
+        timestamp: Date.now(),
+      });
+    }
+
+    if (referral) {
+      const refLogs = await referral.queryFilter(referral.filters.ReferralRegistered(), fromBlock, toBlock);
+      for (const log of refLogs) {
         const args = log.args || [];
         const user = (args.user ?? args[0])?.toLowerCase?.();
-        const amount = args.amount ?? args[1] ?? 0n;
-        const tier = Number(args.tier ?? args[2] ?? 0);
-        const points = Number(args.points ?? args[3] ?? 0);
-        const streak = Number(args.streak ?? args[4] ?? 0);
-        if (!user) continue;
-
-        const tierName = ["BASIC", "PRO", "WHALE"][tier] || "BASIC";
-        const bnbAmount = (Number(amount) / 1e18).toFixed(4);
-
+        const referrer = (args.referrer ?? args[1])?.toLowerCase?.();
+        if (!user || !referrer) continue;
         await User.findOneAndUpdate(
           { address: user },
-          {
-            $set: { streak, tier: tierName, lastCheckIn: new Date() },
-            $inc: { totalPoints: points, weeklyPoints: points, totalCheckIns: 1 },
-            $setOnInsert: { address: user, joinedAt: new Date() },
-          },
+          { $set: { referrer } },
           { upsert: true }
         );
-
-        await CheckInRecord.create({
-          address: user,
-          amount: bnbAmount,
-          tier: tierName,
-          points,
-          streak,
-          txHash,
-        });
-
-        invalidateCache();
-        io.emit("user:checkin", {
-          address: user,
-          amount: bnbAmount,
-          tier: tierName,
-          points,
-          streak,
-          timestamp: Date.now(),
-        });
       }
-
-      if (referral) {
-        const refLogs = await referral.queryFilter(referral.filters.ReferralRegistered(), fromBlock, toBlock);
-        for (const log of refLogs) {
-          const args = log.args || [];
-          const user = (args.user ?? args[0])?.toLowerCase?.();
-          const referrer = (args.referrer ?? args[1])?.toLowerCase?.();
-          if (!user || !referrer) continue;
-          await User.findOneAndUpdate(
-            { address: user },
-            { $set: { referrer } },
-            { upsert: true }
-          );
-        }
-      }
-
-    } catch (err) {
-      console.error("[Events] Poll error:", err?.message || err);
     }
   };
 
@@ -211,10 +212,28 @@ async function setupEventListeners() {
   if (backfillBlocks > 0) {
     const fromBlock = Math.max(0, lastProcessedBlock - backfillBlocks);
     console.log(`[Events] Backfill enabled: scanning blocks ${fromBlock}..${lastProcessedBlock}`);
-    const step = Math.max(1, config.eventMaxBlockRange);
+    const step = Math.max(1, Number(config.eventBackfillBlockRange || config.eventMaxBlockRange || 1));
+    const backfillDelayMs = Math.max(0, Number(config.eventBackfillDelayMs || 0));
+    const maxRetries = Math.max(0, Number(config.eventBackfillMaxRetries || 0));
     for (let cursor = fromBlock; cursor <= lastProcessedBlock; cursor += step) {
       const toBlock = Math.min(lastProcessedBlock, cursor + step - 1);
-      await processRange(cursor, toBlock);
+      let attempt = 0;
+      while (true) {
+        try {
+          await processRange(cursor, toBlock);
+          break;
+        } catch (err) {
+          if (!isRateLimitError(err) || attempt >= maxRetries) {
+            console.error(`[Events] Backfill range failed ${cursor}..${toBlock}:`, err?.message || err);
+            break;
+          }
+          const waitMs = Math.min(30_000, backfillDelayMs * Math.max(1, 2 ** attempt));
+          attempt += 1;
+          console.warn(`[Events] Backfill rate-limited ${cursor}..${toBlock}, retry ${attempt}/${maxRetries} in ${waitMs}ms`);
+          await sleep(waitMs);
+        }
+      }
+      if (backfillDelayMs > 0) await sleep(backfillDelayMs);
     }
     console.log("[Events] Backfill completed.");
   }
