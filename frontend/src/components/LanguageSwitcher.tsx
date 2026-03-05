@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { LOCALES, useI18n, type LocaleCode } from "@/lib/i18n";
 
-export default function LanguageSwitcher() {
+export default function LanguageSwitcher({ compact = false }: { compact?: boolean }) {
   const { locale, setLocale } = useI18n();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -22,15 +22,19 @@ export default function LanguageSwitcher() {
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 px-3 py-2 rounded-xl bg-dark-700 border border-dark-500 text-sm hover:border-neon-cyan/30 transition w-full"
+        className={`flex items-center gap-2 px-3 py-2 rounded-xl bg-dark-700 border border-dark-500 text-sm hover:border-neon-cyan/30 transition ${
+          compact ? "min-h-10 w-auto" : "w-full"
+        }`}
       >
         <span>{current.flag}</span>
-        <span className="text-gray-300 text-xs">{current.name}</span>
+        {!compact && <span className="text-gray-300 text-xs">{current.name}</span>}
         <span className="text-gray-600 text-[10px] ml-auto">{open ? "▲" : "▼"}</span>
       </button>
 
       {open && (
-        <div className="absolute bottom-full mb-1 left-0 right-0 bg-dark-700 border border-dark-500 rounded-xl overflow-hidden z-50 shadow-xl">
+        <div className={`absolute bg-dark-700 border border-dark-500 rounded-xl overflow-hidden z-50 shadow-xl ${
+          compact ? "top-full mt-1 right-0 min-w-[160px]" : "bottom-full mb-1 left-0 right-0"
+        }`}>
           {LOCALES.map((l) => (
             <button
               key={l.code}

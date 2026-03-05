@@ -74,9 +74,20 @@ export const api = {
   getReferralStats: (address: string) => fetchAPI(`/api/user/${address}/referral-stats`),
   getCreatorStats: (address: string) => fetchAPI(`/api/user/${address}/creator-stats`),
   getOnboardingStatus: (address: string) => fetchAPI(`/api/user/${address}/onboarding`),
-  registerReferral: (address: string, referrerCode: string) =>
+  registerReferral: (
+    address: string,
+    referrerCode: string,
+    attribution?: {
+      utmSource?: string;
+      utmMedium?: string;
+      utmCampaign?: string;
+      utmContent?: string;
+      eventId?: number;
+      landingPath?: string;
+    }
+  ) =>
     fetchAPI(`/api/user/${address}/referral`, {
       method: "POST",
-      body: JSON.stringify({ referrerCode }),
+      body: JSON.stringify({ referrerCode, attribution }),
     }),
 };

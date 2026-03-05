@@ -120,7 +120,7 @@ export default function HomePage() {
   const poolStr = prizeBalance ? `${parseFloat(formatEther(prizeBalance)).toFixed(2)} BNB` : "0 BNB";
 
   return (
-    <div className="space-y-6 relative">
+    <div className="space-y-5 sm:space-y-6 relative">
       <WelcomeBanner />
 
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="relative rounded-3xl overflow-hidden mb-2 card-animated">
@@ -136,12 +136,12 @@ export default function HomePage() {
             />
           ))}
         </div>
-        <div className="relative z-10 text-center py-12 lg:py-16 px-6">
+        <div className="relative z-10 text-center py-8 sm:py-10 lg:py-16 px-4 sm:px-6">
           <motion.h1
             initial={{ y: 30, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.2 }}
-            className="text-4xl lg:text-6xl font-heading font-bold mb-4 leading-tight"
+            className="text-[1.75rem] sm:text-4xl lg:text-6xl font-heading font-bold mb-3 sm:mb-4 leading-tight"
           >
             <span className="bg-gradient-to-r from-neon-cyan via-neon-purple to-neon-gold bg-clip-text text-transparent">
               {t("hero.title1")}
@@ -153,7 +153,7 @@ export default function HomePage() {
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.4 }}
-            className="text-gray-400 text-lg lg:text-xl max-w-2xl mx-auto mb-8"
+            className="text-gray-400 text-sm sm:text-lg lg:text-xl max-w-2xl mx-auto mb-6 sm:mb-7"
           >
             {t("hero.subtitle")}
           </motion.p>
@@ -161,7 +161,7 @@ export default function HomePage() {
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.6 }}
-            className="flex justify-center gap-8 lg:gap-16 mb-8"
+            className="flex flex-wrap justify-center gap-4 sm:gap-8 lg:gap-16 mb-6 sm:mb-8"
           >
             {[
               { label: t("hero.activePredictions"), value: predictions.length.toString() },
@@ -169,7 +169,7 @@ export default function HomePage() {
               { label: t("hero.communityShare"), value: "58%" },
             ].map((s, i) => (
               <div key={i} className="text-center">
-                <div className="text-2xl lg:text-3xl font-bold font-mono text-white">{s.value}</div>
+                <div className="text-xl sm:text-2xl lg:text-3xl font-bold font-mono text-white">{s.value}</div>
                 <div className="text-xs text-gray-500">{s.label}</div>
               </div>
             ))}
@@ -183,19 +183,19 @@ export default function HomePage() {
             {!isConnected ? (
               <button
                 onClick={() => document.querySelector<HTMLButtonElement>("[data-rk] button")?.click()}
-                className="px-10 py-4 rounded-2xl bg-gradient-to-r from-neon-cyan to-neon-purple text-dark-900 font-bold text-lg hover:opacity-90 transition animate-pulse-glow"
+                className="min-h-12 px-8 sm:px-10 py-3.5 sm:py-4 rounded-2xl bg-gradient-to-r from-neon-cyan to-neon-purple text-dark-900 font-bold text-base sm:text-lg hover:opacity-90 transition animate-pulse-glow"
               >
                 {t("hero.cta")}
               </button>
             ) : (
               <a
                 href="#checkin"
-                className="px-10 py-4 rounded-2xl bg-gradient-to-r from-neon-cyan to-neon-purple text-dark-900 font-bold text-lg hover:opacity-90 transition animate-pulse-glow"
+                className="min-h-12 px-8 sm:px-10 py-3.5 sm:py-4 rounded-2xl bg-gradient-to-r from-neon-cyan to-neon-purple text-dark-900 font-bold text-base sm:text-lg hover:opacity-90 transition animate-pulse-glow"
               >
                 {t("hero.ctaCheckin")}
               </a>
             )}
-            <div className="flex flex-wrap justify-center gap-3 text-xs">
+            <div className="flex flex-wrap justify-center gap-2 sm:gap-3 text-[11px] sm:text-xs">
               {[t("hero.badges.bnb"), t("hero.badges.ai"), t("hero.badges.community"), t("hero.badges.opensource"), t("hero.badges.nokyc")].map((b, i) => (
                 <span key={i} className="px-3 py-1.5 rounded-full bg-dark-700/80 border border-dark-500/50 text-gray-400">
                   {b}
@@ -209,7 +209,7 @@ export default function HomePage() {
       <div className="flex justify-end">
         <button
           onClick={() => setShowGuide(!showGuide)}
-          className="px-3 py-2 rounded-lg bg-dark-700 border border-dark-500 text-xs text-gray-400 hover:text-neon-cyan hover:border-neon-cyan/30 transition"
+          className="min-h-10 px-3 py-2 rounded-lg bg-dark-700 border border-dark-500 text-xs text-gray-400 hover:text-neon-cyan hover:border-neon-cyan/30 transition"
         >
           {showGuide ? t("guide.hideGuide") : `📖 ${t("guide.showGuide")}`}
         </button>
@@ -251,7 +251,7 @@ export default function HomePage() {
 
       <GlassCard id="checkin" className="relative overflow-hidden" hover={false}>
         <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-neon-cyan/5 to-transparent rounded-full -translate-y-1/2 translate-x-1/2" />
-        <h2 className="text-xl font-heading font-bold mb-1 flex items-center gap-2">
+        <h2 className="text-xl font-heading font-bold mb-1 flex flex-wrap items-center gap-2">
           <span><AppIcon name="target" className="w-5 h-5 text-neon-cyan" /></span> {t("checkin.title")}
           {streak > 0 && (
             <span className="text-sm bg-neon-gold/20 text-neon-gold px-3 py-1 rounded-full">
@@ -267,12 +267,12 @@ export default function HomePage() {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-3 gap-3 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3 mb-5 sm:mb-6">
               {TIERS.map((tier, i) => (
                 <button
                   key={tier.key}
                   onClick={() => setSelectedTier(i)}
-                  className={`relative p-4 rounded-xl border-2 transition-all duration-300 ${
+                    className={`relative p-3.5 sm:p-4 rounded-xl border-2 transition-all duration-300 ${
                     selectedTier === i
                       ? "border-neon-cyan bg-neon-cyan/10 shadow-lg shadow-neon-cyan/10"
                       : "border-dark-500 bg-dark-700"
@@ -294,7 +294,7 @@ export default function HomePage() {
               whileTap={{ scale: 0.98 }}
               onClick={handleCheckIn}
               disabled={isPending || isConfirming}
-              className={`w-full py-4 rounded-xl font-bold text-lg transition-all duration-300 ${
+              className={`w-full min-h-12 py-4 rounded-xl font-bold text-base sm:text-lg transition-all duration-300 ${
                 isPending || isConfirming
                   ? "bg-dark-600 text-gray-500 cursor-wait"
                   : "bg-gradient-to-r from-neon-cyan to-neon-purple text-dark-900 hover:opacity-90 animate-pulse-glow"

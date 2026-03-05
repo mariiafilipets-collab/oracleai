@@ -20,6 +20,7 @@ import aiRouter from "./routes/ai.js";
 
 import User from "./models/User.js";
 import CheckInRecord from "./models/CheckInRecord.js";
+import PredictionEvent from "./models/PredictionEvent.js";
 
 const app = express();
 const server = createServer(app);
@@ -190,6 +191,7 @@ async function setupEventListeners() {
   const contracts = getContracts();
   const checkIn = contracts.CheckIn;
   const referral = contracts.Referral;
+  const prediction = contracts.Prediction;
   if (!checkIn) return;
 
   const provider = checkIn.runner?.provider;
@@ -261,6 +263,44 @@ async function setupEventListeners() {
           { $set: { referrer } },
           { upsert: true }
         );
+      }
+    }
+
+    if (prediction) {
+      const voteLogs = await prediction.queryFilter(prediction.filters.VoteSubmitted(), fromBlock, toBlock);
+      for (const log of voteLogs) {
+        const args = log.args || [];
+        const eventId = Number(args.eventId ?? args[0] ?? 0);
+        if (!Number.isFinite(eventId) || eventId <= 0) continue;
+        try {
+          // Keep vote counters in DB strictly aligned with chain state.
+          const on = await prediction["getEvent(uint256)"](BigInt(eventId));
+          if (!on || Number(on.id || 0n) === 0) continue;
+          await PredictionEvent.updateOne(
+            { eventId },
+            {
+              $set: {
+                totalVotesYes: Number(on.totalVotesYes || 0n),
+                totalVotesNo: Number(on.totalVotesNo || 0n),
+                deadline: new Date(Number(on.deadline || 0n) * 1000),
+                resolved: Boolean(on.resolved),
+                outcome: Boolean(on.resolved) ? Boolean(on.outcome) : null,
+                creator: String(on.creator || "").toLowerCase(),
+                isUserEvent: Boolean(on.isUserEvent),
+                listingFeeWei: String(on.listingFee || 0n),
+                sourcePolicy: String(on.sourcePolicy || ""),
+              },
+              $setOnInsert: {
+                title: String(on.title || `Event #${eventId}`),
+                category: ["SPORTS", "POLITICS", "ECONOMY", "CRYPTO", "CLIMATE"][Number(on.category || 3)] || "CRYPTO",
+                aiProbability: Number(on.aiProbability || 50n),
+              },
+            },
+            { upsert: true }
+          );
+        } catch (e) {
+          console.warn(`[Events] Vote sync failed for event ${eventId}:`, e?.message || e);
+        }
       }
     }
   };

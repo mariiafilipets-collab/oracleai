@@ -241,16 +241,16 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-heading font-bold">
+    <div className="space-y-5 sm:space-y-6">
+      <h1 className="text-2xl sm:text-3xl font-heading font-bold">
         <span className="gradient-cyan">{t("profile.title")}</span>
       </h1>
 
       {/* Oracle Score + Stats */}
-      <div className="grid lg:grid-cols-3 gap-6">
+      <div className="grid lg:grid-cols-3 gap-4 sm:gap-6">
         {/* Oracle Score */}
-        <GlassCard hover={false} className="flex flex-col items-center justify-center py-8">
-          <div className="relative w-32 h-32 mb-4">
+        <GlassCard hover={false} className="flex flex-col items-center justify-center py-6 sm:py-8">
+          <div className="relative w-28 h-28 sm:w-32 sm:h-32 mb-3 sm:mb-4">
             <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
               <circle cx="50" cy="50" r="42" fill="none" stroke="#1e2438" strokeWidth="8" />
               <motion.circle
@@ -269,7 +269,7 @@ export default function ProfilePage() {
               </defs>
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-2xl font-bold font-mono text-white">{oracleScore}</span>
+              <span className="text-xl sm:text-2xl font-bold font-mono text-white">{oracleScore}</span>
               <span className="text-xs text-gray-500">{t("profile.score")}</span>
             </div>
           </div>
@@ -280,7 +280,7 @@ export default function ProfilePage() {
         </GlassCard>
 
         {/* Stats Grid */}
-        <div className="lg:col-span-2 grid grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2 grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           {[
             { label: t("stats.totalPoints"), value: totalPoints.toLocaleString(), icon: "points", color: "text-neon-gold" },
             { label: t("stats.weeklyPoints"), value: weeklyPoints.toLocaleString(), icon: "chart", color: "text-neon-cyan" },
@@ -294,7 +294,7 @@ export default function ProfilePage() {
               color: "text-neon-gold",
             },
           ].map((stat, i) => (
-            <GlassCard key={i} hover={false} className="p-4 text-center">
+            <GlassCard key={i} hover={false} className="p-3.5 sm:p-4 text-center">
               <div className="text-xl mb-1 flex justify-center"><AppIcon name={stat.icon as any} className="w-5 h-5" /></div>
               <div className={`text-lg font-bold font-mono ${stat.color}`}>{stat.value}</div>
               <div className="text-xs text-gray-500">{stat.label}</div>
@@ -304,7 +304,7 @@ export default function ProfilePage() {
       </div>
 
       {/* Referral Section */}
-      <GlassCard hover={false}>
+      <GlassCard hover={false} className="p-4 sm:p-6">
         <h2 className="text-lg font-heading font-bold flex items-center gap-2 mb-4">
           <AppIcon name="globe" className="w-5 h-5 text-neon-cyan" /> {t("profile.referralProgram")}
           <span className="text-xs text-gray-500 font-normal">{t("profile.sixLevels")}</span>
@@ -312,7 +312,7 @@ export default function ProfilePage() {
         <div className="flex flex-col lg:flex-row gap-4">
           <div className="flex-1">
             <label className="text-xs text-gray-500 mb-2 block">{t("profile.yourCode")}</label>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <input
                 readOnly
                 value={referralCode}
@@ -320,13 +320,13 @@ export default function ProfilePage() {
               />
               <button
                 onClick={copyReferralLink}
-                className="px-6 py-3 rounded-xl bg-neon-cyan/10 border border-neon-cyan/30 text-neon-cyan font-bold text-sm hover:bg-neon-cyan/20 transition"
+                className="min-h-11 px-6 py-3 rounded-xl bg-neon-cyan/10 border border-neon-cyan/30 text-neon-cyan font-bold text-sm hover:bg-neon-cyan/20 transition w-full sm:w-auto"
               >
                 {t("common.copyLink")}
               </button>
             </div>
           </div>
-          <div className="flex gap-6 items-center">
+          <div className="flex gap-6 items-center justify-between sm:justify-start">
             <div className="text-center">
               <div className="text-2xl font-bold font-mono text-neon-cyan">{refCount}</div>
               <div className="text-xs text-gray-500">{t("profile.directRefs")}</div>
@@ -339,7 +339,7 @@ export default function ProfilePage() {
             </div>
           </div>
         </div>
-        <div className="mt-4 flex items-center justify-between gap-3 p-3 rounded-xl bg-dark-700/40 border border-dark-500/50">
+        <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 rounded-xl bg-dark-700/40 border border-dark-500/50">
           <div>
             <div className="text-xs text-gray-500">{tr("profile.availableToWithdraw", "Available to withdraw")}</div>
             <div className="text-sm font-mono text-neon-green">{pendingBnb.toFixed(6)} BNB</div>
@@ -347,7 +347,7 @@ export default function ProfilePage() {
           <button
             onClick={handleWithdrawRefEarnings}
             disabled={withdrawing || pendingBnb <= 0}
-            className="px-4 py-2 rounded-lg bg-neon-green/15 border border-neon-green/30 text-neon-green text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-neon-green/25 transition"
+            className="min-h-11 px-4 py-2 rounded-lg bg-neon-green/15 border border-neon-green/30 text-neon-green text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-neon-green/25 transition w-full sm:w-auto"
           >
             {withdrawing
               ? tr("profile.withdrawing", "Withdrawing...")
@@ -360,7 +360,7 @@ export default function ProfilePage() {
       </GlassCard>
 
       {/* Referral Analytics */}
-      <GlassCard hover={false}>
+      <GlassCard hover={false} className="p-4 sm:p-6">
         <h2 className="text-lg font-heading font-bold flex items-center gap-2 mb-4">
           <AppIcon name="chart" className="w-5 h-5 text-neon-cyan" /> {tr("profile.referralAnalytics", "Referral Analytics")}
         </h2>
@@ -419,10 +419,46 @@ export default function ProfilePage() {
             </div>
           </div>
         </div>
+
+        <div className="mt-5 grid lg:grid-cols-3 gap-4">
+          <div className="p-3 rounded-xl bg-dark-700/40 border border-dark-500/50">
+            <h4 className="text-xs text-gray-400 mb-2">{tr("profile.shareBySource", "Registrations by source")}</h4>
+            <div className="space-y-1">
+              {(referralStats?.shareAttribution?.bySource || []).length ? (referralStats.shareAttribution.bySource as any[]).map((row, idx) => (
+                <div key={`${row.key}-${idx}`} className="flex items-center justify-between text-xs">
+                  <span className="text-gray-300">{String(row.key || "").toUpperCase()}</span>
+                  <span className="font-mono text-neon-cyan">{Number(row.count || 0)}</span>
+                </div>
+              )) : <p className="text-xs text-gray-500">{tr("profile.noShareStats", "No share attribution data yet")}</p>}
+            </div>
+          </div>
+          <div className="p-3 rounded-xl bg-dark-700/40 border border-dark-500/50">
+            <h4 className="text-xs text-gray-400 mb-2">{tr("profile.shareByCampaign", "Registrations by campaign")}</h4>
+            <div className="space-y-1">
+              {(referralStats?.shareAttribution?.byCampaign || []).length ? (referralStats.shareAttribution.byCampaign as any[]).map((row, idx) => (
+                <div key={`${row.key}-${idx}`} className="flex items-center justify-between text-xs gap-2">
+                  <span className="text-gray-300 truncate">{String(row.key || "")}</span>
+                  <span className="font-mono text-neon-purple shrink-0">{Number(row.count || 0)}</span>
+                </div>
+              )) : <p className="text-xs text-gray-500">{tr("profile.noShareStats", "No share attribution data yet")}</p>}
+            </div>
+          </div>
+          <div className="p-3 rounded-xl bg-dark-700/40 border border-dark-500/50">
+            <h4 className="text-xs text-gray-400 mb-2">{tr("profile.shareByEvent", "Registrations by event")}</h4>
+            <div className="space-y-1">
+              {(referralStats?.shareAttribution?.byEvent || []).length ? (referralStats.shareAttribution.byEvent as any[]).map((row, idx) => (
+                <div key={`${row.key}-${idx}`} className="flex items-center justify-between text-xs">
+                  <span className="text-gray-300">#{String(row.key || "")}</span>
+                  <span className="font-mono text-neon-gold">{Number(row.count || 0)}</span>
+                </div>
+              )) : <p className="text-xs text-gray-500">{tr("profile.noShareStats", "No share attribution data yet")}</p>}
+            </div>
+          </div>
+        </div>
       </GlassCard>
 
       {/* Social Creatives */}
-      <GlassCard hover={false}>
+      <GlassCard hover={false} className="p-4 sm:p-6">
         <h2 className="text-lg font-heading font-bold flex items-center gap-2 mb-4">
           <AppIcon name="megaphone" className="w-5 h-5 text-neon-cyan" /> {tr("profile.socialCreatives", "Social Media Creatives")}
         </h2>
@@ -443,22 +479,22 @@ export default function ProfilePage() {
                 <p className="mt-3 text-sm text-gray-100 break-words">{preset.text}</p>
                 <p className="mt-2 text-xs text-neon-cyan break-all">{trackedLink}</p>
               </div>
-              <div className="mt-2 flex flex-wrap gap-2 justify-end">
+              <div className="mt-2 flex flex-wrap gap-2 justify-start sm:justify-end">
                 <button
                   onClick={() => copyCreative(fullText)}
-                  className="px-4 py-2 rounded-lg bg-neon-cyan/10 border border-neon-cyan/30 text-neon-cyan text-xs font-bold hover:bg-neon-cyan/20 transition"
+                  className="min-h-10 px-4 py-2 rounded-lg bg-neon-cyan/10 border border-neon-cyan/30 text-neon-cyan text-xs font-bold hover:bg-neon-cyan/20 transition w-full sm:w-auto"
                 >
                   {tr("profile.copyCreative", "Copy Creative")}
                 </button>
                 <button
                   onClick={() => copyCreative(trackedLink)}
-                  className="px-4 py-2 rounded-lg bg-neon-purple/10 border border-neon-purple/30 text-neon-purple text-xs font-bold hover:bg-neon-purple/20 transition"
+                  className="min-h-10 px-4 py-2 rounded-lg bg-neon-purple/10 border border-neon-purple/30 text-neon-purple text-xs font-bold hover:bg-neon-purple/20 transition w-full sm:w-auto"
                 >
                   {tr("profile.copyTrackedLink", "Copy UTM Link")}
                 </button>
                 <button
                   onClick={() => shareCreative(preset.source, preset.text, trackedLink)}
-                  className="px-4 py-2 rounded-lg bg-neon-gold/10 border border-neon-gold/30 text-neon-gold text-xs font-bold hover:bg-neon-gold/20 transition"
+                  className="min-h-10 px-4 py-2 rounded-lg bg-neon-gold/10 border border-neon-gold/30 text-neon-gold text-xs font-bold hover:bg-neon-gold/20 transition w-full sm:w-auto"
                 >
                   {tr("profile.shareNow", "Share Now")}
                 </button>
@@ -470,7 +506,7 @@ export default function ProfilePage() {
       </GlassCard>
 
       {/* Creator Dashboard */}
-      <GlassCard hover={false}>
+      <GlassCard hover={false} className="p-4 sm:p-6">
         <h2 className="text-lg font-heading font-bold flex items-center gap-2 mb-4">
           <AppIcon name="prediction" className="w-5 h-5 text-neon-cyan" /> {tr("profile.creatorDashboard", "Creator Dashboard")}
         </h2>
@@ -511,7 +547,7 @@ export default function ProfilePage() {
           {tr("profile.creatorShare", "Creator share")}:
           <span className="ml-1 text-neon-gold font-mono">{Number(creatorStats?.creatorShareBps || 5000) / 100}%</span>
         </div>
-        <div className="mb-4 flex items-center justify-between gap-3 p-3 rounded-xl bg-dark-700/40 border border-dark-500/50">
+        <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 rounded-xl bg-dark-700/40 border border-dark-500/50">
           <div>
             <div className="text-xs text-gray-500">{tr("profile.creatorAvailableToWithdraw", "Creator rewards available")}</div>
             <div className="text-sm font-mono text-neon-gold">{creatorClaimableBnb.toFixed(6)} BNB</div>
@@ -522,7 +558,7 @@ export default function ProfilePage() {
           <button
             onClick={handleClaimCreatorRewards}
             disabled={creatorClaiming || creatorClaimableBnb <= 0}
-            className="px-4 py-2 rounded-lg bg-neon-gold/15 border border-neon-gold/30 text-neon-gold text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-neon-gold/25 transition"
+            className="min-h-11 px-4 py-2 rounded-lg bg-neon-gold/15 border border-neon-gold/30 text-neon-gold text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-neon-gold/25 transition w-full sm:w-auto"
           >
             {creatorClaiming
               ? tr("profile.creatorWithdrawing", "Withdrawing...")
@@ -533,12 +569,12 @@ export default function ProfilePage() {
           {creatorStats?.latestEvents?.length ? creatorStats.latestEvents.map((evt: any) => {
             const totalVotes = Number(evt.totalVotesYes || 0) + Number(evt.totalVotesNo || 0);
             return (
-              <div key={evt.eventId} className="p-3 rounded-xl bg-dark-700/50 border border-dark-500/50 flex items-center justify-between gap-2">
+              <div key={evt.eventId} className="p-3 rounded-xl bg-dark-700/50 border border-dark-500/50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <div className="min-w-0">
                   <p className="text-sm text-gray-200 truncate">#{evt.eventId} · {evt.title}</p>
                   <p className="text-xs text-gray-500">{evt.category} · {new Date(evt.deadline).toLocaleString()}</p>
                 </div>
-                <div className="text-right shrink-0">
+                <div className="text-left sm:text-right shrink-0">
                   <div className={`text-xs font-bold ${evt.resolved ? "text-neon-purple" : "text-neon-green"}`}>
                     {evt.resolved ? tr("common.resolved", "Resolved") : tr("common.active", "active")}
                   </div>
@@ -553,7 +589,7 @@ export default function ProfilePage() {
       </GlassCard>
 
       {/* Badges */}
-      <GlassCard hover={false}>
+      <GlassCard hover={false} className="p-4 sm:p-6">
         <h2 className="text-lg font-heading font-bold flex items-center gap-2 mb-4">
           <AppIcon name="medal" className="w-5 h-5 text-neon-gold" /> {t("profile.badges")}
         </h2>
@@ -579,7 +615,7 @@ export default function ProfilePage() {
       </GlassCard>
 
       {/* Check-in History */}
-      <GlassCard hover={false}>
+      <GlassCard hover={false} className="p-4 sm:p-6">
         <h2 className="text-lg font-heading font-bold flex items-center gap-2 mb-4">
           <AppIcon name="history" className="w-5 h-5 text-neon-cyan" /> {t("profile.history")}
         </h2>
@@ -590,7 +626,7 @@ export default function ProfilePage() {
             {history.map((item: any, i: number) => (
               <div
                 key={i}
-                className="flex items-center justify-between p-3 rounded-xl bg-dark-700/50 border border-dark-500/50"
+                className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 p-3 rounded-xl bg-dark-700/50 border border-dark-500/50"
               >
                 <div>
                   <span
