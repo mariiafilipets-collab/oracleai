@@ -2,7 +2,7 @@ import User from "../models/User.js";
 import { getContracts } from "./blockchain.service.js";
 
 const leaderboardCache = { data: [], updatedAt: 0 };
-const CACHE_TTL = 10_000;
+const CACHE_TTL = 1_500;
 
 export async function getLeaderboard(limit = 1000) {
   if (Date.now() - leaderboardCache.updatedAt < CACHE_TTL && leaderboardCache.data.length > 0) {

@@ -277,8 +277,8 @@ export default function PredictionsPage() {
     const requestedLang = lang ?? locale;
     try {
       const [activeRes, resolvedRes] = await Promise.all([
-        api.getPredictions(requestedLang),
-        api.getResolvedPredictions(requestedLang),
+        api.getPredictions(requestedLang, address),
+        api.getResolvedPredictions(requestedLang, address),
       ]);
       if (seq !== requestSeqRef.current) return;
       const active = activeRes.success ? activeRes.data || [] : [];
@@ -312,7 +312,7 @@ export default function PredictionsPage() {
       setPredictions(merged);
     } catch {}
     if (seq === requestSeqRef.current) setLoading(false);
-  }, [locale]);
+  }, [locale, address]);
 
   const loadSchedulerStatus = useCallback(async () => {
     try {

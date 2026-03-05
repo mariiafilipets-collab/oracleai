@@ -96,6 +96,44 @@ function getOldPredictionContract() {
   return oldPredictionContract;
 }
 
+async function attachUserVotes(events, address) {
+  const user = String(address || "").toLowerCase();
+  if (!/^0x[a-f0-9]{40}$/.test(user) || !Array.isArray(events) || events.length === 0) {
+    return events;
+  }
+  const { Prediction } = getContracts();
+  if (!Prediction) return events;
+  const oldPrediction = getOldPredictionContract();
+  const CHUNK = 25;
+  const out = [...events];
+  for (let i = 0; i < out.length; i += CHUNK) {
+    const batch = out.slice(i, i + CHUNK);
+    const rows = await Promise.all(
+      batch.map(async (evt) => {
+        try {
+          let uv = await Prediction.getUserVote(BigInt(evt.eventId), user);
+          if (!uv?.voted && oldPrediction) {
+            try {
+              const oldUv = await oldPrediction.getUserVote(BigInt(evt.eventId), user);
+              if (oldUv?.voted) uv = oldUv;
+            } catch {}
+          }
+          return { eventId: Number(evt.eventId), voted: Boolean(uv?.voted), prediction: Boolean(uv?.prediction) };
+        } catch {
+          return { eventId: Number(evt.eventId), voted: false, prediction: false };
+        }
+      })
+    );
+    const byId = new Map(rows.map((r) => [r.eventId, r]));
+    for (let j = i; j < Math.min(i + CHUNK, out.length); j++) {
+      const id = Number(out[j].eventId);
+      const uv = byId.get(id);
+      if (uv?.voted) out[j] = { ...out[j], userPrediction: uv.prediction };
+    }
+  }
+  return out;
+}
+
 // Middleware: translate events if ?lang= is set and not "en"
 async function withTranslation(events, lang) {
   if (!lang || lang === "en" || !events?.length) return events;
@@ -143,6 +181,7 @@ router.get("/", async (req, res) => {
   try {
     let events = await PredictionEvent.find({ resolved: false, deadline: { $gt: new Date() } })
       .sort({ deadline: 1 }).lean();
+    events = await attachUserVotes(events, req.query.address);
     events = await withTranslation(events, req.query.lang);
     res.json({ success: true, data: events });
   } catch (err) {
@@ -175,6 +214,7 @@ router.get("/resolved", async (req, res) => {
     if (!events.length && !includeArchived) {
       events = await PredictionEvent.find({ resolved: true }).sort({ createdAt: -1 }).limit(50).lean();
     }
+    events = await attachUserVotes(events, req.query.address);
     events = await withTranslation(events, req.query.lang);
     res.json({ success: true, data: events });
   } catch (err) {
