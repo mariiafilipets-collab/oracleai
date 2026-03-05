@@ -471,7 +471,8 @@
     },
     "userVoteFeeInfo": "Frais de vote sur evenement utilisateur",
     "creatorGets": "le createur recoit",
-    "creatorPayoutVotesMin": "deblocage du paiement"
+    "creatorPayoutVotesMin": "deblocage du paiement",
+    "alreadyVoted": "Vous avez deja vote sur cet evenement"
   },
   "leaderboard": {
     "title": "Classement Hebdo",

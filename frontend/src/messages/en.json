@@ -471,7 +471,8 @@
       "market": "Market data",
       "newswire": "Newswire",
       "oracle": "Oracle feed"
-    }
+    },
+    "alreadyVoted": "You already voted on this event"
   },
   "leaderboard": {
     "title": "Weekly Leaderboard",

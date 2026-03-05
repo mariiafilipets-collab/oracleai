@@ -471,7 +471,8 @@
     },
     "userVoteFeeInfo": "Comision de voto en evento de usuario",
     "creatorGets": "el creador recibe",
-    "creatorPayoutVotesMin": "desbloqueo de pago"
+    "creatorPayoutVotesMin": "desbloqueo de pago",
+    "alreadyVoted": "Ya votaste en este evento"
   },
   "leaderboard": {
     "title": "Clasificacion Semanal",

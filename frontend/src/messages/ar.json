@@ -471,7 +471,8 @@
     },
     "userVoteFeeInfo": "رسوم التصويت على حدث المستخدم",
     "creatorGets": "حصة المنشئ",
-    "creatorPayoutVotesMin": "فتح الدفعة عند"
+    "creatorPayoutVotesMin": "فتح الدفعة عند",
+    "alreadyVoted": "لقد صوّت بالفعل على هذا الحدث"
   },
   "leaderboard": {
     "title": "ترتيب الأسبوع",

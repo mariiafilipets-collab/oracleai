@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useAccount, useWriteContract, useWaitForTransactionReceipt, useReadContract } from "wagmi";
 import { formatEther, parseEther } from "viem";
 import { motion, AnimatePresence } from "framer-motion";
@@ -388,6 +388,10 @@ export default function PredictionsPage() {
       return;
     }
     const target = predictions.find((p) => Number(p.eventId) === Number(eventId));
+    if (typeof target?.userPrediction === "boolean") {
+      toast.error(tr("predictions.alreadyVoted", "You already voted on this event"));
+      return;
+    }
     const isUserEvent = Boolean(target?.isUserEvent);
     const isOwnUserEvent = Boolean(
       isUserEvent
@@ -534,8 +538,30 @@ export default function PredictionsPage() {
     });
   }, [isConnected, referralCode, buildEventShareLink, tr]);
 
-  const activePredictions = predictions.filter((p) => p._status === "active");
-  const resolvedPredictions = predictions.filter((p) => p._status === "resolved");
+  const votedByEventId = useMemo(() => {
+    const map = new Map<number, any>();
+    for (const row of votedPredictions) {
+      const id = Number(row?.eventId || 0);
+      if (id > 0) map.set(id, row);
+    }
+    return map;
+  }, [votedPredictions]);
+
+  const attachVoteMeta = useCallback((pred: any) => {
+    const vote = votedByEventId.get(Number(pred?.eventId || 0));
+    if (!vote) return pred;
+    return {
+      ...pred,
+      userPrediction: vote.userPrediction,
+      userCorrect: vote.userCorrect,
+      aiWasRight: vote.aiWasRight,
+      beatAi: vote.beatAi,
+      rewardPoints: vote.rewardPoints,
+    };
+  }, [votedByEventId]);
+
+  const activePredictions = predictions.filter((p) => p._status === "active").map(attachVoteMeta);
+  const resolvedPredictions = predictions.filter((p) => p._status === "resolved").map(attachVoteMeta);
   const displayList =
     activeTab === "active"
       ? activePredictions
