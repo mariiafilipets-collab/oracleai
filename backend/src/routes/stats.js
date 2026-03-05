@@ -94,10 +94,11 @@ router.get("/activity", async (req, res) => {
         .limit(limit)
         .lean();
 
+      let seedUsers = [];
       if (users.length === 0) {
         // If `lastCheckIn` is still missing in DB, lazily hydrate a small set from on-chain.
-        const seedUsers = await User.find({ totalCheckIns: { $gt: 0 } })
-          .select("address totalCheckIns streak tier")
+        seedUsers = await User.find({ totalCheckIns: { $gt: 0 } })
+          .select("address totalCheckIns streak tier joinedAt")
           .sort({ totalCheckIns: -1 })
           .limit(Math.min(limit, 50))
           .lean();
@@ -130,16 +131,18 @@ router.get("/activity", async (req, res) => {
         }
       }
 
-      data = users.map((u) => {
+      const fallbackUsers = users.length > 0 ? users : seedUsers;
+      data = fallbackUsers.map((u) => {
         const tier = String(u.tier || "BASIC");
         const defaults = TIER_ACTIVITY_DEFAULTS[tier] || TIER_ACTIVITY_DEFAULTS.BASIC;
+        const timestamp = u.lastCheckIn || u.joinedAt || Date.now();
         return {
           address: String(u.address || "").toLowerCase(),
           amount: defaults.amount,
           tier,
           points: defaults.points,
           streak: Number(u.streak || 0),
-          timestamp: new Date(u.lastCheckIn || Date.now()).getTime(),
+          timestamp: new Date(timestamp).getTime(),
         };
       });
     }
