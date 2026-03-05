@@ -25,7 +25,7 @@ const TIERS = [
 export default function HomePage() {
   const { address, isConnected } = useAccount();
   const { addresses } = useContractAddresses();
-  const { activityFeed, addActivity } = useAppStore();
+  const { activityFeed, addActivity, setActivityFeed } = useAppStore();
   const { t } = useI18n();
   const [selectedTier, setSelectedTier] = useState(0);
   const [predictions, setPredictions] = useState<any[]>([]);
@@ -90,11 +90,29 @@ export default function HomePage() {
       .catch(() => {});
   }, []);
 
+  const refreshActivity = useCallback(() => {
+    api.getActivity(50).then((r) => {
+      if (!r?.success) return;
+      const mapped = (r.data || []).map((x: any) => ({
+        address: String(x.address || "").toLowerCase(),
+        amount: String(x.amount || "0"),
+        tier: String(x.tier || "BASIC"),
+        tierKey: String(x.tier || "BASIC").toLowerCase(),
+        points: Number(x.points || 0),
+        streak: Number(x.streak || 0),
+        timestamp: Number(x.timestamp || Date.now()),
+      }));
+      setActivityFeed(mapped);
+    }).catch(() => {});
+  }, [setActivityFeed]);
+
   useEffect(() => {
     refreshData();
+    refreshActivity();
     const i = setInterval(refreshData, 20000);
-    return () => clearInterval(i);
-  }, [refreshData]);
+    const a = setInterval(refreshActivity, 15000);
+    return () => { clearInterval(i); clearInterval(a); };
+  }, [refreshData, refreshActivity]);
 
   const streak = Number(up?.streak ?? up?.[2] ?? 0);
   const totalPoints = Number(up?.points ?? up?.[0] ?? 0);

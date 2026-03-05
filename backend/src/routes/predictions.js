@@ -3,6 +3,7 @@ import { ethers } from "ethers";
 import PredictionEvent from "../models/PredictionEvent.js";
 import { assessUserEventForListing, generateDailyPredictions } from "../services/ai.service.js";
 import { getContracts, getSigner } from "../services/blockchain.service.js";
+import config from "../config/index.js";
 import { getSchedulerStatus } from "../jobs/prediction-scheduler.js";
 import { pretranslateEvents, translateEvents, translateMissingEvents } from "../services/translate.service.js";
 
@@ -11,6 +12,7 @@ const USER_EVENT_ALLOWED_CATEGORIES = new Set(["SPORTS", "POLITICS", "ECONOMY", 
 const USER_EVENT_ALLOWED_SOURCES = new Set(["official", "market", "newswire", "oracle"]);
 const CATEGORY_INDEX_TO_NAME = ["SPORTS", "POLITICS", "ECONOMY", "CRYPTO", "CLIMATE"];
 const ADDRESS_RE = /^0x[a-f0-9]{40}$/;
+let oldPredictionContract = null;
 
 function normalizeTitle(value) {
   return String(value || "")
@@ -79,6 +81,19 @@ async function getCreatorCooldownState(creatorAddress) {
     creatorShareBps: Number(creatorShareRaw || 5000),
     minCreatorPayoutVotes: Number(minVotesRaw || 20n),
   };
+}
+
+function getOldPredictionContract() {
+  if (oldPredictionContract) return oldPredictionContract;
+  const { Prediction } = getContracts();
+  const provider = Prediction?.runner?.provider;
+  const oldAddr = String(config.oldPredictionAddress || "").toLowerCase();
+  if (!provider || !/^0x[a-f0-9]{40}$/.test(oldAddr)) return null;
+  const abi = [
+    "function getUserVote(uint256 eventId, address user) view returns ((bool voted, bool prediction))",
+  ];
+  oldPredictionContract = new ethers.Contract(oldAddr, abi, provider);
+  return oldPredictionContract;
 }
 
 // Middleware: translate events if ?lang= is set and not "en"
@@ -183,6 +198,7 @@ router.get("/voted/:address", async (req, res) => {
     if (!Prediction) {
       return res.status(503).json({ success: false, error: "Prediction contract unavailable" });
     }
+    const oldPrediction = getOldPredictionContract();
 
     const limit = Math.min(Math.max(parseInt(String(req.query.limit || "300"), 10) || 300, 1), 500);
     const docs = await PredictionEvent.find()
@@ -197,7 +213,13 @@ router.get("/voted/:address", async (req, res) => {
       const results = await Promise.all(
         batch.map(async (evt) => {
           try {
-            const uv = await Prediction.getUserVote(BigInt(evt.eventId), address);
+            let uv = await Prediction.getUserVote(BigInt(evt.eventId), address);
+            if (!uv?.voted && oldPrediction) {
+              try {
+                const oldUv = await oldPrediction.getUserVote(BigInt(evt.eventId), address);
+                if (oldUv?.voted) uv = oldUv;
+              } catch {}
+            }
             if (!uv?.voted) return null;
             const aiPredictedOutcome = Number(evt.aiProbability || 0) >= 50;
             const userPrediction = Boolean(uv.prediction);

@@ -61,6 +61,27 @@ router.get("/contracts", async (req, res) => {
   }
 });
 
+router.get("/activity", async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(parseInt(String(req.query.limit || "50"), 10) || 50, 1), 200);
+    const rows = await CheckInRecord.find()
+      .sort({ timestamp: -1 })
+      .limit(limit)
+      .lean();
+    const data = rows.map((r) => ({
+      address: String(r.address || "").toLowerCase(),
+      amount: String(r.amount || "0"),
+      tier: String(r.tier || "BASIC"),
+      points: Number(r.points || 0),
+      streak: Number(r.streak || 0),
+      timestamp: new Date(r.timestamp || Date.now()).getTime(),
+    }));
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 router.get("/tge-forecast", async (req, res) => {
   try {
     const { Points } = getContracts();

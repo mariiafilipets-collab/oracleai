@@ -34,6 +34,7 @@ async function fetchAPI(path: string, options?: RequestInit) {
 
 export const api = {
   getStats: () => fetchAPI("/api/stats"),
+  getActivity: (limit = 50) => fetchAPI(`/api/stats/activity?limit=${limit}`),
   getTgeForecast: () => fetchAPI("/api/stats/tge-forecast"),
   getContracts: () => fetchAPI("/api/stats/contracts"),
   getPredictions: (lang?: string) => fetchAPI(langParamWithOverride("/api/predictions", lang)),

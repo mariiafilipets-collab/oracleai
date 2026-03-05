@@ -29,6 +29,7 @@ export default {
   openrouterResolveModel: process.env.OPENROUTER_RESOLVE_MODEL || "perplexity/sonar",
   openrouterFallback: process.env.OPENROUTER_FALLBACK_MODEL || "google/gemini-2.0-flash-001",
   deployerKey: process.env.DEPLOYER_PRIVATE_KEY || "",
+  oldPredictionAddress: (process.env.OLD_PREDICTION_ADDRESS || "0x7a6210BD2a3C1233209dC4a2b53BcA267CDE5532").toLowerCase(),
   tgeStartAt: process.env.TGE_START_AT || "TBA",
   tgeAirdropPoolOai: parseFloat(process.env.TGE_AIRDROP_POOL_OAI || "400000000"),
   tgeForecastMinMultiplier: parseFloat(process.env.TGE_FORECAST_MIN_MULTIPLIER || "1.1"),

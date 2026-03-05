@@ -5,6 +5,7 @@ interface AppState {
   setContractAddresses: (addresses: Record<string, string>) => void;
   activityFeed: ActivityItem[];
   addActivity: (item: ActivityItem) => void;
+  setActivityFeed: (items: ActivityItem[]) => void;
 }
 
 export interface ActivityItem {
@@ -21,6 +22,7 @@ export const useAppStore = create<AppState>((set) => ({
   contractAddresses: {},
   setContractAddresses: (addresses) => set({ contractAddresses: addresses }),
   activityFeed: [],
+  setActivityFeed: (items) => set({ activityFeed: items.slice(0, 50) }),
   addActivity: (item) =>
     set((state) => ({
       activityFeed: [item, ...state.activityFeed].slice(0, 50),
