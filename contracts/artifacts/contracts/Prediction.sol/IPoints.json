@@ -1,0 +1,83 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "IPoints",
+  "sourceName": "contracts/Prediction.sol",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "bonus",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bool",
+          "name": "correct",
+          "type": "bool"
+        }
+      ],
+      "name": "addPredictionBonus",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "user",
+          "type": "address"
+        }
+      ],
+      "name": "users",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "points",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "weeklyPoints",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "streak",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "lastCheckIn",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "totalCheckIns",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "correctPredictions",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "totalPredictions",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x",
+  "deployedBytecode": "0x",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

@@ -1,0 +1,26 @@
+<svg width="520" height="170" viewBox="0 0 520 170" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="oaiGrad" x1="70" y1="20" x2="450" y2="150" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#00F0FF"/>
+      <stop offset="1" stop-color="#A855F7"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-40%" width="140%" height="220%">
+      <feGaussianBlur stdDeviation="2.8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <g filter="url(#glow)" stroke="url(#oaiGrad)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M79 72C79 44 99 24 128 24C158 24 179 44 179 72C179 100 158 120 128 120C99 120 79 100 79 72Z"/>
+    <path d="M171 117L227 26H239L295 117"/>
+    <path d="M188 88H278"/>
+    <path d="M308 26V117"/>
+  </g>
+
+  <text x="48" y="154" fill="url(#oaiGrad)" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="42" font-weight="700" letter-spacing="1.1">
+    ORACLEAI PREDICT
+  </text>
+</svg>
