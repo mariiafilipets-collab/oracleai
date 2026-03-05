@@ -61,7 +61,7 @@
     "confirming": "Confirmez dans le wallet...",
     "processing": "Traitement on-chain...",
     "streak": "Serie de {count} jours",
-    "fees": { "prizes": "40% Prix", "treasury": "25% Tresorerie", "referrals": "20% Parrainages", "burn": "10% Burn", "stakers": "5% Stakers" }
+    "fees": { "prizes": "50% Prix", "treasury": "15% Tresorerie", "referrals": "20% Parrainages", "burn": "10% Burn", "stakers": "5% Stakers" }
   },
   "stats": { "totalPoints": "Points Totaux", "weeklyPoints": "Points Hebdo", "streak": "Serie", "prizePool": "Cagnotte", "totalUsers": "Utilisateurs", "totalCheckins": "Check-ins", "yourRank": "Votre Rang" },
   "categories": {
@@ -258,6 +258,18 @@
     "userCreateQualityHint": "Ameliorez la clarte de la question",
     "userCreateSuccess": "Evenement utilisateur cree avec succes",
     "userCreateFailed": "Echec de creation de l'evenement utilisateur",
+    "myVotes": "Mes votes",
+    "noVoted": "Aucun evenement vote pour le moment",
+    "voteToSeeHistory": "Votez sur des evenements pour voir votre historique ici",
+    "aiPick": "Choix IA",
+    "yourVote": "Votre vote",
+    "result": "Resultat",
+    "correct": "Correct",
+    "wrong": "Incorrect",
+    "aiStatus": "IA",
+    "aiWasRight": "a eu raison",
+    "aiWasWrong": "s'est trompee",
+    "reward": "Recompense",
     "source": {
       "official": "Source officielle",
       "market": "Donnees de marche",
@@ -266,7 +278,7 @@
     }
   },
   "leaderboard": { "title": "Classement Hebdo", "subtitle": "Les 100 meilleurs partagent la cagnotte", "rank": "Rang", "address": "Adresse", "tier": "Niveau", "streak": "Serie", "points": "Points", "you": "(Vous)", "noParticipants": "Pas de participants. Soyez le premier!", "weeklyPrizeClaimed": "Prix hebdomadaire reclame", "connectForWeeklyClaim": "Connectez le wallet pour verifier le claim hebdomadaire.", "noClaimableWeeklyPrize": "Aucun prix hebdomadaire reclamable pour votre adresse dans l'epoque actuelle.", "claimableWeeklyReward": "Recompense hebdomadaire reclamable:", "claiming": "Claim en cours...", "alreadyClaimed": "Deja reclame", "claimWeeklyPrize": "Reclamer le prix hebdomadaire" },
-  "profile": { "title": "Votre Profil", "oracleScore": "Score Oracle", "score": "Score", "scoreDesc": "Regularite + Precision + Parrainages", "accuracy": "Precision", "checkins": "Check-ins", "bnbEarned": "BNB Gagne", "referralProgram": "Programme de Parrainage", "sixLevels": "6 niveaux", "yourCode": "Votre Code Parrain", "directRefs": "Refs Directs", "levelRewards": "Par niveau: L1: 10% · L2: 5% · L3: 3% · L4: 2% · L5: 1.5% · L6: 1%", "badges": "Badges", "badgeItems": { "firstCheckin": { "name": "Premier Check-In", "desc": "Realisez votre premier check-in" }, "streak3": { "name": "Serie 3 Jours", "desc": "Maintenir une serie de 3 jours" }, "streak7": { "name": "Guerrier Hebdo", "desc": "Atteindre une serie de 7 jours" }, "predictor": { "name": "Oracle Initiate", "desc": "Faire 5 predictions" }, "accurate": { "name": "Oracle Master", "desc": "Atteindre 90%+ de precision" }, "referrer": { "name": "Batisseur de Reseau", "desc": "Parrainer 5 amis" }, "whale": { "name": "Statut Baleine", "desc": "Faire check-in en niveau Baleine" }, "top10": { "name": "Top 10", "desc": "Entrer dans le top 10 hebdo" } }, "history": "Historique", "noCheckins": "Pas de check-ins", "connectPrompt": "Connectez wallet pour voir votre profil" },
+  "profile": { "title": "Votre Profil", "oracleScore": "Score Oracle", "score": "Score", "scoreDesc": "Regularite + Precision + Parrainages", "accuracy": "Precision", "checkins": "Check-ins", "refEarnings": "Gains de parrainage", "bnbEarned": "BNB Gagne", "referralProgram": "Programme de Parrainage", "sixLevels": "6 niveaux", "yourCode": "Votre Code Parrain", "directRefs": "Refs Directs", "levelRewards": "Par niveau: L1: 10% · L2: 5% · L3: 3% · L4: 2% · L5: 1.5% · L6: 1%", "badges": "Badges", "badgeItems": { "firstCheckin": { "name": "Premier Check-In", "desc": "Realisez votre premier check-in" }, "streak3": { "name": "Serie 3 Jours", "desc": "Maintenir une serie de 3 jours" }, "streak7": { "name": "Guerrier Hebdo", "desc": "Atteindre une serie de 7 jours" }, "predictor": { "name": "Oracle Initiate", "desc": "Faire 5 predictions" }, "accurate": { "name": "Oracle Master", "desc": "Atteindre 90%+ de precision" }, "referrer": { "name": "Batisseur de Reseau", "desc": "Parrainer 5 amis" }, "whale": { "name": "Statut Baleine", "desc": "Faire check-in en niveau Baleine" }, "top10": { "name": "Top 10", "desc": "Entrer dans le top 10 hebdo" } }, "history": "Historique", "noCheckins": "Pas de check-ins", "connectPrompt": "Connectez wallet pour voir votre profil" },
   "staking": { "title": "Staking OAI", "subtitle": "Stakez OAI pour booster points et parrainages", "yourStake": "Votre Stake", "totalStaked": "Total Stake", "pointsBoost": "Boost Points", "referralBoost": "Boost Parrainage", "tierActive": "Niveau {tier} Actif", "noTier": "Pas de niveau — Stakez pour debloquer", "stakeTab": "Staker", "unstakeTab": "Retirer", "amountToStake": "Montant a staker", "amountToUnstake": "Montant a retirer", "balance": "Solde", "staked": "Stake", "cooldown": "Refroidissement (7 jours)", "claimUnstake": "Reclamer retrait", "connectPrompt": "Connectez wallet pour staker", "txConfirmed": "Transaction confirmee!", "tierHint": "Stakez 100+ OAI pour Bronze, 1K pour Argent, 10K pour Or, 100K pour Diamant", "stakeRequired": "Stake Requis", "approving": "Approbation...", "approveOai": "Approuver OAI", "staking": "Staking...", "stakeOai": "Staker OAI", "unstakePending": "Retrait en attente", "cooldownComplete": "Cooldown termine! Vous pouvez retirer.", "cooldownEnds": "Cooldown se termine", "requestUnstake": "Demander retrait (cooldown 7 jours)", "currentBoosts": "{points} boost points, {referral} boost parrainage", "preTgeEtaTba": "Date de lancement: a annoncer", "rangeBronze": "100 - 999", "rangeSilver": "1,000 - 9,999", "rangeGold": "10,000 - 99,999", "rangeDiamond": "100,000+", "lockDays": "{days}j" },
   "guide": {
     "howItWorks": "Comment Ca Marche",

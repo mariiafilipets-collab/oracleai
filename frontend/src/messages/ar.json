@@ -61,7 +61,7 @@
     "confirming": "أكد في المحفظة...",
     "processing": "جار المعالجة...",
     "streak": "سلسلة {count} يوم",
-    "fees": { "prizes": "40% جوائز", "treasury": "25% خزينة", "referrals": "20% إحالات", "burn": "10% حرق", "stakers": "5% مخزنين" }
+    "fees": { "prizes": "50% جوائز", "treasury": "15% خزينة", "referrals": "20% إحالات", "burn": "10% حرق", "stakers": "5% مخزنين" }
   },
   "stats": { "totalPoints": "إجمالي النقاط", "weeklyPoints": "نقاط الأسبوع", "streak": "السلسلة", "prizePool": "مجمع الجوائز", "totalUsers": "المستخدمون", "totalCheckins": "التسجيلات", "yourRank": "ترتيبك" },
   "categories": {
@@ -258,6 +258,18 @@
     "userCreateQualityHint": "حسّن وضوح صياغة السؤال",
     "userCreateSuccess": "تم إنشاء حدث المستخدم بنجاح",
     "userCreateFailed": "فشل إنشاء حدث المستخدم",
+    "myVotes": "تصويتاتي",
+    "noVoted": "لا توجد أحداث قمت بالتصويت عليها بعد",
+    "voteToSeeHistory": "صوّت على الأحداث لعرض سجلك الشخصي هنا",
+    "aiPick": "اختيار الذكاء الاصطناعي",
+    "yourVote": "تصويتك",
+    "result": "النتيجة",
+    "correct": "صحيح",
+    "wrong": "خاطئ",
+    "aiStatus": "الذكاء الاصطناعي",
+    "aiWasRight": "كان محقا",
+    "aiWasWrong": "كان مخطئا",
+    "reward": "المكافأة",
     "source": {
       "official": "مصدر رسمي",
       "market": "بيانات السوق",
@@ -266,7 +278,7 @@
     }
   },
   "leaderboard": { "title": "ترتيب الأسبوع", "subtitle": "أفضل 100 يتقاسمون مجمع الجوائز", "rank": "الترتيب", "address": "العنوان", "tier": "المستوى", "streak": "السلسلة", "points": "النقاط", "you": "(أنت)", "noParticipants": "لا مشاركين بعد. كن الأول!", "weeklyPrizeClaimed": "تمت مطالبة جائزة الأسبوع", "connectForWeeklyClaim": "اربط المحفظة للتحقق من مطالبة الأسبوع.", "noClaimableWeeklyPrize": "لا توجد جائزة أسبوعية قابلة للمطالبة لهذا العنوان في الحقبة الحالية.", "claimableWeeklyReward": "مكافأة أسبوعية قابلة للمطالبة:", "claiming": "جار المطالبة...", "alreadyClaimed": "تمت المطالبة مسبقا", "claimWeeklyPrize": "مطالبة جائزة الأسبوع" },
-  "profile": { "title": "ملفك الشخصي", "oracleScore": "نتيجة Oracle", "score": "النتيجة", "scoreDesc": "الانتظام + الدقة + الإحالات", "accuracy": "الدقة", "checkins": "التسجيلات", "bnbEarned": "BNB المكتسب", "referralProgram": "برنامج الإحالة", "sixLevels": "6 مستويات", "yourCode": "رمز الإحالة", "directRefs": "إحالات مباشرة", "levelRewards": "حسب المستوى: L1: 10% · L2: 5% · L3: 3% · L4: 2% · L5: 1.5% · L6: 1%", "badges": "الشارات", "badgeItems": { "firstCheckin": { "name": "اول تسجيل", "desc": "اكمل اول تسجيل يومي لك" }, "streak3": { "name": "سلسلة 3 ايام", "desc": "حافظ على سلسلة 3 ايام" }, "streak7": { "name": "محارب الاسبوع", "desc": "حقق سلسلة 7 ايام" }, "predictor": { "name": "مبتدئ Oracle", "desc": "قم بـ 5 توقعات" }, "accurate": { "name": "خبير Oracle", "desc": "حقق دقة 90%+" }, "referrer": { "name": "باني الشبكة", "desc": "احل 5 اصدقاء" }, "whale": { "name": "حالة الحوت", "desc": "سجل بمستوى الحوت" }, "top10": { "name": "افضل 10", "desc": "ادخل افضل 10 اسبوعيا" } }, "history": "السجل", "noCheckins": "لا تسجيلات بعد", "connectPrompt": "اربط محفظتك لعرض ملفك" },
+  "profile": { "title": "ملفك الشخصي", "oracleScore": "نتيجة Oracle", "score": "النتيجة", "scoreDesc": "الانتظام + الدقة + الإحالات", "accuracy": "الدقة", "checkins": "التسجيلات", "refEarnings": "ارباح الاحالة", "bnbEarned": "BNB المكتسب", "referralProgram": "برنامج الإحالة", "sixLevels": "6 مستويات", "yourCode": "رمز الإحالة", "directRefs": "إحالات مباشرة", "levelRewards": "حسب المستوى: L1: 10% · L2: 5% · L3: 3% · L4: 2% · L5: 1.5% · L6: 1%", "badges": "الشارات", "badgeItems": { "firstCheckin": { "name": "اول تسجيل", "desc": "اكمل اول تسجيل يومي لك" }, "streak3": { "name": "سلسلة 3 ايام", "desc": "حافظ على سلسلة 3 ايام" }, "streak7": { "name": "محارب الاسبوع", "desc": "حقق سلسلة 7 ايام" }, "predictor": { "name": "مبتدئ Oracle", "desc": "قم بـ 5 توقعات" }, "accurate": { "name": "خبير Oracle", "desc": "حقق دقة 90%+" }, "referrer": { "name": "باني الشبكة", "desc": "احل 5 اصدقاء" }, "whale": { "name": "حالة الحوت", "desc": "سجل بمستوى الحوت" }, "top10": { "name": "افضل 10", "desc": "ادخل افضل 10 اسبوعيا" } }, "history": "السجل", "noCheckins": "لا تسجيلات بعد", "connectPrompt": "اربط محفظتك لعرض ملفك" },
   "staking": { "title": "تخزين OAI", "subtitle": "خزّن OAI لتعزيز النقاط والإحالات", "yourStake": "تخزينك", "totalStaked": "إجمالي المخزن", "pointsBoost": "تعزيز النقاط", "referralBoost": "تعزيز الإحالات", "tierActive": "مستوى {tier} نشط", "noTier": "بدون مستوى — خزّن للفتح", "stakeTab": "تخزين", "unstakeTab": "سحب", "amountToStake": "المبلغ للتخزين", "amountToUnstake": "المبلغ للسحب", "balance": "الرصيد", "staked": "مخزّن", "cooldown": "فترة انتظار (7 أيام)", "claimUnstake": "استلام السحب", "connectPrompt": "اربط المحفظة للتخزين", "txConfirmed": "تم تاكيد المعاملة!", "tierHint": "خزن 100+ OAI لبرونزي، 1K لفضي، 10K لذهبي، 100K لماسي", "stakeRequired": "الكمية المطلوبة للتخزين", "approving": "جار الموافقة...", "approveOai": "الموافقة على OAI", "staking": "جار التخزين...", "stakeOai": "خزن OAI", "unstakePending": "سحب قيد الانتظار", "cooldownComplete": "اكتمل الانتظار! يمكنك السحب الان.", "cooldownEnds": "ينتهي الانتظار", "requestUnstake": "طلب سحب (انتظار 7 ايام)", "currentBoosts": "تعزيز النقاط {points} وتعزيز الاحالة {referral}", "preTgeEtaTba": "تاريخ الإطلاق: سيتم الإعلان", "rangeBronze": "100 - 999", "rangeSilver": "1,000 - 9,999", "rangeGold": "10,000 - 99,999", "rangeDiamond": "100,000+", "lockDays": "{days}ي" },
   "guide": {
     "howItWorks": "كيف يعمل",

@@ -263,7 +263,7 @@ export default function ProfilePage() {
             { label: t("profile.checkins"), value: totalCheckIns.toString(), icon: "check", color: "text-neon-green" },
             { label: t("profile.accuracy"), value: `${accuracy}%`, icon: "target", color: "text-neon-purple" },
             {
-              label: "Ref Earnings",
+              label: tr("profile.refEarnings", "Ref Earnings"),
               value: refEarnings ? `${parseFloat(formatEther(refEarnings)).toFixed(4)} BNB` : "0 BNB",
               icon: "pool",
               color: "text-neon-gold",
@@ -556,7 +556,7 @@ export default function ProfilePage() {
                   <span className="text-sm text-gray-300">{item.amount} BNB</span>
                 </div>
                 <div className="text-right">
-                  <span className="text-sm font-mono text-neon-green">+{item.points} pts</span>
+                  <span className="text-sm font-mono text-neon-green">+{item.points} {t("common.pts")}</span>
                   <span className="text-xs text-gray-500 ml-2">
                     <AppIcon name="streak" className="w-3.5 h-3.5 inline text-neon-gold" />{item.streak}
                   </span>

@@ -61,7 +61,7 @@
     "confirming": "Confirma en tu wallet...",
     "processing": "Procesando en cadena...",
     "streak": "Racha de {count} dias",
-    "fees": { "prizes": "40% Premios", "treasury": "25% Tesoreria", "referrals": "20% Referidos", "burn": "10% Quema", "stakers": "5% Stakers" }
+    "fees": { "prizes": "50% Premios", "treasury": "15% Tesoreria", "referrals": "20% Referidos", "burn": "10% Quema", "stakers": "5% Stakers" }
   },
   "stats": { "totalPoints": "Puntos Totales", "weeklyPoints": "Puntos Semanales", "streak": "Racha", "prizePool": "Fondo de Premios", "totalUsers": "Usuarios", "totalCheckins": "Check-ins", "yourRank": "Tu Rango" },
   "categories": {
@@ -258,6 +258,18 @@
     "userCreateQualityHint": "Mejora la claridad de la pregunta",
     "userCreateSuccess": "Evento de usuario creado con exito",
     "userCreateFailed": "No se pudo crear el evento de usuario",
+    "myVotes": "Mis votos",
+    "noVoted": "Aun no hay eventos votados",
+    "voteToSeeHistory": "Vota en eventos para ver aqui tu historial personal",
+    "aiPick": "Eleccion de IA",
+    "yourVote": "Tu voto",
+    "result": "Resultado",
+    "correct": "Correcto",
+    "wrong": "Incorrecto",
+    "aiStatus": "IA",
+    "aiWasRight": "acerto",
+    "aiWasWrong": "fallo",
+    "reward": "Recompensa",
     "source": {
       "official": "Fuente oficial",
       "market": "Datos de mercado",
@@ -266,7 +278,7 @@
     }
   },
   "leaderboard": { "title": "Clasificacion Semanal", "subtitle": "Los 100 mejores comparten el fondo semanal", "rank": "Rango", "address": "Direccion", "tier": "Nivel", "streak": "Racha", "points": "Puntos", "you": "(Tu)", "noParticipants": "Sin participantes. Se el primero!", "weeklyPrizeClaimed": "Premio semanal reclamado", "connectForWeeklyClaim": "Conecta wallet para verificar el reclamo semanal.", "noClaimableWeeklyPrize": "No hay premio semanal reclamable para tu direccion en la epoca actual.", "claimableWeeklyReward": "Recompensa semanal reclamable:", "claiming": "Reclamando...", "alreadyClaimed": "Ya reclamado", "claimWeeklyPrize": "Reclamar premio semanal" },
-  "profile": { "title": "Tu Perfil", "oracleScore": "Puntuacion Oracle", "score": "Score", "scoreDesc": "Consistencia + Precision + Referidos", "accuracy": "Precision", "checkins": "Check-ins", "bnbEarned": "BNB Ganado", "referralProgram": "Programa de Referidos", "sixLevels": "6 niveles", "yourCode": "Tu Codigo de Referido", "directRefs": "Refs Directos", "levelRewards": "Por nivel: L1: 10% · L2: 5% · L3: 3% · L4: 2% · L5: 1.5% · L6: 1%", "badges": "Logros", "badgeItems": { "firstCheckin": { "name": "Primer Check-In", "desc": "Completa tu primer check-in" }, "streak3": { "name": "Racha de 3 Dias", "desc": "Mantener una racha de 3 dias" }, "streak7": { "name": "Guerrero Semanal", "desc": "Alcanzar racha de 7 dias" }, "predictor": { "name": "Iniciado Oracle", "desc": "Hacer 5 predicciones" }, "accurate": { "name": "Maestro Oracle", "desc": "Alcanzar 90%+ de precision" }, "referrer": { "name": "Constructor de Red", "desc": "Referir 5 amigos" }, "whale": { "name": "Estado Ballena", "desc": "Hacer check-in como Ballena" }, "top10": { "name": "Top 10", "desc": "Entrar al top 10 semanal" } }, "history": "Historial", "noCheckins": "Sin check-ins aun", "connectPrompt": "Conecta tu wallet para ver tu perfil" },
+  "profile": { "title": "Tu Perfil", "oracleScore": "Puntuacion Oracle", "score": "Score", "scoreDesc": "Consistencia + Precision + Referidos", "accuracy": "Precision", "checkins": "Check-ins", "refEarnings": "Ganancias por referidos", "bnbEarned": "BNB Ganado", "referralProgram": "Programa de Referidos", "sixLevels": "6 niveles", "yourCode": "Tu Codigo de Referido", "directRefs": "Refs Directos", "levelRewards": "Por nivel: L1: 10% · L2: 5% · L3: 3% · L4: 2% · L5: 1.5% · L6: 1%", "badges": "Logros", "badgeItems": { "firstCheckin": { "name": "Primer Check-In", "desc": "Completa tu primer check-in" }, "streak3": { "name": "Racha de 3 Dias", "desc": "Mantener una racha de 3 dias" }, "streak7": { "name": "Guerrero Semanal", "desc": "Alcanzar racha de 7 dias" }, "predictor": { "name": "Iniciado Oracle", "desc": "Hacer 5 predicciones" }, "accurate": { "name": "Maestro Oracle", "desc": "Alcanzar 90%+ de precision" }, "referrer": { "name": "Constructor de Red", "desc": "Referir 5 amigos" }, "whale": { "name": "Estado Ballena", "desc": "Hacer check-in como Ballena" }, "top10": { "name": "Top 10", "desc": "Entrar al top 10 semanal" } }, "history": "Historial", "noCheckins": "Sin check-ins aun", "connectPrompt": "Conecta tu wallet para ver tu perfil" },
   "staking": { "title": "Staking OAI", "subtitle": "Haz stake de OAI para impulsar puntos y referidos", "yourStake": "Tu Stake", "totalStaked": "Total Stakeado", "pointsBoost": "Boost Puntos", "referralBoost": "Boost Referidos", "tierActive": "Nivel {tier} Activo", "noTier": "Sin nivel — Haz stake para desbloquear", "stakeTab": "Stake", "unstakeTab": "Retirar", "amountToStake": "Cantidad a stakear", "amountToUnstake": "Cantidad a retirar", "balance": "Balance", "staked": "Stakeado", "cooldown": "Enfriamiento (7 dias)", "claimUnstake": "Reclamar retiro", "connectPrompt": "Conecta wallet para staking", "txConfirmed": "Transaccion confirmada!", "tierHint": "Haz stake de 100+ OAI para Bronce, 1K para Plata, 10K para Oro, 100K para Diamante", "stakeRequired": "Stake Requerido", "approving": "Aprobando...", "approveOai": "Aprobar OAI", "staking": "Stakeando...", "stakeOai": "Stakear OAI", "unstakePending": "Retiro pendiente", "cooldownComplete": "Cooldown completo! Ya puedes retirar.", "cooldownEnds": "Cooldown termina", "requestUnstake": "Solicitar retiro (7 dias de cooldown)", "currentBoosts": "{points} boost de puntos, {referral} boost de referidos", "preTgeEtaTba": "Fecha de lanzamiento: por anunciar", "rangeBronze": "100 - 999", "rangeSilver": "1,000 - 9,999", "rangeGold": "10,000 - 99,999", "rangeDiamond": "100,000+", "lockDays": "{days}d" },
   "guide": {
     "howItWorks": "Como Funciona",
