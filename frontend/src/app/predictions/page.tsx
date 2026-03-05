@@ -98,8 +98,10 @@ export default function PredictionsPage() {
   const [schedulerInfo, setSchedulerInfo] = useState<any>(null);
   const [votedPredictions, setVotedPredictions] = useState<any[]>([]);
   const [referralCode, setReferralCode] = useState("");
+  const [lastSubmittedVote, setLastSubmittedVote] = useState<{ eventId: number; prediction: boolean } | null>(null);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
   const requestSeqRef = useRef(0);
+  const predictionsRef = useRef<any[]>([]);
 
   const { t, locale } = useI18n();
   const tr = useCallback((key: string, fallback: string) => {
@@ -281,10 +283,33 @@ export default function PredictionsPage() {
       if (seq !== requestSeqRef.current) return;
       const active = activeRes.success ? activeRes.data || [] : [];
       const resolved = resolvedRes.success ? resolvedRes.data || [] : [];
-      setPredictions([
+      const next = [
         ...active.map((p: any) => ({ ...p, _status: "active" })),
         ...resolved.map((p: any) => ({ ...p, _status: "resolved" })),
-      ]);
+      ];
+      // Preserve local vote state until backend poll/index catches up.
+      const localById = new Map(predictionsRef.current.map((p) => [Number(p.eventId), p]));
+      const merged = next.map((row) => {
+        const local = localById.get(Number(row.eventId));
+        if (!local) return row;
+        const withLocalVote =
+          typeof local.userPrediction === "boolean"
+            ? {
+                ...row,
+                userPrediction: local.userPrediction,
+                userCorrect: local.userCorrect,
+                aiWasRight: local.aiWasRight,
+                beatAi: local.beatAi,
+                rewardPoints: local.rewardPoints,
+              }
+            : row;
+        return {
+          ...withLocalVote,
+          totalVotesYes: Math.max(Number(withLocalVote.totalVotesYes || 0), Number(local.totalVotesYes || 0)),
+          totalVotesNo: Math.max(Number(withLocalVote.totalVotesNo || 0), Number(local.totalVotesNo || 0)),
+        };
+      });
+      setPredictions(merged);
     } catch {}
     if (seq === requestSeqRef.current) setLoading(false);
   }, [locale]);
@@ -324,6 +349,10 @@ export default function PredictionsPage() {
   }, [loadPredictions, loadSchedulerStatus, loadVotedPredictions, locale, address]);
 
   useEffect(() => {
+    predictionsRef.current = predictions;
+  }, [predictions]);
+
+  useEffect(() => {
     if (!address) {
       setReferralCode("");
       return;
@@ -339,9 +368,34 @@ export default function PredictionsPage() {
     if (isVoteSuccess && voteHash && voteHandledRef.current !== voteHash) {
       voteHandledRef.current = voteHash;
       toast.success(t("predictions.submitted"));
+      if (lastSubmittedVote) {
+        const { eventId, prediction } = lastSubmittedVote;
+        setPredictions((prev) =>
+          prev.map((p) => {
+            if (Number(p.eventId) !== Number(eventId)) return p;
+            if (typeof p.userPrediction === "boolean") return p;
+            return {
+              ...p,
+              userPrediction: prediction,
+              totalVotesYes: Number(p.totalVotesYes || 0) + (prediction ? 1 : 0),
+              totalVotesNo: Number(p.totalVotesNo || 0) + (!prediction ? 1 : 0),
+            };
+          })
+        );
+        setVotedPredictions((prev) => {
+          const exists = prev.some((p) => Number(p.eventId) === Number(eventId));
+          if (exists) return prev;
+          const src = predictionsRef.current.find((p) => Number(p.eventId) === Number(eventId));
+          if (!src) return prev;
+          return [{ ...src, userPrediction: prediction }, ...prev];
+        });
+      }
+      if (address) {
+        void loadVotedPredictions(address);
+      }
       loadPredictions();
     }
-  }, [isVoteSuccess, voteHash, loadPredictions, t]);
+  }, [isVoteSuccess, voteHash, loadPredictions, loadVotedPredictions, t, lastSubmittedVote, address]);
 
   useEffect(() => {
     if (!isCheckInSuccess || !checkInHash || checkInHandledRef.current === checkInHash) return;
@@ -355,6 +409,7 @@ export default function PredictionsPage() {
         functionName: "submitPrediction",
         args: [BigInt(pendingVote.eventId), pendingVote.prediction],
       });
+      setLastSubmittedVote({ eventId: pendingVote.eventId, prediction: pendingVote.prediction });
       setPendingVote(null);
     }
   }, [isCheckInSuccess, checkInHash, pendingVote, predictionAddress, tr, writeVote]);
@@ -409,6 +464,7 @@ export default function PredictionsPage() {
       args: [BigInt(eventId), prediction],
       value: isUserEvent && hasCreatorEconomy ? userEventVoteFeeWei : undefined,
     });
+    setLastSubmittedVote({ eventId, prediction });
   };
 
   const handleCheckInFromModal = () => {
