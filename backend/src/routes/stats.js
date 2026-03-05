@@ -9,11 +9,18 @@ const router = Router();
 
 router.get("/", async (req, res) => {
   try {
-    const [totalUsers, totalPredictions, totalCheckIns] = await Promise.all([
+    const [totalUsers, totalPredictions, totalCheckInsRecords] = await Promise.all([
       User.countDocuments(),
       PredictionEvent.countDocuments(),
       CheckInRecord.countDocuments(),
     ]);
+
+    let totalCheckIns = totalCheckInsRecords;
+    if (totalCheckIns === 0) {
+      // Fallback for cases when event log indexing lags but on-chain user points are already synced.
+      const agg = await User.aggregate([{ $group: { _id: null, total: { $sum: "$totalCheckIns" } } }]);
+      totalCheckIns = Number(agg?.[0]?.total || 0);
+    }
 
     let prizePoolBalance = "0";
     let totalFeesCollected = "0";

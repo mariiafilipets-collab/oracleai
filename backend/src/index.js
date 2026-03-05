@@ -124,6 +124,58 @@ const isRateLimitError = (err) => {
   return msg.includes("rate limit") || msg.includes("too many requests") || msg.includes("-32005");
 };
 
+async function syncUsersFromOnChainSnapshot() {
+  const { Points, CheckIn } = getContracts();
+  if (!Points) {
+    console.warn("[Sync] Points contract unavailable; skipping on-chain user sync.");
+    return;
+  }
+
+  const users = await User.find({}).select("address").lean();
+  if (!users.length) return;
+
+  let updated = 0;
+  for (const u of users) {
+    const address = String(u.address || "").toLowerCase();
+    if (!address) continue;
+    try {
+      const pts = await Points.getUserPoints(address);
+      const totalPoints = Number(pts.points ?? pts[0] ?? 0);
+      const weeklyPoints = Number(pts.weeklyPoints ?? pts[1] ?? 0);
+      const streak = Number(pts.streak ?? pts[2] ?? 0);
+      const totalCheckIns = Number(pts.totalCheckIns ?? pts[4] ?? 0);
+
+      let tier = undefined;
+      if (CheckIn) {
+        try {
+          const rec = await CheckIn.getRecord(address);
+          tier = ["BASIC", "PRO", "WHALE"][Number(rec.lastTier ?? 0)] || "BASIC";
+        } catch {}
+      }
+
+      const update = {
+        totalPoints,
+        weeklyPoints,
+        streak,
+        totalCheckIns,
+      };
+      if (tier) update.tier = tier;
+
+      await User.findOneAndUpdate({ address }, { $set: update }, { upsert: true });
+      updated += 1;
+      // Small delay to avoid RPC bursts on shared public endpoints.
+      await sleep(80);
+    } catch (err) {
+      console.warn(`[Sync] Failed to refresh user ${address}:`, err?.message || err);
+    }
+  }
+
+  if (updated > 0) {
+    invalidateCache();
+    console.log(`[Sync] Refreshed ${updated} users from on-chain points snapshot.`);
+  }
+}
+
 async function setupEventListeners() {
   if (!config.enableEventPolling) {
     console.log("[Events] Polling disabled by config.");
@@ -281,6 +333,7 @@ async function start() {
   await connectMongo();
 
   await initBlockchain();
+  await syncUsersFromOnChainSnapshot();
   await setupEventListeners();
 
   // Auto-scheduler: generates predictions + resolves expired ones automatically
