@@ -11,5 +11,6 @@ const checkInRecordSchema = new mongoose.Schema({
 });
 
 checkInRecordSchema.index({ address: 1, timestamp: -1 });
+checkInRecordSchema.index({ txHash: 1 }, { unique: true, sparse: true });
 
 export default mongoose.model("CheckInRecord", checkInRecordSchema);

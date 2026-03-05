@@ -17,6 +17,7 @@ export default {
     : true,
   eventPollIntervalMs: parseInt(process.env.EVENT_POLL_INTERVAL_MS || (isBscTestnet ? "15000" : "3000")),
   eventMaxBlockRange: parseInt(process.env.EVENT_MAX_BLOCK_RANGE || (isBscTestnet ? "20" : "250")),
+  eventBackfillBlocks: parseInt(process.env.EVENT_BACKFILL_BLOCKS || (isBscTestnet ? "5000" : "0")),
   mongoUri: process.env.MONGODB_URI || "",
   aiProvider: process.env.AI_PROVIDER || "mock",
   openrouterKey: process.env.OPENROUTER_API_KEY || "",

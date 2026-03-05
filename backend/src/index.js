@@ -134,23 +134,17 @@ async function setupEventListeners() {
     return;
   }
 
-  let lastProcessedBlock = await provider.getBlockNumber();
-
-  const pollEvents = async () => {
+  const processRange = async (fromBlock, toBlock) => {
+    if (toBlock < fromBlock) return;
     try {
-      const latestBlock = await provider.getBlockNumber();
-      if (latestBlock < lastProcessedBlock) {
-        // Chain likely reset (Hardhat restart); restart cursor safely.
-        lastProcessedBlock = latestBlock;
-        return;
-      }
-      if (latestBlock === lastProcessedBlock) return;
-
-      const fromBlock = lastProcessedBlock + 1;
-      const toBlock = Math.min(latestBlock, lastProcessedBlock + Math.max(1, config.eventMaxBlockRange));
-
       const checkInLogs = await checkIn.queryFilter(checkIn.filters.CheckedIn(), fromBlock, toBlock);
       for (const log of checkInLogs) {
+        const txHash = log.transactionHash || "";
+        if (txHash) {
+          const alreadyIndexed = await CheckInRecord.exists({ txHash });
+          if (alreadyIndexed) continue;
+        }
+
         const args = log.args || [];
         const user = (args.user ?? args[0])?.toLowerCase?.();
         const amount = args.amount ?? args[1] ?? 0n;
@@ -178,7 +172,7 @@ async function setupEventListeners() {
           tier: tierName,
           points,
           streak,
-          txHash: log.transactionHash || "",
+          txHash,
         });
 
         invalidateCache();
@@ -207,6 +201,37 @@ async function setupEventListeners() {
         }
       }
 
+    } catch (err) {
+      console.error("[Events] Poll error:", err?.message || err);
+    }
+  };
+
+  let lastProcessedBlock = await provider.getBlockNumber();
+  const backfillBlocks = Math.max(0, Number(config.eventBackfillBlocks || 0));
+  if (backfillBlocks > 0) {
+    const fromBlock = Math.max(0, lastProcessedBlock - backfillBlocks);
+    console.log(`[Events] Backfill enabled: scanning blocks ${fromBlock}..${lastProcessedBlock}`);
+    const step = Math.max(1, config.eventMaxBlockRange);
+    for (let cursor = fromBlock; cursor <= lastProcessedBlock; cursor += step) {
+      const toBlock = Math.min(lastProcessedBlock, cursor + step - 1);
+      await processRange(cursor, toBlock);
+    }
+    console.log("[Events] Backfill completed.");
+  }
+
+  const pollEvents = async () => {
+    try {
+      const latestBlock = await provider.getBlockNumber();
+      if (latestBlock < lastProcessedBlock) {
+        // Chain likely reset (Hardhat restart); restart cursor safely.
+        lastProcessedBlock = latestBlock;
+        return;
+      }
+      if (latestBlock === lastProcessedBlock) return;
+
+      const fromBlock = lastProcessedBlock + 1;
+      const toBlock = Math.min(latestBlock, lastProcessedBlock + Math.max(1, config.eventMaxBlockRange));
+      await processRange(fromBlock, toBlock);
       lastProcessedBlock = toBlock;
     } catch (err) {
       console.error("[Events] Poll error:", err?.message || err);
