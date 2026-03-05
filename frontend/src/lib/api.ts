@@ -47,6 +47,7 @@ export const api = {
     category: string;
     deadlineMs: number;
     sourcePolicy: string;
+    creator?: string;
   }) =>
     fetchAPI("/api/predictions/user/validate", {
       method: "POST",

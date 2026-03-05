@@ -1,6 +1,6 @@
 import { Router } from "express";
 import PredictionEvent from "../models/PredictionEvent.js";
-import { generateDailyPredictions } from "../services/ai.service.js";
+import { assessUserEventForListing, generateDailyPredictions } from "../services/ai.service.js";
 import { getContracts, getSigner } from "../services/blockchain.service.js";
 import { getSchedulerStatus } from "../jobs/prediction-scheduler.js";
 import { pretranslateEvents, translateEvents, translateMissingEvents } from "../services/translate.service.js";
@@ -9,12 +9,36 @@ const router = Router();
 const USER_EVENT_ALLOWED_CATEGORIES = new Set(["SPORTS", "POLITICS", "ECONOMY", "CRYPTO", "CLIMATE"]);
 const USER_EVENT_ALLOWED_SOURCES = new Set(["official", "market", "newswire", "oracle"]);
 const CATEGORY_INDEX_TO_NAME = ["SPORTS", "POLITICS", "ECONOMY", "CRYPTO", "CLIMATE"];
+const ADDRESS_RE = /^0x[a-f0-9]{40}$/;
 
 function normalizeTitle(value) {
   return String(value || "")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
+}
+
+async function getCreatorCooldownState(creatorAddress) {
+  const creator = String(creatorAddress || "").toLowerCase();
+  if (!ADDRESS_RE.test(creator)) {
+    return { hasWallet: false, nextAllowedAt: 0, secondsLeft: 0, cooldownSeconds: 0 };
+  }
+  const { Prediction } = getContracts();
+  if (!Prediction) {
+    return { hasWallet: true, nextAllowedAt: 0, secondsLeft: 0, cooldownSeconds: 0 };
+  }
+  const [nextAllowedRaw, cooldownRaw] = await Promise.all([
+    Prediction.nextUserEventAt(creator),
+    Prediction.getCreatorCooldown(creator),
+  ]);
+  const nowSec = Math.floor(Date.now() / 1000);
+  const nextAllowedAt = Number(nextAllowedRaw || 0n);
+  return {
+    hasWallet: true,
+    nextAllowedAt,
+    secondsLeft: Math.max(0, nextAllowedAt - nowSec),
+    cooldownSeconds: Number(cooldownRaw || 0n),
+  };
 }
 
 // Middleware: translate events if ?lang= is set and not "en"
@@ -181,6 +205,7 @@ router.post("/user/validate", async (req, res) => {
     const category = String(req.body?.category || "").toUpperCase();
     const sourcePolicy = String(req.body?.sourcePolicy || "").toLowerCase();
     const deadlineMs = Number(req.body?.deadlineMs || 0);
+    const creator = String(req.body?.creator || "").toLowerCase();
 
     if (title.length < 12 || title.length > 180) {
       return res.status(400).json({ success: false, error: "Title must be 12-180 characters" });
@@ -202,6 +227,19 @@ router.post("/user/validate", async (req, res) => {
       return res.status(400).json({ success: false, error: "Deadline must be in 10m..14d range" });
     }
 
+    const cooldown = await getCreatorCooldownState(creator);
+    if (cooldown.hasWallet && cooldown.secondsLeft > 0) {
+      return res.status(429).json({
+        success: false,
+        error: "Cooldown active",
+        data: {
+          nextAllowedAt: cooldown.nextAllowedAt,
+          secondsLeft: cooldown.secondsLeft,
+          cooldownSeconds: cooldown.cooldownSeconds,
+        },
+      });
+    }
+
     const normalized = normalizeTitle(title);
     const recent = await PredictionEvent.find({
       resolved: false,
@@ -219,12 +257,36 @@ router.post("/user/validate", async (req, res) => {
     if (!title.endsWith("?")) qualityWarnings.push("Question should end with '?' for clarity.");
     if (!/\b(will|is|does|can|won't|will not)\b/i.test(title)) qualityWarnings.push("Use clear binary wording.");
 
+    const aiAssessment = await assessUserEventForListing({
+      title,
+      category,
+      deadlineMs,
+      sourcePolicy,
+    });
+    if (!aiAssessment.accepted) {
+      return res.status(400).json({
+        success: false,
+        error: aiAssessment.reason || "AI validation rejected this event",
+        data: {
+          aiAccepted: false,
+          sourceLanguage: aiAssessment.sourceLanguage || "unknown",
+        },
+      });
+    }
+
     return res.json({
       success: true,
       data: {
         normalizedTitle: normalized,
         accepted: true,
         qualityWarnings,
+        aiAccepted: true,
+        aiProbability: aiAssessment.aiProbability,
+        aiReason: aiAssessment.reason,
+        sourceLanguage: aiAssessment.sourceLanguage,
+        normalizedTitleAi: aiAssessment.normalizedTitle,
+        normalizedDescriptionAi: aiAssessment.normalizedDescription,
+        cooldown,
       },
     });
   } catch (err) {
@@ -249,12 +311,30 @@ router.post("/user/ingest", async (req, res) => {
       return res.status(404).json({ success: false, error: "Event not found on chain" });
     }
     const category = CATEGORY_INDEX_TO_NAME[Number(evt.category || 3)] || "CRYPTO";
+    const aiAssessment = await assessUserEventForListing({
+      title: String(evt.title || ""),
+      category,
+      deadlineMs: Number(evt.deadline || 0n) * 1000,
+      sourcePolicy: String(evt.sourcePolicy || ""),
+    });
+    const baseTitle = aiAssessment?.normalizedTitle || String(evt.title || `Event #${eventId}`);
+    const baseDescription = aiAssessment?.normalizedDescription || "";
+    let localized = {};
+    try {
+      const pre = await pretranslateEvents([
+        { eventId, title: baseTitle, description: baseDescription, aiReasoning: "" },
+      ]);
+      localized = pre?.[0] || {};
+    } catch {
+      localized = {};
+    }
+
     const doc = {
       eventId,
-      title: String(evt.title || `Event #${eventId}`),
-      description: "",
+      title: baseTitle,
+      description: baseDescription,
       category,
-      aiProbability: Number(evt.aiProbability || 50n),
+      aiProbability: Math.max(0, Math.min(100, Number(aiAssessment?.aiProbability ?? evt.aiProbability ?? 50n))),
       deadline: new Date(Number(evt.deadline || 0n) * 1000),
       creator: String(evt.creator || ""),
       isUserEvent: Boolean(evt.isUserEvent),
@@ -264,6 +344,7 @@ router.post("/user/ingest", async (req, res) => {
       outcome: Boolean(evt.resolved) ? Boolean(evt.outcome) : null,
       totalVotesYes: Number(evt.totalVotesYes || 0n),
       totalVotesNo: Number(evt.totalVotesNo || 0n),
+      translations: localized,
     };
 
     await PredictionEvent.updateOne({ eventId }, { $set: doc }, { upsert: true });

@@ -386,6 +386,106 @@ Return: {"verdict":"YES"|"NO","reasoning":"specific fact"}`,
 
 // ═══════════════════════════════════════════════════════════════════════════
 
+export async function assessUserEventForListing({ title, category, deadlineMs, sourcePolicy }) {
+  const cleanTitle = String(title || "").trim().slice(0, 180);
+  if (!cleanTitle) {
+    return {
+      accepted: false,
+      reason: "Empty title",
+      normalizedTitle: "",
+      normalizedDescription: "",
+      aiProbability: 50,
+      sourceLanguage: "unknown",
+    };
+  }
+
+  if (config.aiProvider === "mock" || !config.openrouterKey) {
+    return {
+      accepted: true,
+      reason: "AI unavailable, accepted with defaults",
+      normalizedTitle: cleanTitle,
+      normalizedDescription: "",
+      aiProbability: 50,
+      sourceLanguage: "unknown",
+    };
+  }
+
+  const deadlineIso = Number.isFinite(Number(deadlineMs))
+    ? new Date(Number(deadlineMs)).toISOString()
+    : "unknown";
+  const safeCategory = String(category || "CRYPTO").toUpperCase();
+  const safeSourcePolicy = String(sourcePolicy || "official").toLowerCase();
+
+  const sys = `You validate user-submitted prediction market events and estimate forecast probability.
+Return ONLY strict JSON:
+{
+  "accepted": true|false,
+  "reason": "short reason",
+  "sourceLanguage": "BCP-47 code or language name",
+  "normalizedTitle": "clear yes/no question in English, max 180 chars",
+  "normalizedDescription": "short English context, max 180 chars",
+  "aiProbability": 0-100
+}
+Rules:
+- Preserve original meaning; do not invent new facts.
+- normalizedTitle must be binary and unambiguous.
+- Reject vague, subjective, impossible-to-verify, or non-binary questions.
+- Keep names/tickers/numbers intact.
+- If uncertain, accepted=false with clear reason.`;
+
+  const user = `Category: ${safeCategory}
+Source policy: ${safeSourcePolicy}
+Deadline ISO: ${deadlineIso}
+Original user title: "${cleanTitle}"`;
+
+  const models = [config.openrouterModel, config.openrouterFallback].filter(Boolean);
+  let parsed = null;
+  let lastErr = null;
+
+  for (const model of models) {
+    if (!model) continue;
+    try {
+      const raw = await ask(model, [
+        { role: "system", content: sys },
+        { role: "user", content: user },
+      ], 0.1, 700, "validate-user-event");
+      if (!raw) continue;
+      const data = JSON.parse(raw);
+      const prob = Math.max(0, Math.min(100, parseInt(String(data.aiProbability), 10) || 50));
+      parsed = {
+        accepted: Boolean(data.accepted),
+        reason: String(data.reason || "").slice(0, 200) || "Validation complete",
+        sourceLanguage: String(data.sourceLanguage || "unknown").slice(0, 40),
+        normalizedTitle: String(data.normalizedTitle || cleanTitle).slice(0, 180),
+        normalizedDescription: String(data.normalizedDescription || "").slice(0, 180),
+        aiProbability: prob,
+      };
+      break;
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+
+  if (!parsed) {
+    return {
+      accepted: true,
+      reason: `AI validation fallback: ${String(lastErr?.message || "unavailable").slice(0, 120)}`,
+      sourceLanguage: "unknown",
+      normalizedTitle: cleanTitle,
+      normalizedDescription: "",
+      aiProbability: 50,
+    };
+  }
+
+  // Basic hard guard independent of model output.
+  if (!/[?]$/.test(parsed.normalizedTitle)) {
+    parsed.normalizedTitle = `${parsed.normalizedTitle.replace(/\?*$/, "").trim()}?`.slice(0, 180);
+  }
+  return parsed;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+
 function generateMock() {
   return [
     { title: "Will Bitcoin be above $85,000 tonight?", category: "CRYPTO", aiProbability: 50, description: "BTC price check", hoursToResolve: 6 },

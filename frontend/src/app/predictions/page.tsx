@@ -30,6 +30,14 @@ const CHECKIN_TIERS = [
 const USER_EVENT_CATEGORIES = ["SPORTS", "POLITICS", "ECONOMY", "CRYPTO", "CLIMATE"] as const;
 const USER_EVENT_SOURCES = ["official", "market", "newswire", "oracle"] as const;
 
+function formatSeconds(total: number) {
+  const sec = Math.max(0, Math.floor(total));
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
 function CountdownTimer({ deadline }: { deadline: string }) {
   const [timeLeft, setTimeLeft] = useState("");
 
@@ -167,6 +175,8 @@ export default function PredictionsPage() {
   const userEventFeeDisplay = Number(formatEther(userEventFeeWei)).toFixed(4);
   const nextUserEventAt = Number(nextUserEventAtRaw ?? BigInt(0));
   const cooldownSeconds = Math.max(0, nextUserEventAt - Math.floor(Date.now() / 1000));
+  const nextCreateAtText =
+    nextUserEventAt > 0 ? new Date(nextUserEventAt * 1000).toLocaleString() : "";
   const isVerifiedCreator = Boolean(isVerifiedCreatorRaw);
   const creatorCooldownHours = Math.round(Number(creatorCooldownRaw ?? BigInt(86400)) / 3600);
   const verifiedMinPoints = Number(verifiedMinPointsRaw ?? BigInt(5000));
@@ -310,7 +320,7 @@ export default function PredictionsPage() {
       return;
     }
     if (cooldownSeconds > 0) {
-      toast.error(tr("predictions.cooldownActive", "Cooldown is active. Try later."));
+      toast.error(`${tr("predictions.cooldownActive", "Cooldown is active.")} ${tr("predictions.nextCreateIn", "Next event in")} ${formatSeconds(cooldownSeconds)}`);
       return;
     }
 
@@ -329,8 +339,13 @@ export default function PredictionsPage() {
         category: newEvent.category,
         deadlineMs,
         sourcePolicy: newEvent.sourcePolicy,
+        creator: address,
       });
       if (!validation?.success) {
+        const left = Number(validation?.data?.secondsLeft || 0);
+        if (left > 0) {
+          throw new Error(`${tr("predictions.cooldownActive", "Cooldown is active.")} ${tr("predictions.nextCreateIn", "Next event in")} ${formatSeconds(left)}`);
+        }
         throw new Error(validation?.error || "Validation failed");
       }
 
@@ -341,12 +356,13 @@ export default function PredictionsPage() {
 
       const currentEventCount = Number(eventCountRaw ?? BigInt(0));
       setExpectedCreatedEventId(currentEventCount + 1);
+      const titleForChain = String(validation?.data?.normalizedTitleAi || title).trim().slice(0, 180) || title;
       writeCreateEvent({
         address: predictionAddress,
         abi: PredictionABI,
         functionName: "createUserEvent",
         args: [
-          title,
+          titleForChain,
           categoryIdx,
           BigInt(Math.floor(deadlineMs / 1000)),
           newEvent.sourcePolicy,
@@ -448,7 +464,8 @@ export default function PredictionsPage() {
         </div>
         {cooldownSeconds > 0 && (
           <p className="text-xs text-neon-gold">
-            {tr("predictions.nextCreateIn", "Next event in")} {Math.ceil(cooldownSeconds / 3600)}h
+            {tr("predictions.nextCreateIn", "Next event in")} {formatSeconds(cooldownSeconds)}
+            {nextCreateAtText ? ` (${nextCreateAtText})` : ""}
           </p>
         )}
         {createOpen && (
