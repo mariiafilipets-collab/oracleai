@@ -104,6 +104,7 @@ router.get("/:address/referral-stats", async (req, res) => {
 router.get("/:address/creator-stats", async (req, res) => {
   try {
     const address = req.params.address.toLowerCase();
+    const { Prediction } = getContracts();
     const [summary] = await PredictionEvent.aggregate([
       { $match: { isUserEvent: true, creator: address } },
       {
@@ -161,6 +162,24 @@ router.get("/:address/creator-stats", async (req, res) => {
     const createdCount = Number(summary?.createdCount || 0);
     const conversionPct = createdCount > 0 ? Math.round((Number(summary?.eventsWithVotes || 0) / createdCount) * 100) : 0;
     const avgVotesPerEvent = createdCount > 0 ? Number(summary?.totalVotes || 0) / createdCount : 0;
+    let onChainCreatorClaimableWei = "0";
+    let voteFeeWei = "0";
+    let creatorShareBps = 5000;
+    let minCreatorPayoutVotes = 20;
+    if (Prediction) {
+      try {
+        onChainCreatorClaimableWei = String(await Prediction.creatorClaimableWei(address));
+      } catch {}
+      try {
+        voteFeeWei = String(await Prediction.userEventVoteFee());
+      } catch {}
+      try {
+        creatorShareBps = Number(await Prediction.creatorShareBps());
+      } catch {}
+      try {
+        minCreatorPayoutVotes = Number(await Prediction.minCreatorPayoutVotes());
+      } catch {}
+    }
 
     res.json({
       success: true,
@@ -174,6 +193,10 @@ router.get("/:address/creator-stats", async (req, res) => {
         conversionPct,
         avgVotesPerEvent,
         listingFeeWeiTotal: String(summary?.listingFeeWeiTotal || "0"),
+        onChainCreatorClaimableWei,
+        voteFeeWei,
+        creatorShareBps,
+        minCreatorPayoutVotes,
         latestEvents,
       },
     });

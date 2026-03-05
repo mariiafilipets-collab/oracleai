@@ -89,6 +89,65 @@ export default function TokenomicsPage() {
         </div>
       </GlassCard>
 
+      {/* Creator Economy */}
+      <GlassCard hover={false}>
+        <h2 className="text-xl font-heading font-bold mb-2">
+          {tr("tokenomicsPage.creatorEconomy.title", "Creator Economy (Variant C)")}
+        </h2>
+        <p className="text-sm text-gray-500 mb-6">
+          {tr(
+            "tokenomicsPage.creatorEconomy.desc",
+            "User-created events use a hybrid model: small vote fee, quality gating, and delayed creator payout."
+          )}
+        </p>
+        <div className="grid md:grid-cols-2 gap-3">
+          {[
+            {
+              icon: "prediction",
+              title: tr("tokenomicsPage.creatorEconomy.voteFeeTitle", "Vote fee on user events"),
+              desc: tr("tokenomicsPage.creatorEconomy.voteFeeDesc", "Each vote on a user event pays a small BNB fee."),
+            },
+            {
+              icon: "pool",
+              title: tr("tokenomicsPage.creatorEconomy.splitTitle", "50/50 split"),
+              desc: tr("tokenomicsPage.creatorEconomy.splitDesc", "50% accrues for creator rewards, 50% goes to protocol distribution."),
+            },
+            {
+              icon: "check",
+              title: tr("tokenomicsPage.creatorEconomy.unlockTitle", "Quality unlock"),
+              desc: tr(
+                "tokenomicsPage.creatorEconomy.unlockDesc",
+                "Creator payout unlocks only after valid resolution, minimum unique voter threshold, and verified creator status."
+              ),
+            },
+            {
+              icon: "bank",
+              title: tr("tokenomicsPage.creatorEconomy.protocolTitle", "Protocol side mirrors check-in"),
+              desc: tr(
+                "tokenomicsPage.creatorEconomy.protocolDesc",
+                "Protocol share keeps the same allocation logic: prizes, treasury, referrals, burn reserve, and staking rewards."
+              ),
+            },
+            {
+              icon: "clock",
+              title: tr("tokenomicsPage.creatorEconomy.batchTitle", "12h batched distribution"),
+              desc: tr(
+                "tokenomicsPage.creatorEconomy.batchDesc",
+                "Protocol-side fees from user-event votes are distributed in 12-hour batches to reduce per-vote gas overhead."
+              ),
+            },
+          ].map((item, idx) => (
+            <div key={idx} className="flex items-start gap-3 p-4 rounded-xl bg-dark-700/50 border border-dark-500/50">
+              <div className="text-neon-cyan"><AppIcon name={item.icon as any} className="w-5 h-5" /></div>
+              <div>
+                <h3 className="text-sm font-bold text-white">{item.title}</h3>
+                <p className="text-xs text-gray-400 mt-1">{item.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </GlassCard>
+
       {/* Staking Tiers */}
       <GlassCard hover={false}>
         <h2 className="text-xl font-heading font-bold mb-2">{t("tokenomicsPage.stakingTiers")}</h2>

@@ -65,12 +65,43 @@ export const ReferralABI = [
 export const PredictionABI = [
   { inputs: [], name: "eventCount", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
   { inputs: [], name: "USER_EVENT_FEE", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
+  { inputs: [], name: "userEventVoteFee", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
+  { inputs: [], name: "creatorShareBps", outputs: [{ type: "uint16" }], stateMutability: "view", type: "function" },
+  { inputs: [], name: "minCreatorPayoutVotes", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
+  { inputs: [], name: "pendingProtocolFeesWei", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
+  { inputs: [], name: "nextProtocolDistributionAt", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
+  { inputs: [], name: "distributeProtocolFees", outputs: [], stateMutability: "nonpayable", type: "function" },
+  {
+    inputs: [],
+    name: "getProtocolDistributionState",
+    outputs: [
+      { name: "pendingAmount", type: "uint256" },
+      { name: "nextAt", type: "uint256" },
+      { name: "secondsLeft", type: "uint256" },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
   { inputs: [], name: "USER_EVENT_COOLDOWN", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
   { inputs: [], name: "VERIFIED_CREATOR_COOLDOWN", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
   { inputs: [], name: "VERIFIED_MIN_POINTS", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
+  { inputs: [{ name: "user", type: "address" }], name: "creatorClaimableWei", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
   { inputs: [{ name: "user", type: "address" }], name: "nextUserEventAt", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
   { inputs: [{ name: "user", type: "address" }], name: "isVerifiedCreator", outputs: [{ type: "bool" }], stateMutability: "view", type: "function" },
   { inputs: [{ name: "user", type: "address" }], name: "getCreatorCooldown", outputs: [{ type: "uint256" }], stateMutability: "view", type: "function" },
+  {
+    inputs: [{ name: "eventId", type: "uint256" }],
+    name: "getCreatorEventPayoutPreview",
+    outputs: [
+      { name: "pendingCreatorCut", type: "uint256" },
+      { name: "voterCount", type: "uint256" },
+      { name: "eligibleNow", type: "bool" },
+      { name: "requiredVotes", type: "uint256" },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  { inputs: [], name: "claimCreatorFees", outputs: [], stateMutability: "nonpayable", type: "function" },
   {
     inputs: [
       { name: "title", type: "string" },
@@ -83,7 +114,7 @@ export const PredictionABI = [
     stateMutability: "payable",
     type: "function",
   },
-  { inputs: [{ name: "eventId", type: "uint256" }, { name: "_prediction", type: "bool" }], name: "submitPrediction", outputs: [], stateMutability: "nonpayable", type: "function" },
+  { inputs: [{ name: "eventId", type: "uint256" }, { name: "_prediction", type: "bool" }], name: "submitPrediction", outputs: [], stateMutability: "payable", type: "function" },
   {
     inputs: [{ name: "eventId", type: "uint256" }],
     name: "getEvent",

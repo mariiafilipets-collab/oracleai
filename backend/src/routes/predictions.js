@@ -27,10 +27,20 @@ async function getCreatorCooldownState(creatorAddress) {
   if (!Prediction) {
     return { hasWallet: true, nextAllowedAt: 0, secondsLeft: 0, cooldownSeconds: 0 };
   }
-  const [nextAllowedRaw, cooldownRaw] = await Promise.all([
-    Prediction.nextUserEventAt(creator),
-    Prediction.getCreatorCooldown(creator),
-  ]);
+  const nextAllowedRaw = await Prediction.nextUserEventAt(creator);
+  const cooldownRaw = await Prediction.getCreatorCooldown(creator);
+  let voteFeeRaw = 0n;
+  let creatorShareRaw = 5000n;
+  let minVotesRaw = 20n;
+  if (Prediction.userEventVoteFee) {
+    try { voteFeeRaw = await Prediction.userEventVoteFee(); } catch {}
+  }
+  if (Prediction.creatorShareBps) {
+    try { creatorShareRaw = await Prediction.creatorShareBps(); } catch {}
+  }
+  if (Prediction.minCreatorPayoutVotes) {
+    try { minVotesRaw = await Prediction.minCreatorPayoutVotes(); } catch {}
+  }
   const nowSec = Math.floor(Date.now() / 1000);
   const nextAllowedAt = Number(nextAllowedRaw || 0n);
   return {
@@ -38,6 +48,9 @@ async function getCreatorCooldownState(creatorAddress) {
     nextAllowedAt,
     secondsLeft: Math.max(0, nextAllowedAt - nowSec),
     cooldownSeconds: Number(cooldownRaw || 0n),
+    voteFeeWei: String(voteFeeRaw || 0n),
+    creatorShareBps: Number(creatorShareRaw || 5000),
+    minCreatorPayoutVotes: Number(minVotesRaw || 20n),
   };
 }
 

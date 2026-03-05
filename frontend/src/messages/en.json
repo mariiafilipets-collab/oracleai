@@ -158,6 +158,20 @@
       "tgeCirculating": "TGE Circulating",
       "preTgeGoal": "Pre-TGE Goal",
       "teamVesting": "Team Vesting"
+    },
+    "creatorEconomy": {
+      "title": "Creator Economy (Variant C)",
+      "desc": "Hybrid model for user-created events: vote fee + quality-gated creator rewards.",
+      "voteFeeTitle": "Vote fee on user events",
+      "voteFeeDesc": "Every vote on a user event pays a small BNB fee.",
+      "splitTitle": "50/50 split",
+      "splitDesc": "50% goes to creator rewards, 50% to protocol distribution.",
+      "unlockTitle": "Quality unlock",
+      "unlockDesc": "Creator payout unlocks after valid resolution, minimum unique votes, and verified creator status.",
+      "protocolTitle": "Protocol side mirrors check-in",
+      "protocolDesc": "Protocol share follows prizes/treasury/referrals/burn/staking distribution.",
+      "batchTitle": "12h batched distribution",
+      "batchDesc": "Protocol-side vote fees from user-created events are distributed every 12 hours to reduce gas overhead per vote."
     }
   },
   "litepaperPage": {
@@ -227,6 +241,18 @@
     "pointsToOaiFormula": "Your OAI = (YourPoints / TotalPoints) x AirdropPool",
     "pointsAfterTgeTitle": "Points after TGE",
     "pointsAfterTgeDesc": "Points remain as a seasonal reputation layer for leaderboards, quests, campaign eligibility, and partner incentives.",
+    "creatorEconomyTitle": "Creator Economy (Variant C)",
+    "creatorEconomyFlowTitle": "How the flow works",
+    "creatorEconomyFlow1": "User event creation keeps fixed listing fee for anti-spam.",
+    "creatorEconomyFlow2": "Each vote on user events pays a small vote fee.",
+    "creatorEconomyFlow3": "Vote fee splits into creator side and protocol side.",
+    "creatorEconomyFlow4": "Protocol side follows the same treasury/prize/referral/burn/staking logic.",
+    "creatorEconomyFlow5": "Protocol-side fee distribution is executed in 12-hour batches to reduce gas overhead per vote.",
+    "creatorEconomyQualityTitle": "Quality and anti-abuse gates",
+    "creatorEconomyQuality1": "Creator payout is claimable only after event is resolved.",
+    "creatorEconomyQuality2": "Minimum voter threshold must be reached.",
+    "creatorEconomyQuality3": "Creator must hold verified creator status at payout time.",
+    "creatorEconomyQuality4": "If conditions fail, creator-side fee is redirected to protocol safety treasury.",
     "footerTagline": "OracleAI Predict - Decentralized AI Prediction Market on BNB Chain"
   },
   "predictions": {
@@ -276,6 +302,9 @@
     "filterAiSources": "AI events",
     "filterUserSources": "User-created",
     "userEventBadge": "User Event",
+    "userVoteFeeInfo": "User-event vote fee",
+    "creatorGets": "creator gets",
+    "creatorPayoutVotesMin": "payout unlock",
     "nextCreateIn": "Next event in",
     "userCreateTitleInput": "Will BTC close above 80k by Friday?",
     "deadlineIn": "Deadline in",
@@ -378,6 +407,13 @@
     "creatorAvgVotes": "Avg Votes/Event",
     "creatorDisputeRate": "Disputed/archived",
     "creatorTotalVotes": "Total votes",
+    "creatorVoteFee": "Vote fee",
+    "creatorShare": "Creator share",
+    "creatorAvailableToWithdraw": "Creator rewards available",
+    "creatorRulesHint": "Rewards unlock after valid resolution, minimum voter threshold, and verified creator status.",
+    "creatorWithdraw": "Withdraw Creator Rewards",
+    "creatorWithdrawing": "Withdrawing...",
+    "creatorClaimSuccess": "Creator rewards withdrawn",
     "creatorVotes": "votes",
     "creatorNoEvents": "No user-created events yet",
     "creativeCards": {

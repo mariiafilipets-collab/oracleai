@@ -76,7 +76,14 @@ async function main() {
 
   // 7. Prediction
   const Prediction = await ethers.getContractFactory("Prediction");
-  const prediction = await Prediction.deploy(await points.getAddress(), treasury);
+  const prediction = await Prediction.deploy(
+    await points.getAddress(),
+    treasury,
+    await prizePool.getAddress(),
+    await referral.getAddress(),
+    burnReserve,
+    stakingRewards
+  );
   await prediction.waitForDeployment();
   console.log("Prediction:", await prediction.getAddress());
 
@@ -88,11 +95,12 @@ async function main() {
   await points.grantRole(OPERATOR_ROLE, await prediction.getAddress());
   console.log("Points: OPERATOR granted to CheckIn & Prediction");
 
-  // Referral: grant OPERATOR to CheckIn
+  // Referral: grant OPERATOR to CheckIn and Prediction
   await referral.grantRole(OPERATOR_ROLE, await checkIn.getAddress());
+  await referral.grantRole(OPERATOR_ROLE, await prediction.getAddress());
   // Also grant deployer to support backend referral onboarding registration flow.
   await referral.grantRole(OPERATOR_ROLE, deployer.address);
-  console.log("Referral: OPERATOR granted to CheckIn & deployer");
+  console.log("Referral: OPERATOR granted to CheckIn, Prediction & deployer");
 
   // PrizePool: grant DISTRIBUTOR to deployer (for weekly distribution)
   const DISTRIBUTOR_ROLE = ethers.keccak256(ethers.toUtf8Bytes("DISTRIBUTOR_ROLE"));

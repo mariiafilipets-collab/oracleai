@@ -158,6 +158,20 @@
       "tgeCirculating": "Циркуляция на TGE",
       "preTgeGoal": "Цель до TGE",
       "teamVesting": "Вестинг команды"
+    },
+    "creatorEconomy": {
+      "title": "Экономика создателей (Вариант C)",
+      "desc": "Гибридная модель user-событий: комиссия за голос + награды с quality-условиями.",
+      "voteFeeTitle": "Комиссия за голос в user-событии",
+      "voteFeeDesc": "Каждый голос в событии пользователя оплачивает небольшую комиссию в BNB.",
+      "splitTitle": "Разделение 50/50",
+      "splitDesc": "50% идет в награды создателю, 50% — в протокольное распределение.",
+      "unlockTitle": "Разблокировка по качеству",
+      "unlockDesc": "Награда создателя доступна после резолва, порога уникальных голосов и verified-статуса.",
+      "protocolTitle": "Протокольная часть как в check-in",
+      "protocolDesc": "Протокольная доля распределяется в prizes/treasury/referrals/burn/staking.",
+      "batchTitle": "Пакетное распределение каждые 12ч",
+      "batchDesc": "Протокольная часть vote fee по user-событиям распределяется раз в 12 часов, чтобы снизить газ на каждый голос."
     }
   },
   "litepaperPage": {
@@ -227,6 +241,18 @@
     "pointsToOaiFormula": "Ваши OAI = (ВашиОчки / ОбщиеОчки) x ПулЭйрдропа",
     "pointsAfterTgeTitle": "Очки после TGE",
     "pointsAfterTgeDesc": "Очки остаются сезонным слоем репутации для рейтинга, квестов, доступа к кампаниям и партнерских программ.",
+    "creatorEconomyTitle": "Экономика создателей (Вариант C)",
+    "creatorEconomyFlowTitle": "Как работает поток",
+    "creatorEconomyFlow1": "Создание user-события сохраняет фиксированную anti-spam комиссию листинга.",
+    "creatorEconomyFlow2": "Каждый голос в user-событии платит небольшую vote fee.",
+    "creatorEconomyFlow3": "Vote fee делится на долю создателя и долю протокола.",
+    "creatorEconomyFlow4": "Доля протокола распределяется как treasury/prize/referral/burn/staking.",
+    "creatorEconomyFlow5": "Распределение протокольной части выполняется батчем раз в 12 часов, чтобы снизить газ на каждый голос.",
+    "creatorEconomyQualityTitle": "Фильтры качества и анти-абуза",
+    "creatorEconomyQuality1": "Награда создателя к выводу только после резолва события.",
+    "creatorEconomyQuality2": "Нужно достичь минимального порога голосов.",
+    "creatorEconomyQuality3": "На момент выплаты у создателя должен быть verified-статус.",
+    "creatorEconomyQuality4": "Если условия не выполнены, доля создателя уходит в безопасную казну протокола.",
     "footerTagline": "OracleAI Predict - децентрализованный AI-рынок предсказаний на BNB Chain"
   },
   "predictions": {
@@ -276,6 +302,9 @@
     "filterAiSources": "AI события",
     "filterUserSources": "События пользователей",
     "userEventBadge": "Событие пользователя",
+    "userVoteFeeInfo": "Комиссия за голос в user-событии",
+    "creatorGets": "создатель получает",
+    "creatorPayoutVotesMin": "выплата после",
     "nextCreateIn": "Следующее создание через",
     "userCreateTitleInput": "Закроется ли BTC выше 80k к пятнице?",
     "deadlineIn": "Дедлайн через",
@@ -355,7 +384,14 @@
     "availableToWithdraw": "Доступно к выводу",
     "withdrawEarnings": "Вывести награды",
     "withdrawing": "Вывод...",
-    "refWithdrawSuccess": "Реферальные награды выведены"
+    "refWithdrawSuccess": "Реферальные награды выведены",
+    "creatorVoteFee": "Комиссия за голос",
+    "creatorShare": "Доля создателя",
+    "creatorAvailableToWithdraw": "Доступно к выводу (создатель)",
+    "creatorRulesHint": "Награда доступна после корректного резолва, порога голосов и verified-статуса.",
+    "creatorWithdraw": "Вывести награды создателя",
+    "creatorWithdrawing": "Вывод...",
+    "creatorClaimSuccess": "Награда создателя выведена"
   },
   "staking": {
     "title": "Стейкинг OAI",

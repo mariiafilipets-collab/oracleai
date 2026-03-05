@@ -7,7 +7,7 @@ import { motion } from "framer-motion";
 import toast from "react-hot-toast";
 import GlassCard from "@/components/GlassCard";
 import { useContractAddresses } from "@/hooks/useContracts";
-import { PointsABI, ReferralABI } from "@/lib/contracts";
+import { PointsABI, PredictionABI, ReferralABI } from "@/lib/contracts";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import AppIcon from "@/components/icons/AppIcon";
@@ -38,9 +38,12 @@ export default function ProfilePage() {
   const [creatorStats, setCreatorStats] = useState<any>(null);
   const { writeContract, data: withdrawHash, isPending: withdrawing } = useWriteContract();
   const { isSuccess: withdrawSuccess } = useWaitForTransactionReceipt({ hash: withdrawHash });
+  const { writeContract: writeCreatorClaim, data: creatorClaimHash, isPending: creatorClaiming } = useWriteContract();
+  const { isSuccess: creatorClaimSuccess } = useWaitForTransactionReceipt({ hash: creatorClaimHash });
 
   const pointsAddress = addresses?.Points as `0x${string}` | undefined;
   const referralAddress = addresses?.Referral as `0x${string}` | undefined;
+  const predictionAddress = addresses?.Prediction as `0x${string}` | undefined;
 
   const { data: userPoints } = useReadContract({
     address: pointsAddress,
@@ -73,6 +76,13 @@ export default function ProfilePage() {
     args: address ? [address] : undefined,
     query: { enabled: !!address && !!referralAddress },
   });
+  const { data: creatorClaimableRaw } = useReadContract({
+    address: predictionAddress,
+    abi: PredictionABI,
+    functionName: "creatorClaimableWei",
+    args: address ? [address] : undefined,
+    query: { enabled: !!address && !!predictionAddress },
+  });
 
   useEffect(() => {
     if (!address) return;
@@ -103,6 +113,11 @@ export default function ProfilePage() {
       toast.success(tr("profile.refWithdrawSuccess", "Referral earnings withdrawn"));
     }
   }, [withdrawSuccess, tr]);
+  useEffect(() => {
+    if (creatorClaimSuccess) {
+      toast.success(tr("profile.creatorClaimSuccess", "Creator rewards withdrawn"));
+    }
+  }, [creatorClaimSuccess, tr]);
 
   if (!isConnected) {
     return (
@@ -122,6 +137,7 @@ export default function ProfilePage() {
   const totalPredictions = Number(up?.totalPredictions ?? up?.[6] ?? 0);
   const refCount = directReferrals ? (directReferrals as any[]).length : 0;
   const pendingBnb = pendingRefEarnings ? parseFloat(formatEther(pendingRefEarnings as bigint)) : 0;
+  const creatorClaimableBnb = creatorClaimableRaw ? parseFloat(formatEther(creatorClaimableRaw as bigint)) : 0;
 
   const badgeData = {
     totalCheckIns,
@@ -211,6 +227,15 @@ export default function ProfilePage() {
       address: referralAddress,
       abi: ReferralABI,
       functionName: "withdrawReferralEarnings",
+      args: [],
+    });
+  };
+  const handleClaimCreatorRewards = () => {
+    if (!predictionAddress) return;
+    writeCreatorClaim({
+      address: predictionAddress,
+      abi: PredictionABI,
+      functionName: "claimCreatorFees",
       args: [],
     });
   };
@@ -477,6 +502,32 @@ export default function ProfilePage() {
           {" · "}
           {tr("profile.creatorTotalVotes", "Total votes")}:
           <span className="ml-1 text-neon-cyan font-mono">{creatorStats?.totalVotes ?? 0}</span>
+          {" · "}
+          {tr("profile.creatorVoteFee", "Vote fee")}:
+          <span className="ml-1 text-neon-cyan font-mono">
+            {creatorStats?.voteFeeWei ? `${parseFloat(formatEther(BigInt(creatorStats.voteFeeWei))).toFixed(4)} BNB` : "-"}
+          </span>
+          {" · "}
+          {tr("profile.creatorShare", "Creator share")}:
+          <span className="ml-1 text-neon-gold font-mono">{Number(creatorStats?.creatorShareBps || 5000) / 100}%</span>
+        </div>
+        <div className="mb-4 flex items-center justify-between gap-3 p-3 rounded-xl bg-dark-700/40 border border-dark-500/50">
+          <div>
+            <div className="text-xs text-gray-500">{tr("profile.creatorAvailableToWithdraw", "Creator rewards available")}</div>
+            <div className="text-sm font-mono text-neon-gold">{creatorClaimableBnb.toFixed(6)} BNB</div>
+            <div className="text-[11px] text-gray-500 mt-1">
+              {tr("profile.creatorRulesHint", "Rewards unlock after valid resolution, minimum voter threshold, and verified creator status.")}
+            </div>
+          </div>
+          <button
+            onClick={handleClaimCreatorRewards}
+            disabled={creatorClaiming || creatorClaimableBnb <= 0}
+            className="px-4 py-2 rounded-lg bg-neon-gold/15 border border-neon-gold/30 text-neon-gold text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-neon-gold/25 transition"
+          >
+            {creatorClaiming
+              ? tr("profile.creatorWithdrawing", "Withdrawing...")
+              : tr("profile.creatorWithdraw", "Withdraw Creator Rewards")}
+          </button>
         </div>
         <div className="space-y-2 max-h-64 overflow-y-auto">
           {creatorStats?.latestEvents?.length ? creatorStats.latestEvents.map((evt: any) => {

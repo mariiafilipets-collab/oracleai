@@ -256,6 +256,36 @@ export default function LitepaperPage() {
         </GlassCard>
       </S>
 
+      {/* Creator Economy */}
+      <S delay={0.44}>
+        <GlassCard hover={false}>
+          <h2 className="text-2xl font-heading font-bold mb-4 gradient-cyan inline-block">
+            9. {tr("litepaperPage.creatorEconomyTitle", "Creator Economy (Variant C)")}
+          </h2>
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="p-4 rounded-xl bg-dark-700/50 border border-dark-500/50">
+              <h3 className="text-sm font-bold text-white mb-2">{tr("litepaperPage.creatorEconomyFlowTitle", "How the flow works")}</h3>
+              <ul className="text-xs text-gray-400 space-y-1">
+                <li>- {tr("litepaperPage.creatorEconomyFlow1", "User event creation keeps fixed listing fee for anti-spam.")}</li>
+                <li>- {tr("litepaperPage.creatorEconomyFlow2", "Each vote on user events pays a small vote fee.")}</li>
+                <li>- {tr("litepaperPage.creatorEconomyFlow3", "Vote fee splits into creator side and protocol side.")}</li>
+                <li>- {tr("litepaperPage.creatorEconomyFlow4", "Protocol side follows the same treasury/prize/referral/burn/staking logic.")}</li>
+                <li>- {tr("litepaperPage.creatorEconomyFlow5", "Protocol-side fee distribution is executed in 12-hour batches to reduce gas overhead per vote.")}</li>
+              </ul>
+            </div>
+            <div className="p-4 rounded-xl bg-dark-700/50 border border-dark-500/50">
+              <h3 className="text-sm font-bold text-white mb-2">{tr("litepaperPage.creatorEconomyQualityTitle", "Quality and anti-abuse gates")}</h3>
+              <ul className="text-xs text-gray-400 space-y-1">
+                <li>- {tr("litepaperPage.creatorEconomyQuality1", "Creator payout is claimable only after event is resolved.")}</li>
+                <li>- {tr("litepaperPage.creatorEconomyQuality2", "Minimum voter threshold must be reached.")}</li>
+                <li>- {tr("litepaperPage.creatorEconomyQuality3", "Creator must hold verified creator status at payout time.")}</li>
+                <li>- {tr("litepaperPage.creatorEconomyQuality4", "If conditions fail, creator-side fee is redirected to protocol safety treasury.")}</li>
+              </ul>
+            </div>
+          </div>
+        </GlassCard>
+      </S>
+
       {/* Links */}
       <S delay={0.45}>
         <div className="text-center py-8">
