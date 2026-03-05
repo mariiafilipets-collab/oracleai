@@ -326,6 +326,7 @@
     "userCreateErrDuplicate": "A similar active event already exists.",
     "userCreateErrBinary": "Question is not clearly binary (YES/NO). Clarify conditions and deadline.",
     "userCreateErrClarify": "Question is too vague. Add measurable condition and clear deadline.",
+    "userCreateErrLanguage": "Language detected. Keep the question clear and binary (YES/NO).",
     "userCreateErrAiRejected": "AI validation rejected this event. Please rephrase.",
     "myVotes": "My Votes",
     "noVoted": "No voted events yet",

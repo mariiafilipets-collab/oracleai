@@ -268,6 +268,7 @@
     "userCreateErrDuplicate": "Un evenement actif similaire existe deja.",
     "userCreateErrBinary": "La question n'est pas clairement binaire (OUI/NON). Precisez les conditions et l'echeance.",
     "userCreateErrClarify": "La question est trop vague. Ajoutez une condition mesurable et une echeance claire.",
+    "userCreateErrLanguage": "Langue detectee. Gardez une question claire et binaire (OUI/NON).",
     "userCreateErrAiRejected": "La validation IA a rejete cet evenement. Reformulez la question.",
     "myVotes": "Mes votes",
     "noVoted": "Aucun evenement vote pour le moment",

@@ -288,6 +288,7 @@
     "userCreateErrDuplicate": "已存在相似的进行中事件。",
     "userCreateErrBinary": "问题不够明确为二元（是/否）。请补充条件和截止时间。",
     "userCreateErrClarify": "问题过于模糊。请添加可量化条件和明确截止时间。",
+    "userCreateErrLanguage": "已识别问题语言。请保持问题清晰且为二元（是/否）。",
     "userCreateErrAiRejected": "AI 校验拒绝了该事件，请重新表述问题。",
     "myVotes": "我的投票",
     "noVoted": "暂无已投票事件",

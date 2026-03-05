@@ -496,7 +496,7 @@ Original user title: "${cleanTitle}"`;
   // Accept such cases when local deterministic heuristic says the question is binary and verifiable.
   if (!parsed.accepted) {
     const rejectReason = String(parsed.reason || "").toLowerCase();
-    const looksLikeFalseNegative = /(not.*binary|non[- ]?binary|vague question|too vague|unclear)/i.test(rejectReason);
+    const looksLikeFalseNegative = /(not.*binary|non[- ]?binary|vague question|too vague|unclear|question is in\s+[a-z-]+)/i.test(rejectReason);
     const candidate = parsed.normalizedTitle || cleanTitle;
     if (looksLikeFalseNegative && isLikelyBinaryQuestion(candidate)) {
       parsed.accepted = true;

@@ -157,6 +157,9 @@ export default function PredictionsPage() {
     if (lower.includes("ai validation rejected")) {
       return tr("predictions.userCreateErrAiRejected", "AI validation rejected this event. Please rephrase.");
     }
+    if (lower.includes("question is in ")) {
+      return tr("predictions.userCreateErrLanguage", "Language detected. Please keep the question clear and binary (YES/NO).");
+    }
 
     return message;
   }, [tr]);

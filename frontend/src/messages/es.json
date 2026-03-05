@@ -268,6 +268,7 @@
     "userCreateErrDuplicate": "Ya existe un evento activo similar.",
     "userCreateErrBinary": "La pregunta no es claramente binaria (SI/NO). Aclara condiciones y fecha limite.",
     "userCreateErrClarify": "La pregunta es demasiado vaga. Agrega una condicion medible y una fecha limite clara.",
+    "userCreateErrLanguage": "Se detecto el idioma. Mantén la pregunta clara y binaria (SI/NO).",
     "userCreateErrAiRejected": "La validacion de IA rechazo este evento. Reformulalo.",
     "myVotes": "Mis votos",
     "noVoted": "Aun no hay eventos votados",
