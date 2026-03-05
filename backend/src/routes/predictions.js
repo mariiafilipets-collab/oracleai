@@ -118,9 +118,23 @@ async function attachUserVotes(events, address) {
               if (oldUv?.voted) uv = oldUv;
             } catch {}
           }
-          return { eventId: Number(evt.eventId), voted: Boolean(uv?.voted), prediction: Boolean(uv?.prediction) };
+          const voted = Boolean(uv?.voted);
+          const row = { eventId: Number(evt.eventId), voted, prediction: Boolean(uv?.prediction), yes: null, no: null };
+          if (voted) {
+            try {
+              const on = await Prediction["getEvent(uint256)"](BigInt(evt.eventId));
+              row.yes = Number(on?.totalVotesYes || 0n);
+              row.no = Number(on?.totalVotesNo || 0n);
+              // Best-effort DB healing for counters that can lag under RPC limits.
+              void PredictionEvent.updateOne(
+                { eventId: Number(evt.eventId) },
+                { $set: { totalVotesYes: row.yes, totalVotesNo: row.no } }
+              ).catch(() => null);
+            } catch {}
+          }
+          return row;
         } catch {
-          return { eventId: Number(evt.eventId), voted: false, prediction: false };
+          return { eventId: Number(evt.eventId), voted: false, prediction: false, yes: null, no: null };
         }
       })
     );
@@ -128,7 +142,14 @@ async function attachUserVotes(events, address) {
     for (let j = i; j < Math.min(i + CHUNK, out.length); j++) {
       const id = Number(out[j].eventId);
       const uv = byId.get(id);
-      if (uv?.voted) out[j] = { ...out[j], userPrediction: uv.prediction };
+      if (uv?.voted) {
+        out[j] = {
+          ...out[j],
+          userPrediction: uv.prediction,
+          totalVotesYes: uv.yes ?? out[j].totalVotesYes,
+          totalVotesNo: uv.no ?? out[j].totalVotesNo,
+        };
+      }
     }
   }
   return out;
