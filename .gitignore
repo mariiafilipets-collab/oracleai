@@ -32,3 +32,5 @@ pnpm-debug.log*
 # local temp / data
 backend/.data/
 _tmp_vibe/
+
+.vercel

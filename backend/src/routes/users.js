@@ -308,9 +308,15 @@ router.post("/:address/referral", async (req, res) => {
       return res.json({ success: true, skipped: true, reason: "central-wallet-exempt" });
     }
     const referrerCode = String(req.body?.referrerCode || "").trim().toUpperCase();
+    const isSystemCode = referrerCode === SYSTEM_REFERRAL_CODE;
 
     if (!referrerCode) {
       return res.status(400).json({ success: false, error: "Referral code required" });
+    }
+
+    const existingUser = await User.findOne({ address: userAddress }).lean();
+    if (existingUser?.referrer) {
+      return res.status(400).json({ success: false, error: "Already has a referrer" });
     }
 
     let referrerUser = await User.findOne({ referralCode: referrerCode });
@@ -323,6 +329,25 @@ router.post("/:address/referral", async (req, res) => {
 
     if (referrerUser.address === userAddress) {
       return res.status(400).json({ success: false, error: "Cannot refer yourself" });
+    }
+
+    // ORACLEAI is a system onboarding code: registration succeeds,
+    // but no on-chain referrer link is set, so referral fee share
+    // flows to treasury via CheckIn fallback instead of referral payouts.
+    if (isSystemCode) {
+      await User.findOneAndUpdate(
+        { address: userAddress },
+        {
+          $set: { referrer: referrerUser.address },
+          $setOnInsert: { address: userAddress, referralCode: buildReferralCode(userAddress), joinedAt: new Date() },
+        },
+        { upsert: true }
+      );
+      return res.json({
+        success: true,
+        referrer: referrerUser.address,
+        mode: "system-code-no-referral-payout",
+      });
     }
 
     const { Referral } = getContracts();
