@@ -83,11 +83,12 @@ export default function PredictionsPage() {
   const { address, isConnected } = useAccount();
   const { addresses } = useContractAddresses();
   const [predictions, setPredictions] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<"active" | "resolved">("active");
+  const [activeTab, setActiveTab] = useState<"active" | "resolved" | "voted">("active");
   const [activeCategory, setActiveCategory] = useState("ALL");
   const [sourceFilter, setSourceFilter] = useState<"ALL" | "AI" | "USER">("ALL");
   const [loading, setLoading] = useState(true);
   const [schedulerInfo, setSchedulerInfo] = useState<any>(null);
+  const [votedPredictions, setVotedPredictions] = useState<any[]>([]);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
   const requestSeqRef = useRef(0);
 
@@ -203,17 +204,32 @@ export default function PredictionsPage() {
     } catch {}
   }, []);
 
+  const loadVotedPredictions = useCallback(async (userAddress?: string, lang?: string) => {
+    if (!userAddress) {
+      setVotedPredictions([]);
+      return;
+    }
+    try {
+      const res = await api.getUserVotedPredictions(userAddress, lang ?? locale);
+      if (res?.success) {
+        setVotedPredictions(res.data || []);
+      }
+    } catch {}
+  }, [locale]);
+
   // Auto-refresh every 15 seconds
   useEffect(() => {
     setLoading(true);
     loadPredictions(locale);
     loadSchedulerStatus();
+    if (address) loadVotedPredictions(address, locale);
     pollRef.current = setInterval(() => {
       loadPredictions(locale);
       loadSchedulerStatus();
+      if (address) loadVotedPredictions(address, locale);
     }, 15000);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, [loadPredictions, loadSchedulerStatus, locale]);
+  }, [loadPredictions, loadSchedulerStatus, loadVotedPredictions, locale, address]);
 
   useEffect(() => {
     if (isVoteSuccess && voteHash && voteHandledRef.current !== voteHash) {
@@ -346,7 +362,12 @@ export default function PredictionsPage() {
 
   const activePredictions = predictions.filter((p) => p._status === "active");
   const resolvedPredictions = predictions.filter((p) => p._status === "resolved");
-  const displayList = activeTab === "active" ? activePredictions : resolvedPredictions;
+  const displayList =
+    activeTab === "active"
+      ? activePredictions
+      : activeTab === "resolved"
+        ? resolvedPredictions
+        : votedPredictions;
   const byCategory =
     activeCategory === "ALL" ? displayList : displayList.filter((p) => p.category === activeCategory);
   const filtered = byCategory.filter((p) => {
@@ -505,6 +526,16 @@ export default function PredictionsPage() {
         >
           <span className="inline-flex items-center gap-1"><AppIcon name="check" className="w-4 h-4" /> {t("predictions.resolved")} ({resolvedPredictions.length})</span>
         </button>
+        <button
+          onClick={() => setActiveTab("voted")}
+          className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${
+            activeTab === "voted"
+              ? "bg-neon-cyan/20 text-neon-cyan border border-neon-cyan/30"
+              : "bg-dark-700 text-gray-400 border border-dark-500"
+          }`}
+        >
+          <span className="inline-flex items-center gap-1"><AppIcon name="target" className="w-4 h-4" /> {tr("predictions.myVotes", "My Votes")} ({votedPredictions.length})</span>
+        </button>
       </div>
 
       {/* Category Tabs */}
@@ -551,10 +582,18 @@ export default function PredictionsPage() {
         <GlassCard hover={false} className="text-center py-16">
           <p className="text-4xl mb-4 flex justify-center">{activeTab === "active" ? <AppIcon name="prediction" className="w-10 h-10 text-neon-cyan" /> : <AppIcon name="litepaper" className="w-10 h-10 text-neon-purple" />}</p>
           <p className="text-gray-400 mb-2">
-            {activeTab === "active" ? t("predictions.noActive") : t("predictions.noResolved")}
+            {activeTab === "active"
+              ? t("predictions.noActive")
+              : activeTab === "resolved"
+                ? t("predictions.noResolved")
+                : tr("predictions.noVoted", "No voted events yet")}
           </p>
           <p className="text-sm text-gray-500">
-            {activeTab === "active" ? t("predictions.willGenerate") : t("predictions.resolvedByAi")}
+            {activeTab === "active"
+              ? t("predictions.willGenerate")
+              : activeTab === "resolved"
+                ? t("predictions.resolvedByAi")
+                : tr("predictions.voteToSeeHistory", "Vote on events to see your personal history here")}
           </p>
         </GlassCard>
       ) : (
@@ -644,6 +683,10 @@ export default function PredictionsPage() {
                           }`}
                         />
                       </div>
+                      <p className="mt-1 text-[11px] text-gray-500">
+                        {tr("predictions.aiPick", "AI pick")}:{" "}
+                        <span className="text-gray-300 font-mono">{Number(pred.aiProbability || 0) >= 50 ? "YES" : "NO"}</span>
+                      </p>
                     </div>
 
                     {/* AI Reasoning (for resolved) */}
@@ -651,6 +694,33 @@ export default function PredictionsPage() {
                       <div className="mb-3 p-2.5 rounded-lg bg-dark-700/80 border border-dark-500/50">
                         <p className="text-xs text-gray-400 mb-1 font-bold inline-flex items-center gap-1"><AppIcon name="brain" className="w-3.5 h-3.5" /> {t("predictions.aiReasoning")}</p>
                         <p className="text-xs text-gray-300 leading-relaxed">{pred.aiReasoning}</p>
+                      </div>
+                    )}
+
+                    {typeof pred.userPrediction === "boolean" && (
+                      <div className="mb-3 p-2.5 rounded-lg bg-dark-700/60 border border-dark-500/50 text-xs">
+                        <p className="text-gray-300">
+                          {tr("predictions.yourVote", "Your vote")}:{" "}
+                          <span className={pred.userPrediction ? "text-neon-green" : "text-neon-red"}>
+                            {pred.userPrediction ? tr("predictions.agree", "Agree") : tr("predictions.disagree", "Disagree")}
+                          </span>
+                        </p>
+                        {pred.resolved && (
+                          <p className="text-gray-400 mt-1">
+                            {tr("predictions.result", "Result")}:{" "}
+                            <span className={pred.userCorrect ? "text-neon-green" : "text-neon-red"}>
+                              {pred.userCorrect ? tr("predictions.correct", "Correct") : tr("predictions.wrong", "Wrong")}
+                            </span>
+                            {" · "}
+                            {tr("predictions.aiStatus", "AI")}:{" "}
+                            <span className={pred.aiWasRight ? "text-neon-green" : "text-neon-gold"}>
+                              {pred.aiWasRight ? tr("predictions.aiWasRight", "right") : tr("predictions.aiWasWrong", "wrong")}
+                            </span>
+                            {" · "}
+                            {tr("predictions.reward", "Reward")}:{" "}
+                            <span className="text-neon-cyan font-mono">+{Number(pred.rewardPoints ?? (pred.userCorrect ? (Number(pred.aiProbability || 0) >= 50) === Boolean(pred.outcome) ? 50 : 150 : 0))} pts</span>
+                          </p>
+                        )}
                       </div>
                     )}
 

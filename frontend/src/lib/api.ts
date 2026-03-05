@@ -39,6 +39,8 @@ export const api = {
   getPredictions: (lang?: string) => fetchAPI(langParamWithOverride("/api/predictions", lang)),
   getResolvedPredictions: (lang?: string) => fetchAPI(langParamWithOverride("/api/predictions/resolved", lang)),
   getAllPredictions: (lang?: string) => fetchAPI(langParamWithOverride("/api/predictions/all", lang)),
+  getUserVotedPredictions: (address: string, lang?: string) =>
+    fetchAPI(langParamWithOverride(`/api/predictions/voted/${address}`, lang)),
   getSchedulerStatus: () => fetchAPI("/api/predictions/scheduler"),
   validateUserPredictionEvent: (payload: {
     title: string;

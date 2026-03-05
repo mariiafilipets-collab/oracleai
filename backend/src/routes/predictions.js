@@ -108,6 +108,72 @@ router.get("/scheduler", (req, res) => {
   res.json({ success: true, data: getSchedulerStatus() });
 });
 
+router.get("/voted/:address", async (req, res) => {
+  try {
+    const address = String(req.params.address || "").toLowerCase();
+    if (!/^0x[a-f0-9]{40}$/.test(address)) {
+      return res.status(400).json({ success: false, error: "Invalid address" });
+    }
+
+    const { Prediction } = getContracts();
+    if (!Prediction) {
+      return res.status(503).json({ success: false, error: "Prediction contract unavailable" });
+    }
+
+    const limit = Math.min(Math.max(parseInt(String(req.query.limit || "300"), 10) || 300, 1), 500);
+    const docs = await PredictionEvent.find()
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean();
+
+    const voted = [];
+    const CHUNK = 25;
+    for (let i = 0; i < docs.length; i += CHUNK) {
+      const batch = docs.slice(i, i + CHUNK);
+      const results = await Promise.all(
+        batch.map(async (evt) => {
+          try {
+            const uv = await Prediction.getUserVote(BigInt(evt.eventId), address);
+            if (!uv?.voted) return null;
+            const aiPredictedOutcome = Number(evt.aiProbability || 0) >= 50;
+            const userPrediction = Boolean(uv.prediction);
+            const isResolved = Boolean(evt.resolved);
+            const outcome = Boolean(evt.outcome);
+            const userCorrect = isResolved ? userPrediction === outcome : null;
+            const aiWasRight = isResolved ? aiPredictedOutcome === outcome : null;
+            const beatAi = isResolved ? Boolean(userCorrect && aiWasRight === false) : null;
+            const rewardPoints = isResolved
+              ? userCorrect
+                ? 50 + (beatAi ? 100 : 0)
+                : 0
+              : null;
+            return {
+              ...evt,
+              _status: isResolved ? "resolved" : "active",
+              userPrediction,
+              aiPredictedOutcome,
+              userCorrect,
+              aiWasRight,
+              beatAi,
+              rewardPoints,
+            };
+          } catch {
+            return null;
+          }
+        })
+      );
+      for (const row of results) {
+        if (row) voted.push(row);
+      }
+    }
+
+    const localized = await withTranslation(voted, String(req.query.lang || ""));
+    return res.json({ success: true, data: localized });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // User event pre-validation (anti-spam + quality gates)
 router.post("/user/validate", async (req, res) => {
   try {
