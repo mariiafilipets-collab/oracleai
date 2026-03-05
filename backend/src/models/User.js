@@ -8,6 +8,7 @@ const userSchema = new mongoose.Schema({
   weeklyPoints: { type: Number, default: 0 },
   streak: { type: Number, default: 0 },
   totalCheckIns: { type: Number, default: 0 },
+  lastCheckIn: { type: Date, default: null },
   tier: { type: String, enum: ["BASIC", "PRO", "WHALE"], default: "BASIC" },
   correctPredictions: { type: Number, default: 0 },
   totalPredictions: { type: Number, default: 0 },

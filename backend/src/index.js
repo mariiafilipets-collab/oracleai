@@ -146,10 +146,15 @@ async function syncUsersFromOnChainSnapshot() {
       const totalCheckIns = Number(pts.totalCheckIns ?? pts[4] ?? 0);
 
       let tier = undefined;
+      let lastCheckInAt = undefined;
       if (CheckIn) {
         try {
           const rec = await CheckIn.getRecord(address);
           tier = ["BASIC", "PRO", "WHALE"][Number(rec.lastTier ?? 0)] || "BASIC";
+          const lastCheckInRaw = Number(rec.lastCheckIn ?? 0);
+          if (lastCheckInRaw > 0) {
+            lastCheckInAt = new Date(lastCheckInRaw * 1000);
+          }
         } catch {}
       }
 
@@ -160,6 +165,7 @@ async function syncUsersFromOnChainSnapshot() {
         totalCheckIns,
       };
       if (tier) update.tier = tier;
+      if (lastCheckInAt) update.lastCheckIn = lastCheckInAt;
 
       await User.findOneAndUpdate({ address }, { $set: update }, { upsert: true });
       updated += 1;

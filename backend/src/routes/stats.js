@@ -6,6 +6,11 @@ import { getContracts } from "../services/blockchain.service.js";
 import config from "../config/index.js";
 
 const router = Router();
+const TIER_ACTIVITY_DEFAULTS = {
+  BASIC: { amount: "0.0015", points: 100 },
+  PRO: { amount: "0.01", points: 300 },
+  WHALE: { amount: "0.05", points: 1000 },
+};
 
 router.get("/", async (req, res) => {
   try {
@@ -68,7 +73,9 @@ router.get("/activity", async (req, res) => {
       .sort({ timestamp: -1 })
       .limit(limit)
       .lean();
-    const data = rows.map((r) => ({
+
+    // Preferred source: indexed check-in logs.
+    let data = rows.map((r) => ({
       address: String(r.address || "").toLowerCase(),
       amount: String(r.amount || "0"),
       tier: String(r.tier || "BASIC"),
@@ -76,6 +83,67 @@ router.get("/activity", async (req, res) => {
       streak: Number(r.streak || 0),
       timestamp: new Date(r.timestamp || Date.now()).getTime(),
     }));
+
+    if (data.length === 0) {
+      // Fallback source: user snapshots synchronized from on-chain state.
+      let users = await User.find({
+        totalCheckIns: { $gt: 0 },
+        lastCheckIn: { $ne: null },
+      })
+        .sort({ lastCheckIn: -1 })
+        .limit(limit)
+        .lean();
+
+      if (users.length === 0) {
+        // If `lastCheckIn` is still missing in DB, lazily hydrate a small set from on-chain.
+        const seedUsers = await User.find({ totalCheckIns: { $gt: 0 } })
+          .select("address totalCheckIns streak tier")
+          .sort({ totalCheckIns: -1 })
+          .limit(Math.min(limit, 50))
+          .lean();
+        const { CheckIn } = getContracts();
+        if (CheckIn) {
+          for (const u of seedUsers) {
+            try {
+              const rec = await CheckIn.getRecord(u.address);
+              const lastCheckInRaw = Number(rec.lastCheckIn ?? 0);
+              if (lastCheckInRaw <= 0) continue;
+              const tier = ["BASIC", "PRO", "WHALE"][Number(rec.lastTier ?? 0)] || (u.tier || "BASIC");
+              await User.updateOne(
+                { address: u.address },
+                {
+                  $set: {
+                    lastCheckIn: new Date(lastCheckInRaw * 1000),
+                    tier,
+                  },
+                }
+              );
+            } catch {}
+          }
+          users = await User.find({
+            totalCheckIns: { $gt: 0 },
+            lastCheckIn: { $ne: null },
+          })
+            .sort({ lastCheckIn: -1 })
+            .limit(limit)
+            .lean();
+        }
+      }
+
+      data = users.map((u) => {
+        const tier = String(u.tier || "BASIC");
+        const defaults = TIER_ACTIVITY_DEFAULTS[tier] || TIER_ACTIVITY_DEFAULTS.BASIC;
+        return {
+          address: String(u.address || "").toLowerCase(),
+          amount: defaults.amount,
+          tier,
+          points: defaults.points,
+          streak: Number(u.streak || 0),
+          timestamp: new Date(u.lastCheckIn || Date.now()).getTime(),
+        };
+      });
+    }
+
     res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

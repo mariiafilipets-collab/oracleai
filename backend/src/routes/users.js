@@ -337,6 +337,9 @@ router.get("/:address", async (req, res) => {
         totalCheckIns: typeof onChainData.totalCheckIns === "number" ? onChainData.totalCheckIns : 0,
       };
       if (onChainData.lastTier) update.tier = onChainData.lastTier;
+      if (typeof onChainData.lastCheckIn === "number" && onChainData.lastCheckIn > 0) {
+        update.lastCheckIn = new Date(onChainData.lastCheckIn * 1000);
+      }
 
       await User.findOneAndUpdate(
         { address },
