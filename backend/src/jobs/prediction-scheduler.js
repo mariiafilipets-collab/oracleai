@@ -12,6 +12,7 @@ const RESOLVE_INTERVAL = 5 * 60 * 1000;      // 5 minutes
 const REFILL_CHECK_INTERVAL = 5 * 60 * 1000; // 5 minutes
 const WEEKLY_CHECK_INTERVAL = 60 * 60 * 1000; // 1 hour
 const NIGHTLY_RETRY_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours
+const PROTOCOL_FEE_DISTRIBUTION_CHECK_INTERVAL = 10 * 60 * 1000; // 10 minutes
 const WEEK_SECONDS = 7 * 24 * 60 * 60;
 const MAX_WEEKLY_WINNERS = 1000;
 const MIN_WINNER_REWARD_WEI = 200000000000000n; // 0.0002 BNB
@@ -141,8 +142,9 @@ export function initScheduler(socketIO) {
     schedulerTimers.push(setInterval(scheduledGenerate, GENERATE_INTERVAL));
     schedulerTimers.push(setInterval(weeklyCheck, WEEKLY_CHECK_INTERVAL));
     schedulerTimers.push(setInterval(nightlyRetryPendingResolutions, NIGHTLY_RETRY_INTERVAL));
+    schedulerTimers.push(setInterval(distributeProtocolFeesIfDue, PROTOCOL_FEE_DISTRIBUTION_CHECK_INTERVAL));
 
-    console.log(`[Scheduler] Running. Resolve: ${RESOLVE_INTERVAL / 1000}s | Refill: ${REFILL_CHECK_INTERVAL / 60000}min | Gen: ${GENERATE_INTERVAL / 60000}min | Weekly: ${WEEKLY_CHECK_INTERVAL / 60000}min`);
+    console.log(`[Scheduler] Running. Resolve: ${RESOLVE_INTERVAL / 1000}s | Refill: ${REFILL_CHECK_INTERVAL / 60000}min | Gen: ${GENERATE_INTERVAL / 60000}min | Weekly: ${WEEKLY_CHECK_INTERVAL / 60000}min | Fees: ${PROTOCOL_FEE_DISTRIBUTION_CHECK_INTERVAL / 60000}min`);
   }, 5000);
 }
 
@@ -676,6 +678,33 @@ async function nightlyRetryPendingResolutions() {
     }
   } catch (e) {
     console.warn(`[Scheduler] Nightly retry skipped: ${e.message}`);
+  }
+}
+
+async function distributeProtocolFeesIfDue() {
+  try {
+    const { Prediction } = getContracts();
+    const signer = getSigner();
+    if (!Prediction || !signer || !Prediction.getProtocolDistributionState || !Prediction.distributeProtocolFees) {
+      return;
+    }
+
+    const state = await Prediction.getProtocolDistributionState();
+    const pending = BigInt(state?.pendingAmount ?? state?.[0] ?? 0n);
+    const secondsLeft = Number(state?.secondsLeft ?? state?.[2] ?? 0n);
+    if (pending <= 0n || secondsLeft > 0) return;
+
+    try {
+      const tx = await Prediction.distributeProtocolFees();
+      await tx.wait();
+      console.log(`[Scheduler] Distributed batched protocol fees: ${pending.toString()} wei`);
+    } catch (err) {
+      const msg = String(err?.message || err || "");
+      if (msg.includes("Distribution cooldown") || msg.includes("No protocol fees")) return;
+      console.warn(`[Scheduler] Protocol fee distribution failed: ${msg.slice(0, 140)}`);
+    }
+  } catch (e) {
+    console.warn(`[Scheduler] Protocol fee distribution check skipped: ${e.message}`);
   }
 }
 
