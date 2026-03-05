@@ -263,6 +263,28 @@ router.get("/:address", async (req, res) => {
       } catch {}
     }
 
+    // Keep leaderboard data in sync even when event log indexing lags due RPC limits.
+    if (typeof onChainData.points === "number") {
+      const update = {
+        totalPoints: onChainData.points,
+        weeklyPoints: typeof onChainData.weeklyPoints === "number" ? onChainData.weeklyPoints : 0,
+        streak: typeof onChainData.streak === "number" ? onChainData.streak : 0,
+        totalCheckIns: typeof onChainData.totalCheckIns === "number" ? onChainData.totalCheckIns : 0,
+      };
+      if (onChainData.lastTier) update.tier = onChainData.lastTier;
+
+      await User.findOneAndUpdate(
+        { address },
+        {
+          $set: update,
+          $setOnInsert: { address, referralCode: buildReferralCode(address), joinedAt: new Date() },
+        },
+        { upsert: true }
+      );
+
+      user = await User.findOne({ address }).lean();
+    }
+
     if (!user) {
       user = { address, totalPoints: 0, weeklyPoints: 0, streak: 0, tier: "BASIC" };
     }
