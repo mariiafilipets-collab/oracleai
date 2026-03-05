@@ -169,9 +169,10 @@ router.get("/:address/referral-stats", async (req, res) => {
 router.get("/:address/creator-stats", async (req, res) => {
   try {
     const address = req.params.address.toLowerCase();
+    const creatorMatch = new RegExp(`^${address}$`, "i");
     const { Prediction } = getContracts();
     const [summary] = await PredictionEvent.aggregate([
-      { $match: { isUserEvent: true, creator: address } },
+      { $match: { isUserEvent: true, creator: creatorMatch } },
       {
         $group: {
           _id: null,
@@ -218,7 +219,7 @@ router.get("/:address/creator-stats", async (req, res) => {
       },
     ]);
 
-    const latestEvents = await PredictionEvent.find({ isUserEvent: true, creator: address })
+    const latestEvents = await PredictionEvent.find({ isUserEvent: true, creator: creatorMatch })
       .sort({ createdAt: -1 })
       .limit(10)
       .select("eventId title category deadline resolved totalVotesYes totalVotesNo listingFeeWei sourcePolicy")

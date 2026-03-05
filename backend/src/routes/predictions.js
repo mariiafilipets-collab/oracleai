@@ -398,7 +398,7 @@ router.post("/user/ingest", async (req, res) => {
       category,
       aiProbability: Math.max(0, Math.min(100, Number(aiAssessment?.aiProbability ?? evt.aiProbability ?? 50n))),
       deadline: new Date(Number(evt.deadline || 0n) * 1000),
-      creator: String(evt.creator || ""),
+      creator: String(evt.creator || "").toLowerCase(),
       isUserEvent: Boolean(evt.isUserEvent),
       listingFeeWei: String(evt.listingFee || 0n),
       sourcePolicy: String(evt.sourcePolicy || ""),
