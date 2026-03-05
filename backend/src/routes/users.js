@@ -13,6 +13,26 @@ function buildReferralCode(address) {
   return String(address || "").toLowerCase().slice(2, 10).toUpperCase();
 }
 
+function parseReferralAttribution(input) {
+  const src = String(input?.utmSource || "").trim().slice(0, 64);
+  const med = String(input?.utmMedium || "").trim().slice(0, 64);
+  const camp = String(input?.utmCampaign || "").trim().slice(0, 96);
+  const content = String(input?.utmContent || "").trim().slice(0, 96);
+  const landingPath = String(input?.landingPath || "").trim().slice(0, 256);
+  const eventIdRaw = Number(input?.eventId || 0);
+  const eventId = Number.isFinite(eventIdRaw) && eventIdRaw > 0 ? eventIdRaw : null;
+  if (!src && !camp && !eventId) return null;
+  return {
+    utmSource: src,
+    utmMedium: med,
+    utmCampaign: camp,
+    utmContent: content,
+    eventId,
+    landingPath,
+    attributedAt: new Date(),
+  };
+}
+
 async function ensureSystemReferrerUser() {
   const signer = getSigner();
   if (!signer) return null;
@@ -65,7 +85,7 @@ router.get("/:address/referral-stats", async (req, res) => {
     const sevenDaysAgo = new Date(now - 7 * 24 * 60 * 60 * 1000);
 
     const directRefs = await User.find({ referrer: address })
-      .select("address joinedAt totalPoints weeklyPoints totalCheckIns tier")
+      .select("address joinedAt totalPoints weeklyPoints totalCheckIns tier referralAttribution")
       .sort({ joinedAt: -1 })
       .lean();
 
@@ -106,6 +126,25 @@ router.get("/:address/referral-stats", async (req, res) => {
     const recentDirect7d = directRefs.filter((u) => new Date(u.joinedAt).getTime() >= sevenDaysAgo.getTime()).length;
     const totalDownline = levels.reduce((acc, lvl) => acc + lvl.count, 0);
 
+    const sourceCounts = {};
+    const campaignCounts = {};
+    const eventCounts = {};
+    for (const u of directRefs) {
+      const attr = u?.referralAttribution || {};
+      const src = String(attr.utmSource || "").trim().toLowerCase();
+      const campaign = String(attr.utmCampaign || "").trim();
+      const eventId = Number(attr.eventId || 0);
+      if (src) sourceCounts[src] = (sourceCounts[src] || 0) + 1;
+      if (campaign) campaignCounts[campaign] = (campaignCounts[campaign] || 0) + 1;
+      if (eventId > 0) eventCounts[String(eventId)] = (eventCounts[String(eventId)] || 0) + 1;
+    }
+
+    const top = (obj, limit = 8) =>
+      Object.entries(obj)
+        .map(([key, count]) => ({ key, count: Number(count || 0) }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, limit);
+
     res.json({
       success: true,
       data: {
@@ -115,6 +154,11 @@ router.get("/:address/referral-stats", async (req, res) => {
         recentDirect7d,
         activeDirect7d,
         directRefs: directRefs.slice(0, 20),
+        shareAttribution: {
+          bySource: top(sourceCounts),
+          byCampaign: top(campaignCounts),
+          byEvent: top(eventCounts),
+        },
       },
     });
   } catch (err) {
@@ -399,6 +443,7 @@ router.post("/:address/referral", async (req, res) => {
     }
     const referrerCode = String(req.body?.referrerCode || "").trim().toUpperCase();
     const isSystemCode = referrerCode === SYSTEM_REFERRAL_CODE;
+    const referralAttribution = parseReferralAttribution(req.body?.attribution);
 
     if (!referrerCode) {
       return res.status(400).json({ success: false, error: "Referral code required" });
@@ -425,10 +470,14 @@ router.post("/:address/referral", async (req, res) => {
     // but no on-chain referrer link is set, so referral fee share
     // flows to treasury via CheckIn fallback instead of referral payouts.
     if (isSystemCode) {
+      const update = {
+        referrer: referrerUser.address,
+      };
+      if (referralAttribution) update.referralAttribution = referralAttribution;
       await User.findOneAndUpdate(
         { address: userAddress },
         {
-          $set: { referrer: referrerUser.address },
+          $set: update,
           $setOnInsert: { address: userAddress, referralCode: buildReferralCode(userAddress), joinedAt: new Date() },
         },
         { upsert: true }
@@ -485,10 +534,14 @@ router.post("/:address/referral", async (req, res) => {
     }
     await tx.wait();
 
+    const update = {
+      referrer: referrerUser.address,
+    };
+    if (referralAttribution) update.referralAttribution = referralAttribution;
     await User.findOneAndUpdate(
       { address: userAddress },
       {
-        $set: { referrer: referrerUser.address },
+        $set: update,
         $setOnInsert: { address: userAddress, referralCode: buildReferralCode(userAddress), joinedAt: new Date() },
       },
       { upsert: true }
