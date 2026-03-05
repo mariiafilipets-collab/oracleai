@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { ethers } from "ethers";
 import PredictionEvent from "../models/PredictionEvent.js";
 import { assessUserEventForListing, generateDailyPredictions } from "../services/ai.service.js";
 import { getContracts, getSigner } from "../services/blockchain.service.js";
@@ -18,6 +19,26 @@ function normalizeTitle(value) {
     .trim();
 }
 
+async function readPredictionValueNoArgs(prediction, fragment, methodName, fallback) {
+  try {
+    if (typeof prediction?.[methodName] === "function") {
+      return await prediction[methodName]();
+    }
+  } catch {}
+  try {
+    const provider = prediction?.runner?.provider;
+    const to = prediction?.target || prediction?.address;
+    if (!provider || !to) return fallback;
+    const iface = new ethers.Interface([fragment]);
+    const data = iface.encodeFunctionData(methodName, []);
+    const raw = await provider.call({ to, data });
+    const decoded = iface.decodeFunctionResult(methodName, raw);
+    return decoded?.[0] ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 async function getCreatorCooldownState(creatorAddress) {
   const creator = String(creatorAddress || "").toLowerCase();
   if (!ADDRESS_RE.test(creator)) {
@@ -29,18 +50,24 @@ async function getCreatorCooldownState(creatorAddress) {
   }
   const nextAllowedRaw = await Prediction.nextUserEventAt(creator);
   const cooldownRaw = await Prediction.getCreatorCooldown(creator);
-  let voteFeeRaw = 0n;
-  let creatorShareRaw = 5000n;
-  let minVotesRaw = 20n;
-  if (Prediction.userEventVoteFee) {
-    try { voteFeeRaw = await Prediction.userEventVoteFee(); } catch {}
-  }
-  if (Prediction.creatorShareBps) {
-    try { creatorShareRaw = await Prediction.creatorShareBps(); } catch {}
-  }
-  if (Prediction.minCreatorPayoutVotes) {
-    try { minVotesRaw = await Prediction.minCreatorPayoutVotes(); } catch {}
-  }
+  const voteFeeRaw = await readPredictionValueNoArgs(
+    Prediction,
+    "function userEventVoteFee() view returns (uint256)",
+    "userEventVoteFee",
+    0n
+  );
+  const creatorShareRaw = await readPredictionValueNoArgs(
+    Prediction,
+    "function creatorShareBps() view returns (uint16)",
+    "creatorShareBps",
+    5000n
+  );
+  const minVotesRaw = await readPredictionValueNoArgs(
+    Prediction,
+    "function minCreatorPayoutVotes() view returns (uint256)",
+    "minCreatorPayoutVotes",
+    20n
+  );
   const nowSec = Math.floor(Date.now() / 1000);
   const nextAllowedAt = Number(nextAllowedRaw || 0n);
   return {

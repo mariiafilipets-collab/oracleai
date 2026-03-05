@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { ethers } from "ethers";
 import User from "../models/User.js";
 import CheckInRecord from "../models/CheckInRecord.js";
 import PredictionEvent from "../models/PredictionEvent.js";
@@ -35,6 +36,26 @@ function isBadContractDataError(err) {
 function isAccessControlError(err) {
   const msg = String(err?.message || err || "");
   return msg.includes("AccessControlUnauthorizedAccount") || msg.includes("missing role");
+}
+
+async function readPredictionValueNoArgs(prediction, fragment, methodName, fallback) {
+  try {
+    if (typeof prediction?.[methodName] === "function") {
+      return await prediction[methodName]();
+    }
+  } catch {}
+  try {
+    const provider = prediction?.runner?.provider;
+    const to = prediction?.target || prediction?.address;
+    if (!provider || !to) return fallback;
+    const iface = new ethers.Interface([fragment]);
+    const data = iface.encodeFunctionData(methodName, []);
+    const raw = await provider.call({ to, data });
+    const decoded = iface.decodeFunctionResult(methodName, raw);
+    return decoded?.[0] ?? fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 router.get("/:address/referral-stats", async (req, res) => {
@@ -168,17 +189,38 @@ router.get("/:address/creator-stats", async (req, res) => {
     let minCreatorPayoutVotes = 20;
     if (Prediction) {
       try {
-        onChainCreatorClaimableWei = String(await Prediction.creatorClaimableWei(address));
+        if (typeof Prediction.creatorClaimableWei === "function") {
+          onChainCreatorClaimableWei = String(await Prediction.creatorClaimableWei(address));
+        } else {
+          const provider = Prediction?.runner?.provider;
+          const to = Prediction?.target || Prediction?.address;
+          if (provider && to) {
+            const iface = new ethers.Interface(["function creatorClaimableWei(address) view returns (uint256)"]);
+            const data = iface.encodeFunctionData("creatorClaimableWei", [address]);
+            const raw = await provider.call({ to, data });
+            const dec = iface.decodeFunctionResult("creatorClaimableWei", raw);
+            onChainCreatorClaimableWei = String(dec?.[0] ?? 0n);
+          }
+        }
       } catch {}
-      try {
-        voteFeeWei = String(await Prediction.userEventVoteFee());
-      } catch {}
-      try {
-        creatorShareBps = Number(await Prediction.creatorShareBps());
-      } catch {}
-      try {
-        minCreatorPayoutVotes = Number(await Prediction.minCreatorPayoutVotes());
-      } catch {}
+      voteFeeWei = String(await readPredictionValueNoArgs(
+        Prediction,
+        "function userEventVoteFee() view returns (uint256)",
+        "userEventVoteFee",
+        0n
+      ));
+      creatorShareBps = Number(await readPredictionValueNoArgs(
+        Prediction,
+        "function creatorShareBps() view returns (uint16)",
+        "creatorShareBps",
+        5000n
+      ));
+      minCreatorPayoutVotes = Number(await readPredictionValueNoArgs(
+        Prediction,
+        "function minCreatorPayoutVotes() view returns (uint256)",
+        "minCreatorPayoutVotes",
+        20n
+      ));
     }
 
     res.json({
