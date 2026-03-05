@@ -136,22 +136,66 @@
       }
     },
     "alloc": {
-      "airdrop": { "name": "Community Airdrop", "desc": "Distributed proportionally to pre-TGE points" },
-      "liquidity": { "name": "Liquidity", "desc": "DEX trading pairs, locked 2 years" },
-      "team": { "name": "Team & Advisors", "desc": "2-year vesting, 6-month cliff" },
-      "treasury": { "name": "Treasury (DAO)", "desc": "Governance-controlled development fund" },
-      "stakingRewards": { "name": "Staking Rewards", "desc": "Distributed over 4 years to stakers" },
-      "prizePool": { "name": "Prize Pool (OAI)", "desc": "Weekly OAI prizes post-TGE" },
-      "referral": { "name": "Referral Rewards", "desc": "OAI bonuses for top referrers" },
-      "marketing": { "name": "Marketing", "desc": "Partnerships, campaigns, 1-year vest" },
-      "ecosystem": { "name": "Ecosystem Fund", "desc": "Grants, hackathons, integrations" }
+      "airdrop": {
+        "name": "Community Airdrop",
+        "desc": "Distributed proportionally to pre-TGE points"
+      },
+      "liquidity": {
+        "name": "Liquidity",
+        "desc": "DEX trading pairs, locked 2 years"
+      },
+      "team": {
+        "name": "Team & Advisors",
+        "desc": "2-year vesting, 6-month cliff"
+      },
+      "treasury": {
+        "name": "Treasury (DAO)",
+        "desc": "Governance-controlled development fund"
+      },
+      "stakingRewards": {
+        "name": "Staking Rewards",
+        "desc": "Distributed over 4 years to stakers"
+      },
+      "prizePool": {
+        "name": "Prize Pool (OAI)",
+        "desc": "Weekly OAI prizes post-TGE"
+      },
+      "referral": {
+        "name": "Referral Rewards",
+        "desc": "OAI bonuses for top referrers"
+      },
+      "marketing": {
+        "name": "Marketing",
+        "desc": "Partnerships, campaigns, 1-year vest"
+      },
+      "ecosystem": {
+        "name": "Ecosystem Fund",
+        "desc": "Grants, hackathons, integrations"
+      }
     },
-    "tiers": { "bronze": "Bronze", "silver": "Silver", "gold": "Gold", "diamond": "Diamond" },
+    "tiers": {
+      "bronze": "Bronze",
+      "silver": "Silver",
+      "gold": "Gold",
+      "diamond": "Diamond"
+    },
     "deflationItems": {
-      "buyback": { "title": "Buyback & Burn", "desc": "10% of fees -> buy OAI -> burn forever" },
-      "quarterly": { "title": "Quarterly Burns", "desc": "Treasury burns based on revenue" },
-      "stakingLocks": { "title": "Staking Locks", "desc": "Staked OAI removed from circulation" },
-      "vestingLocks": { "title": "Vesting Locks", "desc": "Team tokens locked, released over 2 years" }
+      "buyback": {
+        "title": "Buyback & Burn",
+        "desc": "10% of fees -> buy OAI -> burn forever"
+      },
+      "quarterly": {
+        "title": "Quarterly Burns",
+        "desc": "Treasury burns based on revenue"
+      },
+      "stakingLocks": {
+        "title": "Staking Locks",
+        "desc": "Staked OAI removed from circulation"
+      },
+      "vestingLocks": {
+        "title": "Vesting Locks",
+        "desc": "Team tokens locked, released over 2 years"
+      }
     },
     "metrics": {
       "maxSupply": "Max Supply",
@@ -160,7 +204,7 @@
       "teamVesting": "Team Vesting"
     },
     "creatorEconomy": {
-      "title": "Creator Economy (Variant C)",
+      "title": "Creator Economy",
       "desc": "Hybrid model for user-created events: vote fee + quality-gated creator rewards.",
       "voteFeeTitle": "Vote fee on user events",
       "voteFeeDesc": "Every vote on a user event pays a small BNB fee.",
@@ -189,23 +233,59 @@
     "visionP1": "OracleAI Predict is building the world's most engaging prediction market, where artificial intelligence generates real-world events, users compete to predict outcomes, and the entire system runs transparently on-chain.",
     "visionP2": "Our mission: make prediction markets accessible, entertaining, and rewarding for everyone - not just traders. By combining AI-powered event generation, gamified participation mechanics, and fair token distribution, we create a platform where knowledge and intuition translate into real value.",
     "problemItems": {
-      "1": { "title": "Boring & Complex", "desc": "Traditional prediction markets require deep domain expertise and are intimidating for casual users." },
-      "2": { "title": "Centralized", "desc": "Platforms like Polymarket rely on centralized resolution. Users must trust the operator." },
-      "3": { "title": "No Engagement Loop", "desc": "Most platforms lack gamification - no streaks, no leaderboards, and no social features to drive retention." }
+      "1": {
+        "title": "Boring & Complex",
+        "desc": "Traditional prediction markets require deep domain expertise and are intimidating for casual users."
+      },
+      "2": {
+        "title": "Centralized",
+        "desc": "Platforms like Polymarket rely on centralized resolution. Users must trust the operator."
+      },
+      "3": {
+        "title": "No Engagement Loop",
+        "desc": "Most platforms lack gamification - no streaks, no leaderboards, and no social features to drive retention."
+      }
     },
     "solutionIntro": "OracleAI Predict solves all three problems with a unique AI + blockchain + gamification stack:",
     "solutionItems": {
-      "aiGeneration": { "title": "AI Event Generation", "desc": "OracleAI Event Engine, our proprietary AI stack, continuously analyzes live data and generates high-relevance prediction events every 90 minutes across 5 categories." },
-      "aiVerification": { "title": "AI Result Verification", "desc": "When events expire, AI searches the web for actual outcomes - real scores, real prices, real results. No human intervention needed." },
-      "gamification": { "title": "Gamified Engagement", "desc": "Daily check-ins with streaks, 4-tier staking, 6-level referrals, weekly leaderboard prizes, achievement badges. Every action earns points." },
-      "onchain": { "title": "Fully On-Chain", "desc": "All fees, points, predictions, and votes are recorded on BNB Chain smart contracts. Transparent, immutable, trustless." }
+      "aiGeneration": {
+        "title": "AI Event Generation",
+        "desc": "OracleAI Event Engine, our proprietary AI stack, continuously analyzes live data and generates high-relevance prediction events every 90 minutes across 5 categories."
+      },
+      "aiVerification": {
+        "title": "AI Result Verification",
+        "desc": "When events expire, AI searches the web for actual outcomes - real scores, real prices, real results. No human intervention needed."
+      },
+      "gamification": {
+        "title": "Gamified Engagement",
+        "desc": "Daily check-ins with streaks, 4-tier staking, 6-level referrals, weekly leaderboard prizes, achievement badges. Every action earns points."
+      },
+      "onchain": {
+        "title": "Fully On-Chain",
+        "desc": "All fees, points, predictions, and votes are recorded on BNB Chain smart contracts. Transparent, immutable, trustless."
+      }
     },
     "howItems": {
-      "1": { "title": "Connect Wallet", "desc": "MetaMask, Trust Wallet, or any Web3 wallet. No registration, no KYC." },
-      "2": { "title": "Daily Check-In", "desc": "Choose Basic (0.0015 BNB), Pro (0.01 BNB), or Whale (0.05 BNB). Earn 100 to 1,000 points per check-in. Build streaks for up to +50% bonus." },
-      "3": { "title": "Predict Events", "desc": "Vote Agree or Disagree on AI-generated predictions. Correct prediction = +50 pts. Beat the AI = +100 bonus." },
-      "4": { "title": "Climb Leaderboard", "desc": "Up to 1,000 players share 50% of all weekly fees in BNB via dynamic payouts." },
-      "5": { "title": "Earn $OAI Airdrop", "desc": "All accumulated points convert proportionally to OAI tokens at TGE. 40% of supply (400M tokens) reserved for community airdrop." }
+      "1": {
+        "title": "Connect Wallet",
+        "desc": "MetaMask, Trust Wallet, or any Web3 wallet. No registration, no KYC."
+      },
+      "2": {
+        "title": "Daily Check-In",
+        "desc": "Choose Basic (0.0015 BNB), Pro (0.01 BNB), or Whale (0.05 BNB). Earn 100 to 1,000 points per check-in. Build streaks for up to +50% bonus."
+      },
+      "3": {
+        "title": "Predict Events",
+        "desc": "Vote Agree or Disagree on AI-generated predictions. Correct prediction = +50 pts. Beat the AI = +100 bonus."
+      },
+      "4": {
+        "title": "Climb Leaderboard",
+        "desc": "Up to 1,000 players share 50% of all weekly fees in BNB via dynamic payouts."
+      },
+      "5": {
+        "title": "Earn $OAI Airdrop",
+        "desc": "All accumulated points convert proportionally to OAI tokens at TGE. 40% of supply (400M tokens) reserved for community airdrop."
+      }
     },
     "tokenSupply": "Total Supply: 1,000,000,000 OAI - Deflationary by design",
     "tokenAllocation": "Token Allocation",
@@ -230,10 +310,45 @@
     },
     "oaiRequired": "OAI Required",
     "roadmapItems": {
-      "q1": { "title": "Foundation", "items": { "1": "Smart contracts on BNB testnet", "2": "AI prediction engine v1", "3": "Web app launch", "4": "Community building (10K users)" } },
-      "q2": { "title": "Growth", "items": { "1": "BNB mainnet deployment", "2": "Certik/PeckShield audit", "3": "Telegram Mini-App", "4": "50K daily active users", "5": "Partnership with data oracles" } },
-      "q3": { "title": "Product Expansion", "items": { "1": "Mobile app beta (React Native)", "2": "Premium AI prediction modes", "3": "RWA prediction market pilots", "4": "Cross-chain readiness and bridge integrations", "5": "Pre-TGE growth campaign and ecosystem onboarding" } },
-      "q4": { "title": "TGE & Scale", "items": { "1": "$OAI token generation event (TGE)", "2": "PancakeSwap listing and liquidity activation", "3": "Staking launch with 4 lock tiers", "4": "DAO governance activation", "5": "100K+ daily active users and treasury target: $4-15M" } }
+      "q1": {
+        "title": "Foundation",
+        "items": {
+          "1": "Smart contracts on BNB testnet",
+          "2": "AI prediction engine v1",
+          "3": "Web app launch",
+          "4": "Community building (10K users)"
+        }
+      },
+      "q2": {
+        "title": "Growth",
+        "items": {
+          "1": "BNB mainnet deployment",
+          "2": "Certik/PeckShield audit",
+          "3": "Telegram Mini-App",
+          "4": "50K daily active users",
+          "5": "Partnership with data oracles"
+        }
+      },
+      "q3": {
+        "title": "Product Expansion",
+        "items": {
+          "1": "Mobile app beta (React Native)",
+          "2": "Premium AI prediction modes",
+          "3": "RWA prediction market pilots",
+          "4": "Cross-chain readiness and bridge integrations",
+          "5": "Pre-TGE growth campaign and ecosystem onboarding"
+        }
+      },
+      "q4": {
+        "title": "TGE & Scale",
+        "items": {
+          "1": "$OAI token generation event (TGE)",
+          "2": "PancakeSwap listing and liquidity activation",
+          "3": "Staking launch with 4 lock tiers",
+          "4": "DAO governance activation",
+          "5": "100K+ daily active users and treasury target: $4-15M"
+        }
+      }
     },
     "tgeUtilityTitle": "TGE Conversion & Post-TGE Utility",
     "pointsToOaiTitle": "Points to OAI conversion",
@@ -241,7 +356,7 @@
     "pointsToOaiFormula": "Your OAI = (YourPoints / TotalPoints) x AirdropPool",
     "pointsAfterTgeTitle": "Points after TGE",
     "pointsAfterTgeDesc": "Points remain as a seasonal reputation layer for leaderboards, quests, campaign eligibility, and partner incentives.",
-    "creatorEconomyTitle": "Creator Economy (Variant C)",
+    "creatorEconomyTitle": "Creator Economy",
     "creatorEconomyFlowTitle": "How the flow works",
     "creatorEconomyFlow1": "User event creation keeps fixed listing fee for anti-spam.",
     "creatorEconomyFlow2": "Each vote on user events pays a small vote fee.",
@@ -392,14 +507,38 @@
     "levelRewards": "Rewards by level: L1: 10% · L2: 5% · L3: 3% · L4: 2% · L5: 1.5% · L6: 1%",
     "badges": "Achievement Badges",
     "badgeItems": {
-      "firstCheckin": { "name": "First Check-in", "desc": "Complete your first check-in" },
-      "streak3": { "name": "3-Day Streak", "desc": "Maintain a 3-day streak" },
-      "streak7": { "name": "Week Warrior", "desc": "Reach a 7-day streak" },
-      "predictor": { "name": "Oracle Initiate", "desc": "Make 5 predictions" },
-      "accurate": { "name": "Oracle Master", "desc": "Reach 90%+ prediction accuracy" },
-      "referrer": { "name": "Network Builder", "desc": "Refer 5 friends" },
-      "whale": { "name": "Whale Status", "desc": "Check in as Whale tier" },
-      "top10": { "name": "Top 10", "desc": "Reach weekly top 10" }
+      "firstCheckin": {
+        "name": "First Check-in",
+        "desc": "Complete your first check-in"
+      },
+      "streak3": {
+        "name": "3-Day Streak",
+        "desc": "Maintain a 3-day streak"
+      },
+      "streak7": {
+        "name": "Week Warrior",
+        "desc": "Reach a 7-day streak"
+      },
+      "predictor": {
+        "name": "Oracle Initiate",
+        "desc": "Make 5 predictions"
+      },
+      "accurate": {
+        "name": "Oracle Master",
+        "desc": "Reach 90%+ prediction accuracy"
+      },
+      "referrer": {
+        "name": "Network Builder",
+        "desc": "Refer 5 friends"
+      },
+      "whale": {
+        "name": "Whale Status",
+        "desc": "Check in as Whale tier"
+      },
+      "top10": {
+        "name": "Top 10",
+        "desc": "Reach weekly top 10"
+      }
     },
     "history": "Check-in History",
     "noCheckins": "No check-ins yet",
@@ -444,9 +583,15 @@
     "creatorVotes": "votes",
     "creatorNoEvents": "No user-created events yet",
     "creativeCards": {
-      "x": { "title": "Post for X" },
-      "telegram": { "title": "Post for Telegram" },
-      "instagram": { "title": "Story for Instagram" }
+      "x": {
+        "title": "Post for X"
+      },
+      "telegram": {
+        "title": "Post for Telegram"
+      },
+      "instagram": {
+        "title": "Story for Instagram"
+      }
     },
     "creatives": {
       "x1": "I am earning with AI predictions on BNB Chain. Join with my referral link:",
@@ -513,19 +658,69 @@
     "hideGuide": "Hide Guide",
     "step": "Step",
     "steps": {
-      "1": { "title": "Connect Wallet", "desc": "Connect MetaMask or any Web3 wallet to start", "detail": "Your wallet is your identity. All points and earnings are tied to your address. No email or registration needed." },
-      "2": { "title": "Daily Check-In", "desc": "Pay a small fee to check in and earn base points", "detail": "Choose your tier: Basic (0.0015 BNB, 1x), Pro (0.01 BNB, 3x), Whale (0.05 BNB, 10x). Check in daily for streak bonus up to +50%!" },
-      "3": { "title": "Make Predictions", "desc": "Agree or disagree with AI predictions about real events", "detail": "AI creates predictions about sports, crypto, politics, economy, climate. Correct = +50 pts. Beat AI = +100 bonus!" },
-      "4": { "title": "Climb Leaderboard", "desc": "Compete weekly for BNB prizes from the prize pool", "detail": "Up to 1,000 winners receive dynamic BNB rewards weekly. Winner count adapts to pool size to keep payouts meaningful." },
-      "5": { "title": "Earn OAI Airdrop", "desc": "Your points convert to OAI tokens at TGE", "detail": "40% of OAI supply (400M) airdropped based on points. Total community share: 58%!" }
+      "1": {
+        "title": "Connect Wallet",
+        "desc": "Connect MetaMask or any Web3 wallet to start",
+        "detail": "Your wallet is your identity. All points and earnings are tied to your address. No email or registration needed."
+      },
+      "2": {
+        "title": "Daily Check-In",
+        "desc": "Pay a small fee to check in and earn base points",
+        "detail": "Choose your tier: Basic (0.0015 BNB, 1x), Pro (0.01 BNB, 3x), Whale (0.05 BNB, 10x). Check in daily for streak bonus up to +50%!"
+      },
+      "3": {
+        "title": "Make Predictions",
+        "desc": "Agree or disagree with AI predictions about real events",
+        "detail": "AI creates predictions about sports, crypto, politics, economy, climate. Correct = +50 pts. Beat AI = +100 bonus!"
+      },
+      "4": {
+        "title": "Climb Leaderboard",
+        "desc": "Compete weekly for BNB prizes from the prize pool",
+        "detail": "Up to 1,000 winners receive dynamic BNB rewards weekly. Winner count adapts to pool size to keep payouts meaningful."
+      },
+      "5": {
+        "title": "Earn OAI Airdrop",
+        "desc": "Your points convert to OAI tokens at TGE",
+        "detail": "40% of OAI supply (400M) airdropped based on points. Total community share: 58%!"
+      }
     },
     "earn": {
-      "checkin": { "title": "Daily Check-In", "pts": "100-1,000", "desc": "Basic (100), Pro (300), Whale (1,000 pts)", "tip": "Daily streak bonus up to +50% at 7 days!" },
-      "prediction": { "title": "Correct Prediction", "pts": "+50", "desc": "Vote Agree/Disagree. Correct = +50 pts", "tip": "Beat AI for +100 bonus!" },
-      "streak": { "title": "Streak Bonus", "pts": "up to +50%", "desc": "Consecutive daily check-ins boost points", "tip": "Day 1: +7%, Day 3: +21%, Day 7: +50%" },
-      "referrals": { "title": "Referrals", "pts": "6 levels", "desc": "Earn % of referrals' check-in fees", "tip": "L1:10% L2:5% L3:3% L4:2% L5:1.5% L6:1%" },
-      "staking": { "title": "Staking Boost", "pts": "+10-50%", "desc": "Bronze/Silver/Gold/Diamond tiers", "tip": "Diamond: +50% points, +20% referral!" },
-      "prizes": { "title": "Weekly Prizes", "pts": "BNB", "desc": "Up to 1,000 winners share 50% of fees in BNB", "tip": "Dynamic winner count and weighted tiers keep rewards sustainable." }
+      "checkin": {
+        "title": "Daily Check-In",
+        "pts": "100-1,000",
+        "desc": "Basic (100), Pro (300), Whale (1,000 pts)",
+        "tip": "Daily streak bonus up to +50% at 7 days!"
+      },
+      "prediction": {
+        "title": "Correct Prediction",
+        "pts": "+50",
+        "desc": "Vote Agree/Disagree. Correct = +50 pts",
+        "tip": "Beat AI for +100 bonus!"
+      },
+      "streak": {
+        "title": "Streak Bonus",
+        "pts": "up to +50%",
+        "desc": "Consecutive daily check-ins boost points",
+        "tip": "Day 1: +7%, Day 3: +21%, Day 7: +50%"
+      },
+      "referrals": {
+        "title": "Referrals",
+        "pts": "6 levels",
+        "desc": "Earn % of referrals' check-in fees",
+        "tip": "L1:10% L2:5% L3:3% L4:2% L5:1.5% L6:1%"
+      },
+      "staking": {
+        "title": "Staking Boost",
+        "pts": "+10-50%",
+        "desc": "Bronze/Silver/Gold/Diamond tiers",
+        "tip": "Diamond: +50% points, +20% referral!"
+      },
+      "prizes": {
+        "title": "Weekly Prizes",
+        "pts": "BNB",
+        "desc": "Up to 1,000 winners share 50% of fees in BNB",
+        "tip": "Dynamic winner count and weighted tiers keep rewards sustainable."
+      }
     }
   },
   "welcome": {
@@ -638,12 +833,30 @@
     "title": "Everything your team needs to forecast, engage, and scale.",
     "subtitle": "OracleAI Predict is designed around one goal: improve decisions while increasing user retention and trust.",
     "items": {
-      "ai": { "title": "Adaptive AI Forecasting", "body": "Generate high-signal predictions with real-time updates from market data and sentiment context." },
-      "incentives": { "title": "On-Chain Incentive Engine", "body": "Reward participation through transparent points, staking boosts, and referral logic." },
-      "leaderboard": { "title": "Weekly Leaderboards", "body": "Drive healthy competition and recurring engagement with merit-based rankings." },
-      "api": { "title": "Predictive Analytics API", "body": "Access event streams and confidence metrics for your own dashboards and automations." },
-      "roles": { "title": "Role-Based Team Views", "body": "Give operators, analysts, and marketing teams purpose-built views from a single data layer." },
-      "ab": { "title": "A/B-Ready Growth Layer", "body": "Test headlines, CTAs, and incentive messages without rebuilding your product flow." }
+      "ai": {
+        "title": "Adaptive AI Forecasting",
+        "body": "Generate high-signal predictions with real-time updates from market data and sentiment context."
+      },
+      "incentives": {
+        "title": "On-Chain Incentive Engine",
+        "body": "Reward participation through transparent points, staking boosts, and referral logic."
+      },
+      "leaderboard": {
+        "title": "Weekly Leaderboards",
+        "body": "Drive healthy competition and recurring engagement with merit-based rankings."
+      },
+      "api": {
+        "title": "Predictive Analytics API",
+        "body": "Access event streams and confidence metrics for your own dashboards and automations."
+      },
+      "roles": {
+        "title": "Role-Based Team Views",
+        "body": "Give operators, analysts, and marketing teams purpose-built views from a single data layer."
+      },
+      "ab": {
+        "title": "A/B-Ready Growth Layer",
+        "body": "Test headlines, CTAs, and incentive messages without rebuilding your product flow."
+      }
     }
   },
   "pricingPage": {
@@ -683,12 +896,36 @@
     "subtitle": "Fresh playbooks to help your product convert better and retain users longer.",
     "readMore": "Read more ->",
     "posts": {
-      "1": { "tag": "Growth", "title": "How to Increase Prediction Participation by 2x", "excerpt": "A practical framework for balancing incentives, onboarding clarity, and anti-spam mechanics." },
-      "2": { "tag": "UX", "title": "Designing Trust in AI Forecast Products", "excerpt": "Why explainability, confidence intervals, and feedback loops outperform black-box dashboards." },
-      "3": { "tag": "Marketing", "title": "A/B Testing CTAs for Web3 Landing Pages", "excerpt": "Five high-impact experiments that improve click-through rates without hurting user quality." },
-      "4": { "tag": "Token Design", "title": "Referral Systems That Don't Feel Like Pyramid Schemes", "excerpt": "Build ethical, sustainable referral mechanics with transparent on-chain logic." },
-      "5": { "tag": "Analytics", "title": "What to Measure Before You Scale Paid Acquisition", "excerpt": "Track conversion velocity, retention quality, and intent-based engagement before spending more." },
-      "6": { "tag": "Strategy", "title": "From Litepaper to Product-Market Traction", "excerpt": "Turn narrative into roadmap with predictable weekly activation goals." }
+      "1": {
+        "tag": "Growth",
+        "title": "How to Increase Prediction Participation by 2x",
+        "excerpt": "A practical framework for balancing incentives, onboarding clarity, and anti-spam mechanics."
+      },
+      "2": {
+        "tag": "UX",
+        "title": "Designing Trust in AI Forecast Products",
+        "excerpt": "Why explainability, confidence intervals, and feedback loops outperform black-box dashboards."
+      },
+      "3": {
+        "tag": "Marketing",
+        "title": "A/B Testing CTAs for Web3 Landing Pages",
+        "excerpt": "Five high-impact experiments that improve click-through rates without hurting user quality."
+      },
+      "4": {
+        "tag": "Token Design",
+        "title": "Referral Systems That Don't Feel Like Pyramid Schemes",
+        "excerpt": "Build ethical, sustainable referral mechanics with transparent on-chain logic."
+      },
+      "5": {
+        "tag": "Analytics",
+        "title": "What to Measure Before You Scale Paid Acquisition",
+        "excerpt": "Track conversion velocity, retention quality, and intent-based engagement before spending more."
+      },
+      "6": {
+        "tag": "Strategy",
+        "title": "From Litepaper to Product-Market Traction",
+        "excerpt": "Turn narrative into roadmap with predictable weekly activation goals."
+      }
     }
   },
   "contactPage": {

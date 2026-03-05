@@ -260,7 +260,7 @@ export default function LitepaperPage() {
       <S delay={0.44}>
         <GlassCard hover={false}>
           <h2 className="text-2xl font-heading font-bold mb-4 gradient-cyan inline-block">
-            9. {tr("litepaperPage.creatorEconomyTitle", "Creator Economy (Variant C)")}
+            9. {tr("litepaperPage.creatorEconomyTitle", "Creator Economy")}
           </h2>
           <div className="grid md:grid-cols-2 gap-4">
             <div className="p-4 rounded-xl bg-dark-700/50 border border-dark-500/50">

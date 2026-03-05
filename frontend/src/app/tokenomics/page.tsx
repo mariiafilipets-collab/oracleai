@@ -92,7 +92,7 @@ export default function TokenomicsPage() {
       {/* Creator Economy */}
       <GlassCard hover={false}>
         <h2 className="text-xl font-heading font-bold mb-2">
-          {tr("tokenomicsPage.creatorEconomy.title", "Creator Economy (Variant C)")}
+          {tr("tokenomicsPage.creatorEconomy.title", "Creator Economy")}
         </h2>
         <p className="text-sm text-gray-500 mb-6">
           {tr(

@@ -40,7 +40,11 @@
     "claimed": "已领取",
     "unclaimed": "未领取"
   },
-  "tiers": { "basic": "基础", "pro": "专业", "whale": "鲸鱼" },
+  "tiers": {
+    "basic": "基础",
+    "pro": "专业",
+    "whale": "鲸鱼"
+  },
   "hero": {
     "title1": "预测未来。",
     "title2": "赚取真实奖励。",
@@ -132,24 +136,87 @@
       }
     },
     "alloc": {
-      "airdrop": { "name": "社区空投", "desc": "按TGE前积分比例分配" },
-      "liquidity": { "name": "流动性", "desc": "DEX交易对，锁定2年" },
-      "team": { "name": "团队与顾问", "desc": "2年归属，6个月悬崖期" },
-      "treasury": { "name": "国库（DAO）", "desc": "由治理控制的发展基金" },
-      "stakingRewards": { "name": "质押奖励", "desc": "4年内分配给质押者" },
-      "prizePool": { "name": "奖金池（OAI）", "desc": "TGE后每周OAI奖励" },
-      "referral": { "name": "推荐奖励", "desc": "给顶级推荐人的OAI奖励" },
-      "marketing": { "name": "市场推广", "desc": "合作与活动，1年归属" },
-      "ecosystem": { "name": "生态基金", "desc": "资助、黑客松与集成" }
+      "airdrop": {
+        "name": "社区空投",
+        "desc": "按TGE前积分比例分配"
+      },
+      "liquidity": {
+        "name": "流动性",
+        "desc": "DEX交易对，锁定2年"
+      },
+      "team": {
+        "name": "团队与顾问",
+        "desc": "2年归属，6个月悬崖期"
+      },
+      "treasury": {
+        "name": "国库（DAO）",
+        "desc": "由治理控制的发展基金"
+      },
+      "stakingRewards": {
+        "name": "质押奖励",
+        "desc": "4年内分配给质押者"
+      },
+      "prizePool": {
+        "name": "奖金池（OAI）",
+        "desc": "TGE后每周OAI奖励"
+      },
+      "referral": {
+        "name": "推荐奖励",
+        "desc": "给顶级推荐人的OAI奖励"
+      },
+      "marketing": {
+        "name": "市场推广",
+        "desc": "合作与活动，1年归属"
+      },
+      "ecosystem": {
+        "name": "生态基金",
+        "desc": "资助、黑客松与集成"
+      }
     },
-    "tiers": { "bronze": "青铜", "silver": "白银", "gold": "黄金", "diamond": "钻石" },
+    "tiers": {
+      "bronze": "青铜",
+      "silver": "白银",
+      "gold": "黄金",
+      "diamond": "钻石"
+    },
     "deflationItems": {
-      "buyback": { "title": "回购与销毁", "desc": "10%费用 -> 回购OAI -> 永久销毁" },
-      "quarterly": { "title": "季度销毁", "desc": "国库根据收入执行销毁" },
-      "stakingLocks": { "title": "质押锁仓", "desc": "已质押OAI从流通中移除" },
-      "vestingLocks": { "title": "归属锁仓", "desc": "团队代币锁定并在2年内释放" }
+      "buyback": {
+        "title": "回购与销毁",
+        "desc": "10%费用 -> 回购OAI -> 永久销毁"
+      },
+      "quarterly": {
+        "title": "季度销毁",
+        "desc": "国库根据收入执行销毁"
+      },
+      "stakingLocks": {
+        "title": "质押锁仓",
+        "desc": "已质押OAI从流通中移除"
+      },
+      "vestingLocks": {
+        "title": "归属锁仓",
+        "desc": "团队代币锁定并在2年内释放"
+      }
     },
-    "metrics": { "maxSupply": "最大供应", "tgeCirculating": "TGE流通", "preTgeGoal": "TGE前目标", "teamVesting": "团队归属" }
+    "metrics": {
+      "maxSupply": "最大供应",
+      "tgeCirculating": "TGE流通",
+      "preTgeGoal": "TGE前目标",
+      "teamVesting": "团队归属"
+    },
+    "creatorEconomy": {
+      "title": "创作者经济",
+      "desc": "用户事件采用混合模型：投票费 + 质量门槛创作者奖励。",
+      "voteFeeTitle": "用户事件投票费用",
+      "voteFeeDesc": "每次对用户事件投票都会支付少量 BNB 费用。",
+      "splitTitle": "50/50 分配",
+      "splitDesc": "50% 进入创作者奖励，50% 进入协议分配。",
+      "unlockTitle": "质量解锁",
+      "unlockDesc": "创作者奖励仅在有效结算、达到最低唯一投票门槛且创作者已验证后解锁。",
+      "protocolTitle": "协议侧沿用签到分配",
+      "protocolDesc": "协议侧按 prizes/treasury/referrals/burn/staking 逻辑分配。",
+      "batchTitle": "每 12 小时批量分配",
+      "batchDesc": "用户事件投票的协议侧费用每 12 小时分配一次，降低单票 gas 成本。"
+    }
   },
   "litepaperPage": {
     "subtitle": "简报 v1.0 — 2026年3月",
@@ -166,23 +233,59 @@
     "visionP1": "OracleAI Predict 构建高参与度预测市场，AI生成真实事件，用户竞争预测结果，系统透明运行在链上。",
     "visionP2": "我们的使命是让预测市场对所有人都更易用、更有趣、回报更高，而不仅是交易者。",
     "problemItems": {
-      "1": { "title": "枯燥且复杂", "desc": "传统预测市场门槛高，对普通用户不友好。" },
-      "2": { "title": "中心化", "desc": "许多平台依赖中心化裁决，用户必须信任运营方。" },
-      "3": { "title": "缺少留存循环", "desc": "缺乏连续签到、排行榜和社交等游戏化机制。" }
+      "1": {
+        "title": "枯燥且复杂",
+        "desc": "传统预测市场门槛高，对普通用户不友好。"
+      },
+      "2": {
+        "title": "中心化",
+        "desc": "许多平台依赖中心化裁决，用户必须信任运营方。"
+      },
+      "3": {
+        "title": "缺少留存循环",
+        "desc": "缺乏连续签到、排行榜和社交等游戏化机制。"
+      }
     },
     "solutionIntro": "OracleAI Predict 通过 AI + 区块链 + 游戏化 一体化方案解决以上问题：",
     "solutionItems": {
-      "aiGeneration": { "title": "AI事件生成", "desc": "OracleAI Event Engine 是我们专为平台打造的自研AI引擎，持续分析实时数据，并每90分钟在5个分类生成高相关事件。" },
-      "aiVerification": { "title": "AI结果验证", "desc": "事件到期后，AI检索真实结果（比分、价格、结论）并自动裁决。" },
-      "gamification": { "title": "游戏化参与", "desc": "每日签到、连击奖励、4级质押、6级推荐、每周排行榜奖励与徽章系统。" },
-      "onchain": { "title": "完全链上", "desc": "费用、积分、事件和投票均记录在BNB Chain智能合约中。" }
+      "aiGeneration": {
+        "title": "AI事件生成",
+        "desc": "OracleAI Event Engine 是我们专为平台打造的自研AI引擎，持续分析实时数据，并每90分钟在5个分类生成高相关事件。"
+      },
+      "aiVerification": {
+        "title": "AI结果验证",
+        "desc": "事件到期后，AI检索真实结果（比分、价格、结论）并自动裁决。"
+      },
+      "gamification": {
+        "title": "游戏化参与",
+        "desc": "每日签到、连击奖励、4级质押、6级推荐、每周排行榜奖励与徽章系统。"
+      },
+      "onchain": {
+        "title": "完全链上",
+        "desc": "费用、积分、事件和投票均记录在BNB Chain智能合约中。"
+      }
     },
     "howItems": {
-      "1": { "title": "连接钱包", "desc": "MetaMask、Trust Wallet或任何Web3钱包。无需注册与KYC。" },
-      "2": { "title": "每日签到", "desc": "选择基础/专业/鲸鱼等级，单次可获得100到1000积分，连击最高+50%加成。" },
-      "3": { "title": "参与预测", "desc": "对AI事件投同意/反对。正确+50分，击败AI再+100分。" },
-      "4": { "title": "冲榜", "desc": "每周前100名分享40%BNB费用，第一名获得池子20%。" },
-      "5": { "title": "获得$OAI空投", "desc": "累计积分在TGE按比例兑换OAI，40%总量（4亿）用于社区空投。" }
+      "1": {
+        "title": "连接钱包",
+        "desc": "MetaMask、Trust Wallet或任何Web3钱包。无需注册与KYC。"
+      },
+      "2": {
+        "title": "每日签到",
+        "desc": "选择基础/专业/鲸鱼等级，单次可获得100到1000积分，连击最高+50%加成。"
+      },
+      "3": {
+        "title": "参与预测",
+        "desc": "对AI事件投同意/反对。正确+50分，击败AI再+100分。"
+      },
+      "4": {
+        "title": "冲榜",
+        "desc": "每周前100名分享40%BNB费用，第一名获得池子20%。"
+      },
+      "5": {
+        "title": "获得$OAI空投",
+        "desc": "累计积分在TGE按比例兑换OAI，40%总量（4亿）用于社区空投。"
+      }
     },
     "tokenSupply": "总供应量：1,000,000,000 OAI - 通缩设计",
     "tokenAllocation": "代币分配",
@@ -207,10 +310,45 @@
     },
     "oaiRequired": "所需OAI",
     "roadmapItems": {
-      "q1": { "title": "基础建设", "items": { "1": "BNB测试网智能合约", "2": "AI预测引擎v1", "3": "Web应用上线", "4": "社区建设（1万用户）" } },
-      "q2": { "title": "增长", "items": { "1": "BNB主网上线", "2": "Certik/PeckShield审计", "3": "Telegram Mini-App", "4": "5万日活", "5": "与数据预言机合作" } },
-      "q3": { "title": "产品扩展", "items": { "1": "移动端应用Beta（React Native）", "2": "高级AI预测模式", "3": "RWA预测市场试点", "4": "跨链准备与桥接集成", "5": "TGE前增长活动与生态入驻" } },
-      "q4": { "title": "TGE与规模化", "items": { "1": "$OAI代币生成事件（TGE）", "2": "PancakeSwap上线与流动性激活", "3": "4档锁定质押上线", "4": "DAO治理启动", "5": "10万+日活与国库目标：$4-15M" } }
+      "q1": {
+        "title": "基础建设",
+        "items": {
+          "1": "BNB测试网智能合约",
+          "2": "AI预测引擎v1",
+          "3": "Web应用上线",
+          "4": "社区建设（1万用户）"
+        }
+      },
+      "q2": {
+        "title": "增长",
+        "items": {
+          "1": "BNB主网上线",
+          "2": "Certik/PeckShield审计",
+          "3": "Telegram Mini-App",
+          "4": "5万日活",
+          "5": "与数据预言机合作"
+        }
+      },
+      "q3": {
+        "title": "产品扩展",
+        "items": {
+          "1": "移动端应用Beta（React Native）",
+          "2": "高级AI预测模式",
+          "3": "RWA预测市场试点",
+          "4": "跨链准备与桥接集成",
+          "5": "TGE前增长活动与生态入驻"
+        }
+      },
+      "q4": {
+        "title": "TGE与规模化",
+        "items": {
+          "1": "$OAI代币生成事件（TGE）",
+          "2": "PancakeSwap上线与流动性激活",
+          "3": "4档锁定质押上线",
+          "4": "DAO治理启动",
+          "5": "10万+日活与国库目标：$4-15M"
+        }
+      }
     },
     "tgeUtilityTitle": "TGE转换与TGE后效用",
     "pointsToOaiTitle": "积分转换为OAI",
@@ -218,7 +356,19 @@
     "pointsToOaiFormula": "你的 OAI = (你的积分 / 总积分) x 空投池",
     "pointsAfterTgeTitle": "TGE后的积分",
     "pointsAfterTgeDesc": "积分将继续作为季节性声誉层，用于排行榜、任务、活动资格和合作激励。",
-    "footerTagline": "OracleAI Predict - BNB Chain上的去中心化AI预测市场"
+    "footerTagline": "OracleAI Predict - BNB Chain上的去中心化AI预测市场",
+    "creatorEconomyTitle": "创作者经济",
+    "creatorEconomyFlowTitle": "流程说明",
+    "creatorEconomyFlow1": "用户事件创建保留固定上架费以防垃圾内容。",
+    "creatorEconomyFlow2": "每次对用户事件投票都收取小额投票费。",
+    "creatorEconomyFlow3": "投票费分为创作者侧和协议侧。",
+    "creatorEconomyFlow4": "协议侧遵循与 treasury/prize/referral/burn/staking 相同逻辑。",
+    "creatorEconomyFlow5": "协议侧费用每12小时批量分发，以降低每次投票gas开销。",
+    "creatorEconomyQualityTitle": "质量与反滥用门槛",
+    "creatorEconomyQuality1": "创作者奖励仅在事件结算后可领取。",
+    "creatorEconomyQuality2": "必须达到最低投票门槛。",
+    "creatorEconomyQuality3": "创作者在发放时必须具备已验证状态。",
+    "creatorEconomyQuality4": "若条件不满足，创作者侧费用将转入协议安全金库。"
   },
   "predictions": {
     "title": "AI预测",
@@ -318,7 +468,10 @@
       "market": "市场数据",
       "newswire": "新闻信源",
       "oracle": "预言机数据"
-    }
+    },
+    "userVoteFeeInfo": "用户事件投票费",
+    "creatorGets": "创作者获得",
+    "creatorPayoutVotesMin": "解锁门槛"
   },
   "leaderboard": {
     "title": "每周排行榜",
@@ -354,18 +507,98 @@
     "levelRewards": "各级奖励：L1: 10% · L2: 5% · L3: 3% · L4: 2% · L5: 1.5% · L6: 1%",
     "badges": "成就徽章",
     "badgeItems": {
-      "firstCheckin": { "name": "首次签到", "desc": "完成你的第一次签到" },
-      "streak3": { "name": "3天连击", "desc": "保持3天连续签到" },
-      "streak7": { "name": "周度战士", "desc": "达成7天连续签到" },
-      "predictor": { "name": "预言新手", "desc": "完成5次预测" },
-      "accurate": { "name": "预言大师", "desc": "预测准确率达到90%+" },
-      "referrer": { "name": "网络建设者", "desc": "邀请5位朋友" },
-      "whale": { "name": "鲸鱼身份", "desc": "以鲸鱼等级完成签到" },
-      "top10": { "name": "前10名", "desc": "进入周榜前10" }
+      "firstCheckin": {
+        "name": "首次签到",
+        "desc": "完成你的第一次签到"
+      },
+      "streak3": {
+        "name": "3天连击",
+        "desc": "保持3天连续签到"
+      },
+      "streak7": {
+        "name": "周度战士",
+        "desc": "达成7天连续签到"
+      },
+      "predictor": {
+        "name": "预言新手",
+        "desc": "完成5次预测"
+      },
+      "accurate": {
+        "name": "预言大师",
+        "desc": "预测准确率达到90%+"
+      },
+      "referrer": {
+        "name": "网络建设者",
+        "desc": "邀请5位朋友"
+      },
+      "whale": {
+        "name": "鲸鱼身份",
+        "desc": "以鲸鱼等级完成签到"
+      },
+      "top10": {
+        "name": "前10名",
+        "desc": "进入周榜前10"
+      }
     },
     "history": "签到历史",
     "noCheckins": "暂无签到记录",
-    "connectPrompt": "连接钱包查看个人资料"
+    "connectPrompt": "连接钱包查看个人资料",
+    "referralAnalytics": "推荐数据分析",
+    "totalDownline": "总下级网络",
+    "newRefs7d": "近7天新增推荐",
+    "activeRefs7d": "近7天活跃推荐",
+    "levelBreakdown": "6级结构分布",
+    "levelN": "第 {n} 级",
+    "latestReferrals": "最新直属推荐",
+    "noReferralsYet": "暂无推荐用户",
+    "shareBySource": "按来源注册",
+    "shareByCampaign": "按活动注册",
+    "shareByEvent": "按事件注册",
+    "noShareStats": "暂无分享归因数据",
+    "socialCreatives": "社媒传播素材",
+    "socialCreativesDesc": "使用现成文案快速分享你的推荐链接。",
+    "copyCreative": "复制文案",
+    "copyTrackedLink": "复制 UTM 链接",
+    "shareNow": "立即分享",
+    "availableToWithdraw": "可提现",
+    "withdrawEarnings": "提取收益",
+    "withdrawing": "提现中...",
+    "refWithdrawSuccess": "推荐收益已提现",
+    "creatorDashboard": "创作者面板",
+    "creatorDashboardDesc": "你创建的用户事件表现数据。",
+    "creatorCreated": "已创建",
+    "creatorActive": "进行中",
+    "creatorResolved": "已结算",
+    "creatorConversion": "投票转化率",
+    "creatorAvgVotes": "平均票数/事件",
+    "creatorDisputeRate": "争议/归档",
+    "creatorTotalVotes": "总票数",
+    "creatorVoteFee": "投票费用",
+    "creatorShare": "创作者分成",
+    "creatorAvailableToWithdraw": "可提取创作者奖励",
+    "creatorRulesHint": "奖励需满足有效结算、最低投票门槛及已验证创作者状态后解锁。",
+    "creatorWithdraw": "提取创作者奖励",
+    "creatorWithdrawing": "提现中...",
+    "creatorClaimSuccess": "创作者奖励已提现",
+    "creatorVotes": "票",
+    "creatorNoEvents": "暂无用户创建事件",
+    "creativeCards": {
+      "x": {
+        "title": "X 发帖文案"
+      },
+      "telegram": {
+        "title": "Telegram 文案"
+      },
+      "instagram": {
+        "title": "Instagram 故事文案"
+      }
+    },
+    "creatives": {
+      "x1": "我在 BNB Chain 上通过 AI 预测赚取奖励，欢迎通过我的链接加入：",
+      "x2": "OracleAI Predict 已上线。每日签到 + 预测 + 排行榜奖励，从这里开始：",
+      "telegram": "朋友们，我正在 OracleAI Predict 刷积分。连接钱包加入我的团队：",
+      "story": "Predict. Earn. Win. 通过我的邀请加入 OracleAI Predict："
+    }
   },
   "staking": {
     "title": "OAI质押",
@@ -412,19 +645,69 @@
     "hideGuide": "隐藏指南",
     "step": "步骤",
     "steps": {
-      "1": { "title": "连接钱包", "desc": "连接MetaMask或任何Web3钱包即可开始", "detail": "钱包就是你的身份。所有积分和收益都绑定在你的地址上，无需邮箱或注册。" },
-      "2": { "title": "每日签到", "desc": "支付少量费用签到，赚取基础积分", "detail": "选择等级：基础（0.0015 BNB，1倍）、专业（0.01 BNB，3倍）、鲸鱼（0.05 BNB，10倍）。连续签到最高可获得+50%加成！" },
-      "3": { "title": "参与预测", "desc": "对AI生成的真实事件投出同意或反对", "detail": "AI会生成关于体育、加密货币、政治、经济、气候等领域的预测。猜对 = +50分。击败AI = +100奖励！" },
-      "4": { "title": "攀登排行榜", "desc": "每周争夺BNB奖金池", "detail": "前100名每周分享40%的手续费（BNB形式）。第1名=20%，第2-5名=30%，第6-20名=30%，第21-100名=20%。" },
-      "5": { "title": "获取OAI空投", "desc": "你的积分将在TGE时转换为OAI代币", "detail": "40%的OAI总量（4亿枚）根据积分空投。社区总份额高达58%！" }
+      "1": {
+        "title": "连接钱包",
+        "desc": "连接MetaMask或任何Web3钱包即可开始",
+        "detail": "钱包就是你的身份。所有积分和收益都绑定在你的地址上，无需邮箱或注册。"
+      },
+      "2": {
+        "title": "每日签到",
+        "desc": "支付少量费用签到，赚取基础积分",
+        "detail": "选择等级：基础（0.0015 BNB，1倍）、专业（0.01 BNB，3倍）、鲸鱼（0.05 BNB，10倍）。连续签到最高可获得+50%加成！"
+      },
+      "3": {
+        "title": "参与预测",
+        "desc": "对AI生成的真实事件投出同意或反对",
+        "detail": "AI会生成关于体育、加密货币、政治、经济、气候等领域的预测。猜对 = +50分。击败AI = +100奖励！"
+      },
+      "4": {
+        "title": "攀登排行榜",
+        "desc": "每周争夺BNB奖金池",
+        "detail": "前100名每周分享40%的手续费（BNB形式）。第1名=20%，第2-5名=30%，第6-20名=30%，第21-100名=20%。"
+      },
+      "5": {
+        "title": "获取OAI空投",
+        "desc": "你的积分将在TGE时转换为OAI代币",
+        "detail": "40%的OAI总量（4亿枚）根据积分空投。社区总份额高达58%！"
+      }
     },
     "earn": {
-      "checkin": { "title": "每日签到", "pts": "100-1,000", "desc": "基础（100）、专业（300）、鲸鱼（1,000分）", "tip": "连续签到7天最高+50%加成！" },
-      "prediction": { "title": "预测正确", "pts": "+50", "desc": "投同意/反对，猜对 = +50分", "tip": "击败AI额外+100奖励！" },
-      "streak": { "title": "连续签到加成", "pts": "最高+50%", "desc": "连续每日签到可提升积分", "tip": "第1天：+7%，第3天：+21%，第7天：+50%" },
-      "referrals": { "title": "推荐奖励", "pts": "6级", "desc": "赚取推荐人签到费用的百分比", "tip": "L1:10% L2:5% L3:3% L4:2% L5:1.5% L6:1%" },
-      "staking": { "title": "质押加成", "pts": "+10-50%", "desc": "青铜/白银/黄金/钻石等级", "tip": "钻石：积分+50%，推荐+20%！" },
-      "prizes": { "title": "每周奖金", "pts": "BNB", "desc": "前100名分享40%手续费（BNB）", "tip": "第1名=20% 第2-5名=30% 第6-20名=30% 第21-100名=20%" }
+      "checkin": {
+        "title": "每日签到",
+        "pts": "100-1,000",
+        "desc": "基础（100）、专业（300）、鲸鱼（1,000分）",
+        "tip": "连续签到7天最高+50%加成！"
+      },
+      "prediction": {
+        "title": "预测正确",
+        "pts": "+50",
+        "desc": "投同意/反对，猜对 = +50分",
+        "tip": "击败AI额外+100奖励！"
+      },
+      "streak": {
+        "title": "连续签到加成",
+        "pts": "最高+50%",
+        "desc": "连续每日签到可提升积分",
+        "tip": "第1天：+7%，第3天：+21%，第7天：+50%"
+      },
+      "referrals": {
+        "title": "推荐奖励",
+        "pts": "6级",
+        "desc": "赚取推荐人签到费用的百分比",
+        "tip": "L1:10% L2:5% L3:3% L4:2% L5:1.5% L6:1%"
+      },
+      "staking": {
+        "title": "质押加成",
+        "pts": "+10-50%",
+        "desc": "青铜/白银/黄金/钻石等级",
+        "tip": "钻石：积分+50%，推荐+20%！"
+      },
+      "prizes": {
+        "title": "每周奖金",
+        "pts": "BNB",
+        "desc": "前100名分享40%手续费（BNB）",
+        "tip": "第1名=20% 第2-5名=30% 第6-20名=30% 第21-100名=20%"
+      }
     }
   },
   "welcome": {
