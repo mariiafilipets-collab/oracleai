@@ -97,6 +97,7 @@ export default function PredictionsPage() {
   const [loading, setLoading] = useState(true);
   const [schedulerInfo, setSchedulerInfo] = useState<any>(null);
   const [votedPredictions, setVotedPredictions] = useState<any[]>([]);
+  const [referralCode, setReferralCode] = useState("");
   const pollRef = useRef<NodeJS.Timeout | null>(null);
   const requestSeqRef = useRef(0);
 
@@ -323,6 +324,18 @@ export default function PredictionsPage() {
   }, [loadPredictions, loadSchedulerStatus, loadVotedPredictions, locale, address]);
 
   useEffect(() => {
+    if (!address) {
+      setReferralCode("");
+      return;
+    }
+    api.getReferralCode(address)
+      .then((res) => {
+        if (res?.success) setReferralCode(String(res?.data?.code || ""));
+      })
+      .catch(() => {});
+  }, [address]);
+
+  useEffect(() => {
     if (isVoteSuccess && voteHash && voteHandledRef.current !== voteHash) {
       voteHandledRef.current = voteHash;
       toast.success(t("predictions.submitted"));
@@ -376,6 +389,15 @@ export default function PredictionsPage() {
     }
     const target = predictions.find((p) => Number(p.eventId) === Number(eventId));
     const isUserEvent = Boolean(target?.isUserEvent);
+    const isOwnUserEvent = Boolean(
+      isUserEvent
+      && address
+      && String(target?.creator || "").toLowerCase() === address.toLowerCase()
+    );
+    if (isOwnUserEvent) {
+      toast.error(tr("predictions.creatorCannotVoteOwn", "You cannot vote on your own event"));
+      return;
+    }
     writeVote({
       address: predictionAddress,
       abi: PredictionABI,
@@ -459,6 +481,58 @@ export default function PredictionsPage() {
       toast.error(localizeUserCreateMessage(err?.message || tr("predictions.userCreateFailed", "Failed to create user event"), "error"));
     }
   };
+
+  const buildEventShareLink = useCallback((pred: any, source: "telegram" | "x" | "discord" | "copy") => {
+    if (typeof window === "undefined") return "";
+    const eventId = Number(pred?.eventId || 0);
+    const category = String(pred?.category || "general").toLowerCase();
+    const params = new URLSearchParams({
+      eventId: String(eventId),
+      utm_source: source,
+      utm_medium: "social",
+      utm_campaign: `event_share_${category}`,
+      utm_content: `event_${eventId}`,
+    });
+    if (referralCode) params.set("ref", referralCode);
+    return `${window.location.origin}/predictions?${params.toString()}`;
+  }, [referralCode]);
+
+  const shareEvent = useCallback((platform: "telegram" | "x" | "discord", pred: any) => {
+    if (!isConnected || !referralCode) {
+      toast.error(tr("predictions.connectToShareRef", "Connect wallet to share with your referral link"));
+      return;
+    }
+    const link = buildEventShareLink(pred, platform);
+    const text = `${pred?.title || tr("predictions.title", "Predictions")} — ${tr("predictions.shareInvite", "Predict with AI on OracleAI Predict")}`;
+    const payload = `${text} ${link}`.trim();
+    if (platform === "telegram") {
+      window.open(`https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+      return;
+    }
+    if (platform === "x") {
+      window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(payload)}`, "_blank", "noopener,noreferrer");
+      return;
+    }
+    navigator.clipboard.writeText(payload).then(() => {
+      toast.success(tr("predictions.discordCopied", "Share text copied for Discord"));
+      window.open("https://discord.com/channels/@me", "_blank", "noopener,noreferrer");
+    }).catch(() => {
+      toast.error(tr("predictions.discordCopyFailed", "Failed to copy Discord share text"));
+    });
+  }, [isConnected, referralCode, buildEventShareLink, tr]);
+
+  const copyEventLink = useCallback((pred: any) => {
+    if (!isConnected || !referralCode) {
+      toast.error(tr("predictions.connectToShareRef", "Connect wallet to share with your referral link"));
+      return;
+    }
+    const link = buildEventShareLink(pred, "copy");
+    navigator.clipboard.writeText(link).then(() => {
+      toast.success(tr("predictions.shareLinkCopied", "Referral link copied"));
+    }).catch(() => {
+      toast.error(tr("predictions.shareLinkCopyFailed", "Failed to copy referral link"));
+    });
+  }, [isConnected, referralCode, buildEventShareLink, tr]);
 
   const activePredictions = predictions.filter((p) => p._status === "active");
   const resolvedPredictions = predictions.filter((p) => p._status === "resolved");
@@ -712,6 +786,11 @@ export default function PredictionsPage() {
               const deadline = new Date(pred.deadline);
               const isExpired = deadline < new Date();
               const totalVotes = (pred.totalVotesYes || 0) + (pred.totalVotesNo || 0);
+              const isOwnUserEvent = Boolean(
+                pred.isUserEvent
+                && address
+                && String(pred.creator || "").toLowerCase() === address.toLowerCase()
+              );
 
               return (
                 <motion.div
@@ -772,6 +851,34 @@ export default function PredictionsPage() {
                     {pred.description && (
                       <ExpandableDesc text={pred.description} />
                     )}
+
+                    {/* Share with referral tracking */}
+                    <div className="mb-3 flex flex-wrap gap-2">
+                      <button
+                        onClick={() => shareEvent("telegram", pred)}
+                        className="px-3 py-1.5 rounded-lg text-[11px] bg-neon-cyan/10 border border-neon-cyan/30 text-neon-cyan hover:bg-neon-cyan/20 transition"
+                      >
+                        <span className="inline-flex items-center gap-1"><AppIcon name="send" className="w-3.5 h-3.5" /> {tr("predictions.shareTelegram", "Telegram")}</span>
+                      </button>
+                      <button
+                        onClick={() => shareEvent("x", pred)}
+                        className="px-3 py-1.5 rounded-lg text-[11px] bg-neon-purple/10 border border-neon-purple/30 text-neon-purple hover:bg-neon-purple/20 transition"
+                      >
+                        <span className="inline-flex items-center gap-1"><AppIcon name="x" className="w-3.5 h-3.5" /> {tr("predictions.shareX", "X")}</span>
+                      </button>
+                      <button
+                        onClick={() => shareEvent("discord", pred)}
+                        className="px-3 py-1.5 rounded-lg text-[11px] bg-neon-gold/10 border border-neon-gold/30 text-neon-gold hover:bg-neon-gold/20 transition"
+                      >
+                        <span className="inline-flex items-center gap-1"><AppIcon name="link" className="w-3.5 h-3.5" /> {tr("predictions.shareDiscord", "Discord")}</span>
+                      </button>
+                      <button
+                        onClick={() => copyEventLink(pred)}
+                        className="px-3 py-1.5 rounded-lg text-[11px] bg-dark-700 border border-dark-500 text-gray-300 hover:border-neon-cyan/40 hover:text-neon-cyan transition"
+                      >
+                        <span className="inline-flex items-center gap-1"><AppIcon name="chain" className="w-3.5 h-3.5" /> {tr("predictions.shareCopyLink", "Copy Link")}</span>
+                      </button>
+                    </div>
 
                     {/* AI Probability Gauge */}
                     <div className="mb-3">
@@ -845,22 +952,28 @@ export default function PredictionsPage() {
 
                     {/* Vote Buttons (active + not expired + connected) */}
                     {!pred.resolved && !isExpired && isConnected && (
-                      <div className="grid grid-cols-2 gap-2 mt-2">
-                        <button
-                          onClick={() => handleVote(pred.eventId, true)}
-                          disabled={isVotePending || isCheckInPending || isCheckInConfirming}
-                          className="min-h-11 py-2.5 rounded-xl bg-neon-green/10 border border-neon-green/30 text-neon-green text-sm font-bold hover:bg-neon-green/20 transition disabled:opacity-50"
-                        >
-                        👍 {t("predictions.agree")}
-                      </button>
-                      <button
-                        onClick={() => handleVote(pred.eventId, false)}
-                        disabled={isVotePending || isCheckInPending || isCheckInConfirming}
-                        className="min-h-11 py-2.5 rounded-xl bg-neon-red/10 border border-neon-red/30 text-neon-red text-sm font-bold hover:bg-neon-red/20 transition disabled:opacity-50"
-                      >
-                        👎 {t("predictions.disagree")}
+                      isOwnUserEvent ? (
+                        <p className="text-xs text-gray-400 text-center mt-2">
+                          {tr("predictions.creatorCannotVoteOwn", "You cannot vote on your own event")}
+                        </p>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-2 mt-2">
+                          <button
+                            onClick={() => handleVote(pred.eventId, true)}
+                            disabled={isVotePending || isCheckInPending || isCheckInConfirming}
+                            className="min-h-11 py-2.5 rounded-xl bg-neon-green/10 border border-neon-green/30 text-neon-green text-sm font-bold hover:bg-neon-green/20 transition disabled:opacity-50"
+                          >
+                          👍 {t("predictions.agree")}
                         </button>
-                      </div>
+                        <button
+                          onClick={() => handleVote(pred.eventId, false)}
+                          disabled={isVotePending || isCheckInPending || isCheckInConfirming}
+                          className="min-h-11 py-2.5 rounded-xl bg-neon-red/10 border border-neon-red/30 text-neon-red text-sm font-bold hover:bg-neon-red/20 transition disabled:opacity-50"
+                        >
+                          👎 {t("predictions.disagree")}
+                          </button>
+                        </div>
+                      )
                     )}
 
                     {/* Connect prompt */}
