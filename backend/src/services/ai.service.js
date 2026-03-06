@@ -267,12 +267,13 @@ Bad: "Will Bitcoin rise soon?"`
         return buildUtcDate(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
       }
 
-      // Month name date: March 10 [2026]
-      const monthNamed = s.match(/\b(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2})(?:,?\s*(\d{2,4}))?\b/i);
+      // Month name date: "March 10", "March 10 2026", "March 10, 2026".
+      // Important: do NOT interpret time fragments like ", 10:00 UTC" as a year.
+      const monthNamed = s.match(/\b(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2})(?:(?:,\s*|\s+)(20\d{2}))?\b/i);
       if (monthNamed) {
         const monthIdx = monthMap[String(monthNamed[1] || "").toLowerCase()];
         const day = Number(monthNamed[2]);
-        let year = monthNamed[3] ? normalizeYear(Number(monthNamed[3])) : yNow;
+        let year = monthNamed[3] ? Number(monthNamed[3]) : yNow;
         let ts = buildUtcDate(year, monthIdx, day);
         if (ts === null) return null;
         // If year is omitted and this date has already passed, treat as next year occurrence.
