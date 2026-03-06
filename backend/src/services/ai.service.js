@@ -105,7 +105,7 @@ async function ask(model, messages, temp = 0.5, tokens = 2048, operation = "gene
 
 async function search(query) {
   return ask(config.openrouterSearchModel, [
-    { role: "system", content: "You have live web search. Return only verified, factual, current information. Be specific: names, numbers, times, scores. Only events happening TODAY. Prioritize mainstream/high-interest topics with broad public attention and reliable data sources." },
+    { role: "system", content: "You have live web search. Return only verified, factual, current information. Be specific: names, numbers, times, scores. Focus on mainstream/high-interest topics with reliable sources. Include both currently running events and upcoming events in the next 30 days, prioritizing the next 1-7 days." },
     { role: "user", content: query },
   ], 0.1, 2000, "search");
 }
@@ -140,28 +140,28 @@ function getTimeInfo() {
 }
 
 const SEARCH_QUERIES = {
-  SPORTS: `What MAJOR sports matches and games are being played RIGHT NOW or in the next few hours TODAY?
-Check: Premier League, La Liga, Serie A, Champions League, NBA tonight, NHL tonight, UFC/MMA fight card TODAY, F1 if race weekend, tennis tournaments in progress.
-ONLY list matches happening TODAY with kickoff/tip-off times. Do NOT list future matches on other days.`,
+  SPORTS: `What MAJOR sports matches and games are happening now and in the next 30 days?
+Check: Premier League, La Liga, Serie A, Champions League, NBA, NHL, UFC/MMA, F1, ATP/WTA.
+Prioritize globally popular fixtures in the next 1-7 days, but include important events later in the month when relevant.
+List kickoff/tip-off/start times in UTC.`,
 
-  POLITICS: `What are the TOP political news stories RIGHT NOW today?
-Focus on: US politics, Russia-Ukraine, Israel-Iran, China, EU decisions, elections TODAY, major protests happening NOW, sanctions announced TODAY.
-Only things happening or announced TODAY — not scheduled for future days.`,
+  POLITICS: `What are the TOP political stories and scheduled decisions happening now and in the next 30 days?
+Focus on: US politics, Russia-Ukraine, Israel-Iran, China, EU decisions, elections, sanctions, major summits.
+Prioritize high-impact events in the next 1-7 days, then major events later this month.`,
 
-  ECONOMY: `What is happening in financial markets RIGHT NOW today?
-Current exact prices: S&P 500, Nasdaq, Dow Jones, Gold, Oil. Are markets open now?
-Any earnings reports TODAY? Central bank decisions TODAY? Economic data releases TODAY?
-What stocks moved the most TODAY? Give exact current numbers and percentage changes.`,
+  ECONOMY: `What is happening in financial markets now and in the next 30 days?
+Provide current exact prices: S&P 500, Nasdaq, Dow Jones, Gold, Oil.
+Include major upcoming events: central bank meetings, CPI/jobs data, top earnings.
+Prioritize items in the next 1-7 days and include exact times/dates in UTC.`,
 
-  CRYPTO: `What is happening in crypto RIGHT NOW?
+  CRYPTO: `What is happening in crypto now and over the next 30 days?
 Bitcoin exact price right now? Ethereum exact price? 24h change?
-What coins are pumping or dumping TODAY? Any hacks or exploits TODAY?
-Any regulatory news TODAY? Any major listings or delistings TODAY?`,
+What coins are pumping or dumping now? Any hacks/exploits?
+Any regulatory events, ETF decisions, token unlocks, major listings/delistings in the next 1-7 days (and key ones later this month)?`,
 
-  CLIMATE: `What weather and climate events are happening RIGHT NOW today?
-Any active severe weather warnings RIGHT NOW? Hurricanes, storms, earthquakes in last 24h?
-Extreme temperatures TODAY in any major city? Active wildfires? Flood warnings?
-Only current, active events — not forecasts for next week.`,
+  CLIMATE: `What weather and climate events are active now and likely to be highly relevant in the next 30 days?
+Include active severe warnings, storms, earthquakes, heatwaves, floods, wildfire situations.
+Prioritize events with strong public attention in the next 1-7 days, and include major scheduled weather risks later in the month.`,
 };
 
 async function searchPopularEvents(category) {
@@ -181,29 +181,29 @@ async function generateCategoryPredictions(category, context) {
   const { today, hour, day } = getTimeInfo();
 
   const r = await generate(
-    `You create prediction market events. You are extremely strict about dates.
+    `You create prediction market events. You are strict about timing and verifiability.
 
 ABSOLUTE RULES:
 - Today is ${day}, ${today}, ${hour}:00 UTC
-- ONLY create predictions about things happening TODAY (${today})
-- NEVER reference dates other than today in the title
-- NEVER create predictions about matches/events on future days
-- Every prediction must resolve within a few hours from NOW
-- The outcome MUST be verifiable by searching the web TONIGHT
+- Create predictions for events from now up to the next 30 days.
+- Prefer the next 1-7 days for most events.
+- At least 3 of 5 predictions should resolve in 1-7 days.
+- You may include explicit dates if they are within the next 30 days.
+- The outcome MUST be verifiable by trusted sources at or shortly after deadline.
 - Prefer HIGH-POPULARITY topics only (major teams, major assets, major political/economic headlines).
 - Avoid niche/local/low-volume topics unless they are globally trending today.
 - Frame as a clear YES/NO question with specific names and numbers
-- hoursToResolve = hours from NOW until the result is known (2-12 max)
+- hoursToResolve = hours from NOW until result is known (6-720 max)
+- Most hoursToResolve should be 24-168 (1-7 days)
 - hoursToResolve must reflect real result availability (e.g., match end, market close, official statement window)
-- If a sports match kicks off at 20:00 UTC and it's now ${hour}:00 UTC, hoursToResolve = ${Math.max(2, 20 - hour + 2)}
 - For markets: will resolve when market closes today
-- For crypto: will resolve in 2-8 hours based on price movement
+- For crypto: usually 6-48h, unless event is a scheduled date item
 - Return ONLY a JSON array of 5 objects, nothing else
 
 REJECT these types of predictions:
-- Events on other dates (e.g. "on March 10" when today is not March 10)
-- Vague future events ("this week", "by Friday")
-- Events that already happened today
+- Events with deadlines beyond 30 days
+- Vague timing ("sometime soon") or unverifiable outcomes
+- Events that already happened
 - Events that are not sufficiently popular/visible`,
 
     `Today: ${day}, ${today}, ${hour}:00 UTC. Category: ${category}
@@ -211,8 +211,8 @@ REJECT these types of predictions:
 VERIFIED NEWS FOR TODAY:
 ${context || "No specific news. Use current verifiable facts: live prices, current standings, today's weather."}
 
-Create exactly 5 predictions about things happening TODAY (${today}) only.
-Each: {"title":"yes/no question max 80 chars, NO explicit calendar dates in title","description":"context max 150 chars","category":"${category}","aiProbability":15-85,"hoursToResolve":2-12}
+Create exactly 5 predictions about events in the next 30 days.
+Each: {"title":"yes/no question max 80 chars","description":"context max 150 chars","category":"${category}","aiProbability":15-85,"hoursToResolve":6-720}
 
 For SPORTS wording precision:
 - If it is a two-leg/tournament tie, title MUST be about this specific match result only.
@@ -221,9 +221,10 @@ For SPORTS wording precision:
 - Bad: "Will Barcelona advance vs Atletico tonight?"
 - Bad reasoning basis: aggregate score when title asks match winner.
 
-DO NOT include any dates in the title. Say "today" or "tonight" instead of a specific date.
-Good: "Will Real Madrid win tonight?" Bad: "Will Real Madrid win on March 10?"
-Good: "Will Bitcoin close above $90k today?" Bad: "Will Bitcoin hit $90k this week?"`
+If helpful, include concrete date/time context in title for future events within 30 days.
+Good: "Will Real Madrid win on March 10?"
+Good: "Will Bitcoin close above $90k this week?"
+Bad: "Will Bitcoin rise soon?"`
   );
 
   if (!r) return [];
@@ -231,8 +232,7 @@ Good: "Will Bitcoin close above $90k today?" Bad: "Will Bitcoin hit $90k this we
     const events = JSON.parse(r);
     if (!Array.isArray(events)) return [];
 
-    // Filter out events with invalid time references or low-quality timing semantics.
-    const todayShort = today.slice(5); // "03-02"
+    // Filter out events with obviously stale timing semantics.
     const filtered = events.filter(e => {
       const title = String(e.title || "");
       // Check for date patterns like "March 10", "Mar 10", "3/10", "2026-03-10"
@@ -245,20 +245,34 @@ Good: "Will Bitcoin close above $90k today?" Bad: "Will Bitcoin hit $90k this we
           return false;
         }
       }
-      if (/\b(tomorrow|next week|next month|by friday|by monday|this week)\b/i.test(title)) {
-        console.log(`[AI] Filtered out non-today timing event: "${title}"`);
+      if (/\b(yesterday|last week|last month|already happened)\b/i.test(title)) {
+        console.log(`[AI] Filtered out stale timing event: "${title}"`);
         return false;
       }
       return true;
     });
 
-    return filtered.map(e => ({
+    const normalized = filtered.map(e => ({
       title: String(e.title || "").slice(0, 100),
       description: String(e.description || "").slice(0, 200),
       category,
       aiProbability: Math.max(15, Math.min(85, parseInt(e.aiProbability) || 50)),
-      hoursToResolve: Math.max(2, Math.min(12, parseInt(e.hoursToResolve) || 6)),
+      hoursToResolve: Math.max(6, Math.min(720, parseInt(e.hoursToResolve) || 72)),
     }));
+
+    // Ensure majority of events resolve in 1-7 days while still allowing longer monthly events.
+    const inRangeCount = normalized.filter((e) => e.hoursToResolve >= 24 && e.hoursToResolve <= 168).length;
+    if (normalized.length >= 5 && inRangeCount < 3) {
+      let need = 3 - inRangeCount;
+      for (const e of normalized) {
+        if (need <= 0) break;
+        if (e.hoursToResolve < 24 || e.hoursToResolve > 168) {
+          e.hoursToResolve = 72;
+          need--;
+        }
+      }
+    }
+    return normalized;
   } catch { return []; }
 }
 
