@@ -225,9 +225,13 @@ async function publishNewBatch() {
 
     for (let i = 0; i < unique.length; i++) {
       const p = unique[i];
-      const normalizedCategory = ALLOWED_CATEGORIES.has(String(p.category || "").toUpperCase())
+      const modelCategory = ALLOWED_CATEGORIES.has(String(p.category || "").toUpperCase())
         ? String(p.category).toUpperCase()
-        : inferCategoryFromText(`${p.title || ""} ${p.description || ""}`);
+        : "CRYPTO";
+      const inferredCategory = inferCategoryFromText(`${p.title || ""} ${p.description || ""}`);
+      // Semantic override: if text strongly matches a non-crypto domain, prefer inferred category.
+      const normalizedCategory =
+        inferredCategory !== "CRYPTO" ? inferredCategory : modelCategory;
       const deadline = new Date(Date.now() + (p.hoursToResolve || 8) * 3600000);
       const catIdx = CATEGORY_NAMES.indexOf(normalizedCategory);
       try {
