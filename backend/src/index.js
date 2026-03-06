@@ -414,15 +414,16 @@ async function start() {
   await connectMongo();
 
   await initBlockchain();
-  await syncUsersFromOnChainSnapshot();
-  await setupEventListeners();
-
-  // Auto-scheduler: generates predictions + resolves expired ones automatically
+  // Start scheduler immediately after blockchain init so it isn't blocked by
+  // potentially slow startup sync/backfill tasks.
   if (config.enableScheduler) {
     initScheduler(io);
   } else {
     console.log("[Scheduler] Disabled by config.");
   }
+
+  await syncUsersFromOnChainSnapshot();
+  await setupEventListeners();
 }
 
 start().catch((err) => {
