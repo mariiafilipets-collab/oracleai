@@ -17,6 +17,7 @@ const WEEK_SECONDS = 7 * 24 * 60 * 60;
 const MAX_WEEKLY_WINNERS = 1000;
 const MIN_WINNER_REWARD_WEI = 200000000000000n; // 0.0002 BNB
 const PRETRANSLATE_TIMEOUT_MS = 15000;
+const SYNC_TIMEOUT_MS = 12000;
 
 let io = null;
 let generating = false;
@@ -29,6 +30,12 @@ const schedulerTimers = [];
 
 const CATEGORY_NAMES = ["SPORTS", "POLITICS", "ECONOMY", "CRYPTO", "CLIMATE"];
 const ALLOWED_CATEGORIES = new Set(CATEGORY_NAMES);
+const withTimeout = async (promise, timeoutMs, label) => {
+  return await Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(`${label || "operation"} timeout`)), timeoutMs)),
+  ]);
+};
 
 async function getOnChainEvent(Prediction, eventId) {
   // In ethers v6, contract.getEvent is a meta-method; call by full signature to avoid name collision.
@@ -160,10 +167,18 @@ export function initScheduler(socketIO) {
 // ─── REFILL ─────────────────────────────────────────────────────────────────
 
 async function refill() {
-  await syncUnresolvedWithChain(500);
+  try {
+    await withTimeout(syncUnresolvedWithChain(500), SYNC_TIMEOUT_MS, "syncUnresolvedWithChain");
+  } catch (e) {
+    console.warn(`[Scheduler] Refill sync timeout, continuing with DB counts: ${e.message}`);
+  }
   let active = await PredictionEvent.countDocuments({ resolved: false, deadline: { $gt: new Date() } });
   if (active === 0) {
-    await bootstrapPredictionsFromChain();
+    try {
+      await withTimeout(bootstrapPredictionsFromChain(), SYNC_TIMEOUT_MS, "bootstrapPredictionsFromChain");
+    } catch (e) {
+      console.warn(`[Scheduler] Bootstrap timeout during refill: ${e.message}`);
+    }
     active = await PredictionEvent.countDocuments({ resolved: false, deadline: { $gt: new Date() } });
   }
   if (active < MIN_ACTIVE) {
