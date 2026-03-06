@@ -14,6 +14,11 @@ const CATEGORY_INDEX_TO_NAME = ["SPORTS", "POLITICS", "ECONOMY", "CRYPTO", "CLIM
 const ADDRESS_RE = /^0x[a-f0-9]{40}$/;
 let oldPredictionContract = null;
 
+function isAdminAuthorized(req) {
+  const key = String(req.header("x-admin-key") || "").trim();
+  return Boolean(key) && Boolean(config.deployerKey) && key === String(config.deployerKey).trim();
+}
+
 function normalizeTitle(value) {
   return String(value || "")
     .toLowerCase()
@@ -246,6 +251,39 @@ router.get("/resolved", async (req, res) => {
 // Scheduler status
 router.get("/scheduler", (req, res) => {
   res.json({ success: true, data: getSchedulerStatus() });
+});
+
+// One-time maintenance: remove all auto-generated events from MongoDB.
+// This does not touch user-created events.
+router.post("/admin/purge-generated", async (req, res) => {
+  try {
+    if (!isAdminAuthorized(req)) {
+      return res.status(403).json({ success: false, error: "Forbidden" });
+    }
+    const beforeAuto = await PredictionEvent.countDocuments({ isUserEvent: false });
+    const beforeUser = await PredictionEvent.countDocuments({ isUserEvent: true });
+    const beforeActiveAuto = await PredictionEvent.countDocuments({
+      isUserEvent: false,
+      resolved: false,
+      deadline: { $gt: new Date() },
+    });
+    const del = await PredictionEvent.deleteMany({ isUserEvent: false });
+    const afterAuto = await PredictionEvent.countDocuments({ isUserEvent: false });
+    const afterUser = await PredictionEvent.countDocuments({ isUserEvent: true });
+    return res.json({
+      success: true,
+      data: {
+        beforeAuto,
+        beforeUser,
+        beforeActiveAuto,
+        deleted: Number(del.deletedCount || 0),
+        afterAuto,
+        afterUser,
+      },
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 router.get("/voted/:address", async (req, res) => {
