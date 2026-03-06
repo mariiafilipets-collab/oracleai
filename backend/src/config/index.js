@@ -3,18 +3,18 @@ dotenv.config();
 
 const deploymentNetwork = process.env.DEPLOYMENT_NETWORK || "localhost";
 const isBscTestnet = deploymentNetwork === "bscTestnet";
+const boolFromEnv = (value, fallback) => {
+  if (value === undefined || value === null || value === "") return fallback;
+  return String(value).trim().toLowerCase() === "true";
+};
 
 export default {
   port: parseInt(process.env.PORT || "3001"),
   rpcUrl: process.env.RPC_URL || "http://127.0.0.1:8545",
   deploymentNetwork,
   centralWallet: (process.env.CENTRAL_WALLET || "").toLowerCase(),
-  enableScheduler: process.env.ENABLE_SCHEDULER
-    ? String(process.env.ENABLE_SCHEDULER).toLowerCase() === "true"
-    : !isBscTestnet,
-  enableEventPolling: process.env.ENABLE_EVENT_POLLING
-    ? String(process.env.ENABLE_EVENT_POLLING).toLowerCase() === "true"
-    : true,
+  enableScheduler: boolFromEnv(process.env.ENABLE_SCHEDULER, !isBscTestnet),
+  enableEventPolling: boolFromEnv(process.env.ENABLE_EVENT_POLLING, true),
   eventPollIntervalMs: parseInt(process.env.EVENT_POLL_INTERVAL_MS || (isBscTestnet ? "15000" : "3000")),
   eventMaxBlockRange: parseInt(process.env.EVENT_MAX_BLOCK_RANGE || (isBscTestnet ? "20" : "250")),
   eventBackfillBlocks: parseInt(process.env.EVENT_BACKFILL_BLOCKS || (isBscTestnet ? "5000" : "0")),
