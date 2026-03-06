@@ -210,6 +210,8 @@ ABSOLUTE RULES:
 - Frame as a clear YES/NO question with specific names and numbers
 - hoursToResolve = hours from NOW until result is known (6-720 max)
 - Most hoursToResolve should be 24-168 (1-7 days)
+- If hoursToResolve > 24, include explicit UTC date context in title (e.g., "on March 9", "by Mar 10 18:00 UTC")
+- Do NOT use "today/tonight/now" unless hoursToResolve <= 6
 - hoursToResolve must reflect real result availability (e.g., match end, market close, official statement window)
 - For markets: will resolve when market closes today
 - For crypto: usually 6-48h, unless event is a scheduled date item
@@ -228,6 +230,10 @@ ${context || "No specific news. Use current verifiable facts: live prices, curre
 
 Create exactly 5 predictions about events in the next 30 days.
 Each: {"title":"yes/no question max 80 chars","description":"context max 150 chars","category":"${category}","aiProbability":15-85,"hoursToResolve":6-720}
+Required horizon mix per 5 events:
+- at least 1 event resolving within 6-24h
+- at least 3 events resolving within 24-168h (1-7 days)
+- at least 1 event resolving within 168-720h (8-30 days)
 
 For SPORTS wording precision:
 - If it is a two-leg/tournament tie, title MUST be about this specific match result only.
@@ -321,6 +327,7 @@ Bad: "Will Bitcoin rise soon?"`
     const filtered = events.filter(e => {
       const title = String(e.title || "");
       const description = String(e.description || "");
+      const rawHours = Math.max(6, Math.min(720, parseInt(e.hoursToResolve) || 72));
       const parsedTs = parseDateFromTitle(title);
       if (parsedTs !== null && !isWithinNext30Days(parsedTs)) {
         console.log(`[AI] Filtered out out-of-window event (outside next 30d): "${title}"`);
@@ -334,6 +341,14 @@ Bad: "Will Bitcoin rise soon?"`
         console.log(`[AI] Filtered out low-popularity event: "${title}"`);
         return false;
       }
+      if (/\b(today|tonight|now)\b/i.test(title) && rawHours > 6) {
+        console.log(`[AI] Filtered out ambiguous timing event (>6h with today/tonight): "${title}"`);
+        return false;
+      }
+      if (rawHours > 24 && parsedTs === null) {
+        console.log(`[AI] Filtered out future-window event without explicit date: "${title}"`);
+        return false;
+      }
       return true;
     });
 
@@ -345,15 +360,55 @@ Bad: "Will Bitcoin rise soon?"`
       hoursToResolve: Math.max(6, Math.min(720, parseInt(e.hoursToResolve) || 72)),
     }));
 
-    // Ensure majority of events resolve in 1-7 days while still allowing longer monthly events.
-    const inRangeCount = normalized.filter((e) => e.hoursToResolve >= 24 && e.hoursToResolve <= 168).length;
-    if (normalized.length >= 5 && inRangeCount < 3) {
-      let need = 3 - inRangeCount;
-      for (const e of normalized) {
-        if (need <= 0) break;
-        if (e.hoursToResolve < 24 || e.hoursToResolve > 168) {
-          e.hoursToResolve = 72;
-          need--;
+    const fmtUtc = (ts) => {
+      const d = new Date(ts);
+      return d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+    };
+
+    // Keep semantic consistency: "today/tonight/now" should stay very near-term.
+    for (const e of normalized) {
+      if (/\b(today|tonight|now)\b/i.test(e.title) && e.hoursToResolve > 6) {
+        e.hoursToResolve = 6;
+      }
+      if (e.hoursToResolve > 24 && parseDateFromTitle(e.title) === null) {
+        const targetTs = Date.now() + e.hoursToResolve * 3600000;
+        const safeTitle = e.title.replace(/\?+$/, "").trim();
+        e.title = `${safeTitle} by ${fmtUtc(targetTs)} UTC?`.slice(0, 100);
+      }
+    }
+
+    // Enforce horizon mix so feed is not concentrated in same-day events.
+    if (normalized.length >= 5) {
+      const recalc = () => ({
+        within24: normalized.filter((e) => e.hoursToResolve <= 24).length,
+        withinWeek: normalized.filter((e) => e.hoursToResolve > 24 && e.hoursToResolve <= 168).length,
+        withinMonth: normalized.filter((e) => e.hoursToResolve > 168 && e.hoursToResolve <= 720).length,
+      });
+      let { withinWeek, withinMonth } = recalc();
+
+      // At least 1 event in 8-30d.
+      if (withinMonth < 1) {
+        const candidate = normalized.find((e) => !/\b(today|tonight|now)\b/i.test(e.title));
+        if (candidate) {
+          candidate.hoursToResolve = 216; // ~9 days
+          ({ withinWeek, withinMonth } = recalc());
+        }
+      }
+
+      // At least 3 events in 1-7d.
+      if (withinWeek < 3) {
+        let need = 3 - withinWeek;
+        for (const e of normalized) {
+          if (need <= 0) break;
+          if (e.hoursToResolve <= 24 && !/\b(today|tonight|now)\b/i.test(e.title)) {
+            e.hoursToResolve = 72;
+            ({ withinWeek } = recalc());
+            need -= 1;
+          } else if (e.hoursToResolve > 168) {
+            e.hoursToResolve = 120;
+            ({ withinWeek, withinMonth } = recalc());
+            need -= 1;
+          }
         }
       }
     }
