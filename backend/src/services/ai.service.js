@@ -105,7 +105,7 @@ async function ask(model, messages, temp = 0.5, tokens = 2048, operation = "gene
 
 async function search(query) {
   return ask(config.openrouterSearchModel, [
-    { role: "system", content: "You have live web search. Return only verified, factual, current information. Be specific: names, numbers, times, scores. Only events happening TODAY." },
+    { role: "system", content: "You have live web search. Return only verified, factual, current information. Be specific: names, numbers, times, scores. Only events happening TODAY. Prioritize mainstream/high-interest topics with broad public attention and reliable data sources." },
     { role: "user", content: query },
   ], 0.1, 2000, "search");
 }
@@ -190,8 +190,11 @@ ABSOLUTE RULES:
 - NEVER create predictions about matches/events on future days
 - Every prediction must resolve within a few hours from NOW
 - The outcome MUST be verifiable by searching the web TONIGHT
+- Prefer HIGH-POPULARITY topics only (major teams, major assets, major political/economic headlines).
+- Avoid niche/local/low-volume topics unless they are globally trending today.
 - Frame as a clear YES/NO question with specific names and numbers
 - hoursToResolve = hours from NOW until the result is known (2-12 max)
+- hoursToResolve must reflect real result availability (e.g., match end, market close, official statement window)
 - If a sports match kicks off at 20:00 UTC and it's now ${hour}:00 UTC, hoursToResolve = ${Math.max(2, 20 - hour + 2)}
 - For markets: will resolve when market closes today
 - For crypto: will resolve in 2-8 hours based on price movement
@@ -200,7 +203,8 @@ ABSOLUTE RULES:
 REJECT these types of predictions:
 - Events on other dates (e.g. "on March 10" when today is not March 10)
 - Vague future events ("this week", "by Friday")
-- Events that already happened today`,
+- Events that already happened today
+- Events that are not sufficiently popular/visible`,
 
     `Today: ${day}, ${today}, ${hour}:00 UTC. Category: ${category}
 
@@ -208,7 +212,7 @@ VERIFIED NEWS FOR TODAY:
 ${context || "No specific news. Use current verifiable facts: live prices, current standings, today's weather."}
 
 Create exactly 5 predictions about things happening TODAY (${today}) only.
-Each: {"title":"yes/no question max 80 chars, NO dates in title unless today","description":"context max 150 chars","category":"${category}","aiProbability":15-85,"hoursToResolve":2-12}
+Each: {"title":"yes/no question max 80 chars, NO explicit calendar dates in title","description":"context max 150 chars","category":"${category}","aiProbability":15-85,"hoursToResolve":2-12}
 
 For SPORTS wording precision:
 - If it is a two-leg/tournament tie, title MUST be about this specific match result only.
@@ -227,7 +231,7 @@ Good: "Will Bitcoin close above $90k today?" Bad: "Will Bitcoin hit $90k this we
     const events = JSON.parse(r);
     if (!Array.isArray(events)) return [];
 
-    // Filter out events with future dates in the title
+    // Filter out events with invalid time references or low-quality timing semantics.
     const todayShort = today.slice(5); // "03-02"
     const filtered = events.filter(e => {
       const title = String(e.title || "");
@@ -240,6 +244,10 @@ Good: "Will Bitcoin close above $90k today?" Bad: "Will Bitcoin hit $90k this we
           console.log(`[AI] Filtered out future-dated event: "${title}"`);
           return false;
         }
+      }
+      if (/\b(tomorrow|next week|next month|by friday|by monday|this week)\b/i.test(title)) {
+        console.log(`[AI] Filtered out non-today timing event: "${title}"`);
+        return false;
       }
       return true;
     });
