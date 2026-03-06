@@ -4,7 +4,7 @@ import PredictionEvent from "../models/PredictionEvent.js";
 import { assessUserEventForListing, generateDailyPredictions } from "../services/ai.service.js";
 import { getContracts, getSigner } from "../services/blockchain.service.js";
 import config from "../config/index.js";
-import { getSchedulerStatus } from "../jobs/prediction-scheduler.js";
+import { getSchedulerStatus, initScheduler } from "../jobs/prediction-scheduler.js";
 import { pretranslateEvents, translateEvents, translateMissingEvents } from "../services/translate.service.js";
 
 const router = Router();
@@ -265,6 +265,21 @@ router.get("/scheduler", (req, res) => {
       },
     },
   });
+});
+
+// Emergency maintenance: force-start scheduler in current process.
+router.post("/admin/scheduler/start", async (req, res) => {
+  try {
+    if (!isAdminAuthorized(req)) {
+      return res.status(403).json({ success: false, error: "Forbidden" });
+    }
+    initScheduler(null);
+    // Give event loop one tick so status reflects initialization.
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    return res.json({ success: true, data: getSchedulerStatus() });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // One-time maintenance: remove all auto-generated events from MongoDB.
