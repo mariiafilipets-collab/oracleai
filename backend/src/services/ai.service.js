@@ -179,6 +179,58 @@ function isPopularEvent(category, title, description = "") {
   return re.test(text);
 }
 
+async function vetPredictionsWithWeb(category, events, nowInfo) {
+  if (!Array.isArray(events) || !events.length) return [];
+  const payload = events.map((e, idx) => ({
+    idx,
+    title: e.title,
+    description: e.description || "",
+    hoursToResolve: e.hoursToResolve,
+    category,
+  }));
+  const sys = `You are a strict prediction-market QA checker with live web search.
+Validate each candidate for:
+1) mainstream relevance (massively discussed topic),
+2) temporal correctness (event still pending, not already decided),
+3) resolvability timing consistency.
+Return ONLY JSON array:
+[{"idx":number,"accepted":true|false,"reason":"short","adjustedHoursToResolve":number|null}]
+Rules:
+- Reject stale/incongruent events ("today/tonight" already passed).
+- Reject unrealistic or trivial market thresholds.
+- Reject mismatched timing where verification would happen before event window ends.
+- Keep only high-signal mainstream events.`;
+  const user = `Now UTC: ${nowInfo.day}, ${nowInfo.today}, ${nowInfo.hour}:00 UTC
+Candidates:
+${JSON.stringify(payload)}`;
+  try {
+    const raw = await search(`${sys}\n\n${user}`);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    const byIdx = new Map(
+      parsed
+        .filter((x) => Number.isFinite(Number(x?.idx)))
+        .map((x) => [Number(x.idx), x])
+    );
+    const out = [];
+    for (let i = 0; i < events.length; i++) {
+      const verdict = byIdx.get(i);
+      if (!verdict || !verdict.accepted) continue;
+      const adjusted = Number(verdict.adjustedHoursToResolve);
+      out.push({
+        ...events[i],
+        hoursToResolve: Number.isFinite(adjusted)
+          ? Math.max(6, Math.min(720, adjusted))
+          : events[i].hoursToResolve,
+      });
+    }
+    return out;
+  } catch {
+    return events;
+  }
+}
+
 async function searchPopularEvents(category) {
   const { today, hour, day } = getTimeInfo();
   try {
@@ -375,6 +427,14 @@ Bad: "Will Bitcoin rise soon?"`
         const safeTitle = e.title.replace(/\?+$/, "").trim();
         e.title = `${safeTitle} by ${fmtUtc(targetTs)} UTC?`.slice(0, 100);
       }
+      // If title includes explicit date, align hours to that date window.
+      const parsedTs = parseDateFromTitle(e.title);
+      if (parsedTs !== null) {
+        const diffH = Math.round((parsedTs - Date.now()) / 3600000);
+        if (diffH > 6) {
+          e.hoursToResolve = Math.max(6, Math.min(720, diffH));
+        }
+      }
     }
 
     // Enforce horizon mix so feed is not concentrated in same-day events.
@@ -412,7 +472,8 @@ Bad: "Will Bitcoin rise soon?"`
         }
       }
     }
-    return normalized;
+    const vetted = await vetPredictionsWithWeb(category, normalized, { today, hour, day });
+    return vetted;
   } catch { return []; }
 }
 
