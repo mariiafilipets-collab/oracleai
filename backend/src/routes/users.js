@@ -8,6 +8,14 @@ import config from "../config/index.js";
 
 const router = Router();
 const SYSTEM_REFERRAL_CODE = "ORACLEAI";
+const CHAIN_READ_TIMEOUT_MS = 8000;
+
+async function withTimeout(promise, timeoutMs = CHAIN_READ_TIMEOUT_MS) {
+  return await Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error("chain-read-timeout")), timeoutMs)),
+  ]);
+}
 
 function buildReferralCode(address) {
   return String(address || "").toLowerCase().slice(2, 10).toUpperCase();
@@ -70,7 +78,7 @@ async function readPredictionValueNoArgs(prediction, fragment, methodName, fallb
     if (!provider || !to) return fallback;
     const iface = new ethers.Interface([fragment]);
     const data = iface.encodeFunctionData(methodName, []);
-    const raw = await provider.call({ to, data });
+    const raw = await withTimeout(provider.call({ to, data }));
     const decoded = iface.decodeFunctionResult(methodName, raw);
     return decoded?.[0] ?? fallback;
   } catch {
@@ -235,14 +243,14 @@ router.get("/:address/creator-stats", async (req, res) => {
     if (Prediction) {
       try {
         if (typeof Prediction.creatorClaimableWei === "function") {
-          onChainCreatorClaimableWei = String(await Prediction.creatorClaimableWei(address));
+          onChainCreatorClaimableWei = String(await withTimeout(Prediction.creatorClaimableWei(address)));
         } else {
           const provider = Prediction?.runner?.provider;
           const to = Prediction?.target || Prediction?.address;
           if (provider && to) {
             const iface = new ethers.Interface(["function creatorClaimableWei(address) view returns (uint256)"]);
             const data = iface.encodeFunctionData("creatorClaimableWei", [address]);
-            const raw = await provider.call({ to, data });
+            const raw = await withTimeout(provider.call({ to, data }));
             const dec = iface.decodeFunctionResult("creatorClaimableWei", raw);
             onChainCreatorClaimableWei = String(dec?.[0] ?? 0n);
           }
@@ -312,7 +320,7 @@ router.get("/:address/onboarding", async (req, res) => {
     const { Referral } = getContracts();
     if (Referral) {
       try {
-        hasReferrerOnChain = await Referral.hasReferrer(address);
+        hasReferrerOnChain = await withTimeout(Referral.hasReferrer(address));
       } catch {}
     }
 
@@ -340,7 +348,7 @@ router.get("/:address", async (req, res) => {
     let onChainData = {};
     if (Points) {
       try {
-        const pts = await Points.getUserPoints(address);
+        const pts = await withTimeout(Points.getUserPoints(address));
         onChainData.points = Number(pts.points);
         onChainData.weeklyPoints = Number(pts.weeklyPoints);
         onChainData.streak = Number(pts.streak);
@@ -350,7 +358,7 @@ router.get("/:address", async (req, res) => {
 
     if (CheckIn) {
       try {
-        const rec = await CheckIn.getRecord(address);
+        const rec = await withTimeout(CheckIn.getRecord(address));
         onChainData.lastCheckIn = Number(rec.lastCheckIn);
         onChainData.lastTier = ["BASIC", "PRO", "WHALE"][Number(rec.lastTier)];
       } catch {}
@@ -358,7 +366,7 @@ router.get("/:address", async (req, res) => {
 
     if (Staking) {
       try {
-        const stake = await Staking.getStakeInfo(address);
+        const stake = await withTimeout(Staking.getStakeInfo(address));
         onChainData.staked = stake.amount.toString();
         onChainData.stakedAt = Number(stake.stakedAt);
       } catch {}
@@ -366,10 +374,10 @@ router.get("/:address", async (req, res) => {
 
     if (Referral) {
       try {
-        const refs = await Referral.getDirectReferrals(address);
+        const refs = await withTimeout(Referral.getDirectReferrals(address));
         onChainData.directReferrals = refs.length;
-        onChainData.hasReferrer = await Referral.hasReferrer(address);
-        onChainData.referralEarnings = (await Referral.totalEarnings(address)).toString();
+        onChainData.hasReferrer = await withTimeout(Referral.hasReferrer(address));
+        onChainData.referralEarnings = (await withTimeout(Referral.totalEarnings(address))).toString();
       } catch {}
     }
 
@@ -501,7 +509,7 @@ router.post("/:address/referral", async (req, res) => {
 
     let already = false;
     try {
-      already = await Referral.hasReferrer(userAddress);
+      already = await withTimeout(Referral.hasReferrer(userAddress));
     } catch (err) {
       if (isBadContractDataError(err)) {
         return res.status(503).json({
