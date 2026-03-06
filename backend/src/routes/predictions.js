@@ -4,7 +4,7 @@ import PredictionEvent from "../models/PredictionEvent.js";
 import { assessUserEventForListing, generateDailyPredictions } from "../services/ai.service.js";
 import { getContracts, getSigner } from "../services/blockchain.service.js";
 import config from "../config/index.js";
-import { getSchedulerStatus, initScheduler } from "../jobs/prediction-scheduler.js";
+import { getSchedulerStatus, initScheduler, runSchedulerKick } from "../jobs/prediction-scheduler.js";
 import { pretranslateEvents, translateEvents, translateMissingEvents } from "../services/translate.service.js";
 
 const router = Router();
@@ -277,6 +277,19 @@ router.post("/admin/scheduler/start", async (req, res) => {
     // Give event loop one tick so status reflects initialization.
     await new Promise((resolve) => setTimeout(resolve, 10));
     return res.json({ success: true, data: getSchedulerStatus() });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Emergency maintenance: trigger one scheduler refill cycle immediately.
+router.post("/admin/scheduler/kick", async (req, res) => {
+  try {
+    if (!isAdminAuthorized(req)) {
+      return res.status(403).json({ success: false, error: "Forbidden" });
+    }
+    const status = await runSchedulerKick();
+    return res.json({ success: true, data: status });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }

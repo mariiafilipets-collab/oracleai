@@ -920,10 +920,16 @@ export function getSchedulerStatus() {
   const nextWeeklyReset = lastWeeklyReset + WEEK_SECONDS * 1000;
   return {
     initialized: schedulerInitialized,
+    timersCount: schedulerTimers.length,
     generating, resolving, lastGenerate, stats, minActive: MIN_ACTIVE,
     generateIntervalMin: GENERATE_INTERVAL / 60000,
     resolveIntervalSec: RESOLVE_INTERVAL / 1000,
     nextWeeklyReset: new Date(nextWeeklyReset).toISOString(),
     weeklyResetIn: Math.max(0, Math.round((nextWeeklyReset - Date.now()) / 60000)) + " min",
   };
+}
+
+export async function runSchedulerKick() {
+  await refill();
+  return getSchedulerStatus();
 }
