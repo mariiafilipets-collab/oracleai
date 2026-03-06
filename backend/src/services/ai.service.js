@@ -233,17 +233,81 @@ Bad: "Will Bitcoin rise soon?"`
     if (!Array.isArray(events)) return [];
 
     // Filter out events with obviously stale timing semantics.
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    const now = new Date();
+    const todayUtcMs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+    const monthMap = {
+      january: 0, jan: 0,
+      february: 1, feb: 1,
+      march: 2, mar: 2,
+      april: 3, apr: 3,
+      may: 4,
+      june: 5, jun: 5,
+      july: 6, jul: 6,
+      august: 7, aug: 7,
+      september: 8, sep: 8,
+      october: 9, oct: 9,
+      november: 10, nov: 10,
+      december: 11, dec: 11,
+    };
+    const buildUtcDate = (year, monthIdx, day) => {
+      const ts = Date.UTC(year, monthIdx, day);
+      const d = new Date(ts);
+      if (d.getUTCFullYear() !== year || d.getUTCMonth() !== monthIdx || d.getUTCDate() !== day) return null;
+      return ts;
+    };
+    const normalizeYear = (y) => (y < 100 ? 2000 + y : y);
+    const parseDateFromTitle = (title) => {
+      const s = String(title || "");
+      const yNow = now.getUTCFullYear();
+
+      // ISO-like date: 2026-03-10
+      const iso = s.match(/\b(20\d{2})-(\d{1,2})-(\d{1,2})\b/);
+      if (iso) {
+        return buildUtcDate(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
+      }
+
+      // Month name date: March 10 [2026]
+      const monthNamed = s.match(/\b(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2})(?:,?\s*(\d{2,4}))?\b/i);
+      if (monthNamed) {
+        const monthIdx = monthMap[String(monthNamed[1] || "").toLowerCase()];
+        const day = Number(monthNamed[2]);
+        let year = monthNamed[3] ? normalizeYear(Number(monthNamed[3])) : yNow;
+        let ts = buildUtcDate(year, monthIdx, day);
+        if (ts === null) return null;
+        // If year is omitted and this date has already passed, treat as next year occurrence.
+        if (!monthNamed[3] && ts < todayUtcMs) {
+          ts = buildUtcDate(year + 1, monthIdx, day);
+        }
+        return ts;
+      }
+
+      // Numeric date: 3/10[/2026]
+      const md = s.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/);
+      if (md) {
+        const monthIdx = Number(md[1]) - 1;
+        const day = Number(md[2]);
+        let year = md[3] ? normalizeYear(Number(md[3])) : yNow;
+        let ts = buildUtcDate(year, monthIdx, day);
+        if (ts === null) return null;
+        if (!md[3] && ts < todayUtcMs) {
+          ts = buildUtcDate(year + 1, monthIdx, day);
+        }
+        return ts;
+      }
+      return null;
+    };
+    const isWithinNext30Days = (ts) => {
+      const diffDays = Math.floor((ts - todayUtcMs) / DAY_MS);
+      return diffDays >= 0 && diffDays <= 30;
+    };
+
     const filtered = events.filter(e => {
       const title = String(e.title || "");
-      // Check for date patterns like "March 10", "Mar 10", "3/10", "2026-03-10"
-      const dateMatch = title.match(/(?:January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2})/i);
-      if (dateMatch) {
-        const mentioned = parseInt(dateMatch[1]);
-        const todayDate = new Date().getUTCDate();
-        if (mentioned !== todayDate) {
-          console.log(`[AI] Filtered out future-dated event: "${title}"`);
-          return false;
-        }
+      const parsedTs = parseDateFromTitle(title);
+      if (parsedTs !== null && !isWithinNext30Days(parsedTs)) {
+        console.log(`[AI] Filtered out out-of-window event (outside next 30d): "${title}"`);
+        return false;
       }
       if (/\b(yesterday|last week|last month|already happened)\b/i.test(title)) {
         console.log(`[AI] Filtered out stale timing event: "${title}"`);
