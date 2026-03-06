@@ -3,6 +3,14 @@ import { getContracts } from "./blockchain.service.js";
 
 const leaderboardCache = { data: [], updatedAt: 0 };
 const CACHE_TTL = 1_500;
+const CHAIN_READ_TIMEOUT_MS = 8000;
+
+async function withTimeout(promise, timeoutMs = CHAIN_READ_TIMEOUT_MS) {
+  return await Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error("chain-read-timeout")), timeoutMs)),
+  ]);
+}
 
 export async function getLeaderboard(limit = 1000) {
   if (Date.now() - leaderboardCache.updatedAt < CACHE_TTL && leaderboardCache.data.length > 0) {
@@ -12,7 +20,7 @@ export async function getLeaderboard(limit = 1000) {
   const { Points } = getContracts();
   if (Points && typeof Points.getTopUsers === "function") {
     try {
-      const [topAddrs, topPts] = await Points.getTopUsers(limit);
+      const [topAddrs, topPts] = await withTimeout(Points.getTopUsers(limit));
       const addresses = [];
       const chainRows = [];
       for (let i = 0; i < topAddrs.length; i++) {

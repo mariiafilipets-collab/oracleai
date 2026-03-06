@@ -11,6 +11,14 @@ const TIER_ACTIVITY_DEFAULTS = {
   PRO: { amount: "0.01", points: 300 },
   WHALE: { amount: "0.05", points: 1000 },
 };
+const CHAIN_READ_TIMEOUT_MS = 8000;
+
+async function withTimeout(promise, timeoutMs = CHAIN_READ_TIMEOUT_MS) {
+  return await Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error("chain-read-timeout")), timeoutMs)),
+  ]);
+}
 
 router.get("/", async (req, res) => {
   try {
@@ -32,12 +40,12 @@ router.get("/", async (req, res) => {
     const { PrizePool, CheckIn } = getContracts();
     if (PrizePool) {
       try {
-        prizePoolBalance = (await PrizePool.getBalance()).toString();
+        prizePoolBalance = (await withTimeout(PrizePool.getBalance())).toString();
       } catch {}
     }
     if (CheckIn) {
       try {
-        totalFeesCollected = (await CheckIn.totalFeesCollected()).toString();
+        totalFeesCollected = (await withTimeout(CheckIn.totalFeesCollected())).toString();
       } catch {}
     }
 
@@ -106,7 +114,7 @@ router.get("/activity", async (req, res) => {
         if (CheckIn) {
           for (const u of seedUsers) {
             try {
-              const rec = await CheckIn.getRecord(u.address);
+              const rec = await withTimeout(CheckIn.getRecord(u.address), 5000);
               const lastCheckInRaw = Number(rec.lastCheckIn ?? 0);
               if (lastCheckInRaw <= 0) continue;
               const tier = ["BASIC", "PRO", "WHALE"][Number(rec.lastTier ?? 0)] || (u.tier || "BASIC");
