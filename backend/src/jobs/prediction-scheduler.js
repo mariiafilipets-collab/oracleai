@@ -253,13 +253,12 @@ async function publishNewBatch() {
 
     for (let i = 0; i < unique.length; i++) {
       const p = unique[i];
-      const modelCategory = ALLOWED_CATEGORIES.has(String(p.category || "").toUpperCase())
-        ? String(p.category).toUpperCase()
-        : "CRYPTO";
-      const inferredCategory = inferCategoryFromText(`${p.title || ""} ${p.description || ""}`);
-      // Semantic override: if text strongly matches a non-crypto domain, prefer inferred category.
-      const normalizedCategory =
-        inferredCategory !== "CRYPTO" ? inferredCategory : modelCategory;
+      const normalizedCategory = normalizeStoredCategory(
+        p.category,
+        p.title,
+        p.description || "",
+        false
+      );
       const timing = buildEventTiming(p.hoursToResolve || 8);
       const catIdx = CATEGORY_NAMES.indexOf(normalizedCategory);
       try {
@@ -322,7 +321,7 @@ async function publishNewBatch() {
 
 function inferCategoryFromText(text) {
   const t = String(text || "").toLowerCase();
-  if (/\b(vs|match|league|cup|goal|player|team|nba|nfl|mlb|uefa|premier league|laliga|serie a|champions)\b/.test(t)) {
+  if (/\b(vs|match|fixture|derby|league|cup|goal|score|scorer|assist|player|team|coach|lineup|penalty|football|soccer|basketball|tennis|hockey|baseball|cricket|mma|ufc|f1|formula 1|motogp|nba|nfl|mlb|nhl|uefa|fifa|premier league|la liga|laliga|serie a|bundesliga|champions league|europa league|arsenal|manchester|liverpool|chelsea|tottenham|real madrid|barcelona|atletico|bayern|psg|juventus|inter|milan|dortmund)\b/.test(t)) {
     return "SPORTS";
   }
   if (/\b(election|president|parliament|sanction|summit|ceasefire|government|minister|vote)\b/.test(t)) {
@@ -338,6 +337,15 @@ function inferCategoryFromText(text) {
     return "CLIMATE";
   }
   return "CRYPTO";
+}
+
+function normalizeStoredCategory(eventCategory, title, description, isUserEvent) {
+  const modelCategory = ALLOWED_CATEGORIES.has(String(eventCategory || "").toUpperCase())
+    ? String(eventCategory).toUpperCase()
+    : "CRYPTO";
+  if (isUserEvent) return modelCategory;
+  const inferredCategory = inferCategoryFromText(`${title || ""} ${description || ""}`);
+  return inferredCategory !== "CRYPTO" ? inferredCategory : modelCategory;
 }
 
 async function bootstrapPredictionsFromChain() {
@@ -358,7 +366,12 @@ async function bootstrapPredictionsFromChain() {
         const deadlineSec = Number(evt.deadline ?? 0n);
         const deadline = new Date(deadlineSec * 1000);
         const verifyAfter = new Date(deadline.getTime() + RESULT_VERIFY_BUFFER_MS);
-        const category = CATEGORY_NAMES[Number(evt.category ?? 3)] || "CRYPTO";
+        const category = normalizeStoredCategory(
+          CATEGORY_NAMES[Number(evt.category ?? 3)] || "CRYPTO",
+          String(evt.title || `Event #${id}`),
+          "",
+          Boolean(evt.isUserEvent)
+        );
 
         await PredictionEvent.updateOne(
           { eventId: id },
@@ -419,7 +432,14 @@ async function resyncArchivedFromChain() {
         const on = await getOnChainEvent(Prediction, row.eventId);
         if (!on || Number(on.id || 0n) === 0) continue;
         const onResolved = Boolean(on.resolved);
+        const normalizedCategory = normalizeStoredCategory(
+          CATEGORY_NAMES[Number(on.category || 3)] || "CRYPTO",
+          String(on.title || ""),
+          "",
+          Boolean(on.isUserEvent)
+        );
         const update = {
+          category: normalizedCategory,
           resolved: onResolved,
           outcome: onResolved ? Boolean(on.outcome) : null,
           aiReasoning: onResolved ? "Synced from chain after restart recovery." : "",
@@ -467,7 +487,12 @@ async function syncUnresolvedWithChain(limit = 1000) {
                 eventId: id,
                 title: String(on.title || `Event #${id}`),
                 description: "",
-                category: CATEGORY_NAMES[Number(on.category || 3)] || "CRYPTO",
+                category: normalizeStoredCategory(
+                  CATEGORY_NAMES[Number(on.category || 3)] || "CRYPTO",
+                  String(on.title || `Event #${id}`),
+                  "",
+                  Boolean(on.isUserEvent)
+                ),
                 aiProbability: Number(on.aiProbability || 50n),
                 deadline: new Date(Number(on.deadline || 0n) * 1000),
                 verifyAfter: new Date(Number(on.deadline || 0n) * 1000 + RESULT_VERIFY_BUFFER_MS),
@@ -535,6 +560,12 @@ async function syncUnresolvedWithChain(limit = 1000) {
             filter: { eventId: row.eventId },
             update: {
               $set: {
+                category: normalizeStoredCategory(
+                  CATEGORY_NAMES[Number(on.category || 3)] || "CRYPTO",
+                  String(on.title || ""),
+                  "",
+                  Boolean(on.isUserEvent)
+                ),
                 deadline: new Date(Number(on.deadline || 0n) * 1000),
                 verifyAfter: new Date(Number(on.deadline || 0n) * 1000 + RESULT_VERIFY_BUFFER_MS),
                 totalVotesYes: Number(on.totalVotesYes || 0n),

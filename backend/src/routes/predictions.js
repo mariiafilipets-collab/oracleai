@@ -15,6 +15,24 @@ const ADDRESS_RE = /^0x[a-f0-9]{40}$/;
 let oldPredictionContract = null;
 let schedulerEnsureInProgress = false;
 const RESULT_VERIFY_BUFFER_MS = 10 * 60 * 1000;
+const CATEGORY_NAMES = ["SPORTS", "POLITICS", "ECONOMY", "CRYPTO", "CLIMATE"];
+
+function inferCategoryFromText(text) {
+  const t = String(text || "").toLowerCase();
+  if (/\b(vs|match|fixture|derby|league|cup|goal|score|scorer|assist|football|soccer|basketball|tennis|hockey|ufc|f1|nba|nfl|mlb|nhl|arsenal|manchester|liverpool|chelsea|tottenham|real madrid|barcelona|atletico|bayern|psg|juventus|inter|milan)\b/.test(t)) return "SPORTS";
+  if (/\b(election|president|parliament|sanction|summit|ceasefire|government|minister|vote)\b/.test(t)) return "POLITICS";
+  if (/\b(cpi|inflation|gdp|fed|ecb|interest rate|jobs report|earnings|dow|nasdaq|s&p|gold|oil)\b/.test(t)) return "ECONOMY";
+  if (/\b(bitcoin|btc|ethereum|eth|solana|xrp|crypto|token|etf|on-chain|wallet|binance|coinbase)\b/.test(t)) return "CRYPTO";
+  if (/\b(storm|hurricane|earthquake|wildfire|flood|temperature|heatwave|weather|climate)\b/.test(t)) return "CLIMATE";
+  return "CRYPTO";
+}
+
+function normalizeAutoCategory(category, title, description = "") {
+  const model = String(category || "").toUpperCase();
+  if (!CATEGORY_NAMES.includes(model)) return inferCategoryFromText(`${title} ${description}`);
+  const inferred = inferCategoryFromText(`${title} ${description}`);
+  return inferred !== "CRYPTO" ? inferred : model;
+}
 
 function isAdminAuthorized(req) {
   const key = String(req.header("x-admin-key") || "").trim();
@@ -590,7 +608,8 @@ router.post("/generate", async (req, res) => {
         const hours = pred.hoursToResolve || 8;
         const resultCheckAt = new Date(Date.now() + hours * 3600000);
         const deadline = new Date(Math.max(Date.now() + 60_000, resultCheckAt.getTime() - RESULT_VERIFY_BUFFER_MS));
-        const catIdx = ["SPORTS", "POLITICS", "ECONOMY", "CRYPTO", "CLIMATE"].indexOf(pred.category);
+        const normalizedCategory = normalizeAutoCategory(pred.category, pred.title, pred.description || "");
+        const catIdx = CATEGORY_NAMES.indexOf(normalizedCategory);
         try {
           const tx = await Prediction.createEvent(pred.title, catIdx >= 0 ? catIdx : 3, Math.floor(deadline.getTime() / 1000), pred.aiProbability, { nonce: nonce++ });
           await tx.wait();
@@ -599,7 +618,7 @@ router.post("/generate", async (req, res) => {
             eventId: id,
             title: pred.title,
             description: pred.description || "",
-            category: pred.category,
+            category: normalizedCategory,
             aiProbability: pred.aiProbability,
             deadline,
             verifyAfter: resultCheckAt,
