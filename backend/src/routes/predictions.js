@@ -13,10 +13,27 @@ const USER_EVENT_ALLOWED_SOURCES = new Set(["official", "market", "newswire", "o
 const CATEGORY_INDEX_TO_NAME = ["SPORTS", "POLITICS", "ECONOMY", "CRYPTO", "CLIMATE"];
 const ADDRESS_RE = /^0x[a-f0-9]{40}$/;
 let oldPredictionContract = null;
+let schedulerEnsureInProgress = false;
 
 function isAdminAuthorized(req) {
   const key = String(req.header("x-admin-key") || "").trim();
   return Boolean(key) && Boolean(config.deployerKey) && key === String(config.deployerKey).trim();
+}
+
+async function ensureSchedulerStarted() {
+  if (!config.enableScheduler) return getSchedulerStatus();
+  const current = getSchedulerStatus();
+  if (current.initialized) return current;
+  if (schedulerEnsureInProgress) return current;
+
+  schedulerEnsureInProgress = true;
+  try {
+    initScheduler(null);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    return getSchedulerStatus();
+  } finally {
+    schedulerEnsureInProgress = false;
+  }
 }
 
 function normalizeTitle(value) {
@@ -249,8 +266,8 @@ router.get("/resolved", async (req, res) => {
 });
 
 // Scheduler status
-router.get("/scheduler", (req, res) => {
-  const scheduler = getSchedulerStatus();
+router.get("/scheduler", async (req, res) => {
+  const scheduler = await ensureSchedulerStarted();
   res.json({
     success: true,
     data: {
@@ -273,10 +290,8 @@ router.post("/admin/scheduler/start", async (req, res) => {
     if (!isAdminAuthorized(req)) {
       return res.status(403).json({ success: false, error: "Forbidden" });
     }
-    initScheduler(null);
-    // Give event loop one tick so status reflects initialization.
-    await new Promise((resolve) => setTimeout(resolve, 10));
-    return res.json({ success: true, data: getSchedulerStatus() });
+    const status = await ensureSchedulerStarted();
+    return res.json({ success: true, data: status });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }
