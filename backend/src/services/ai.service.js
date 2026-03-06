@@ -164,6 +164,21 @@ Include active severe warnings, storms, earthquakes, heatwaves, floods, wildfire
 Prioritize events with strong public attention in the next 1-7 days, and include major scheduled weather risks later in the month.`,
 };
 
+const POPULARITY_PATTERNS = {
+  SPORTS: /\b(arsenal|manchester|liverpool|chelsea|tottenham|real madrid|barcelona|atletico|bayern|psg|juventus|inter|milan|champions league|premier league|la liga|serie a|bundesliga|nba|nfl|mlb|nhl|ufc|f1|atp|wta|grand slam|world cup)\b/i,
+  POLITICS: /\b(us|white house|congress|senate|eu|european union|ukraine|russia|china|israel|iran|un|nato|election|parliament|sanctions|summit|sec|fed|ecb|imf|g7|g20)\b/i,
+  ECONOMY: /\b(s&p|nasdaq|dow|gold|oil|brent|fed|ecb|cpi|inflation|jobs|nonfarm|payrolls|earnings|treasury|bond|yield|rate cut|rate hike|recession)\b/i,
+  CRYPTO: /\b(bitcoin|btc|ethereum|eth|solana|xrp|bnb|doge|ton|sec|etf|coinbase|binance|blackrock|grayscale|ark|token unlock|airdrop|listing)\b/i,
+  CLIMATE: /\b(hurricane|storm|tornado|earthquake|wildfire|flood|heatwave|weather warning|red warning|landfall|severe weather|cyclone|air quality)\b/i,
+};
+
+function isPopularEvent(category, title, description = "") {
+  const text = `${String(title || "")} ${String(description || "")}`;
+  const re = POPULARITY_PATTERNS[category];
+  if (!re) return true;
+  return re.test(text);
+}
+
 async function searchPopularEvents(category) {
   const { today, hour, day } = getTimeInfo();
   try {
@@ -305,6 +320,7 @@ Bad: "Will Bitcoin rise soon?"`
 
     const filtered = events.filter(e => {
       const title = String(e.title || "");
+      const description = String(e.description || "");
       const parsedTs = parseDateFromTitle(title);
       if (parsedTs !== null && !isWithinNext30Days(parsedTs)) {
         console.log(`[AI] Filtered out out-of-window event (outside next 30d): "${title}"`);
@@ -312,6 +328,10 @@ Bad: "Will Bitcoin rise soon?"`
       }
       if (/\b(yesterday|last week|last month|already happened)\b/i.test(title)) {
         console.log(`[AI] Filtered out stale timing event: "${title}"`);
+        return false;
+      }
+      if (!isPopularEvent(category, title, description)) {
+        console.log(`[AI] Filtered out low-popularity event: "${title}"`);
         return false;
       }
       return true;

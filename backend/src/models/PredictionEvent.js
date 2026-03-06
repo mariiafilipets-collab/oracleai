@@ -20,6 +20,7 @@ const predictionEventSchema = new mongoose.Schema({
   },
   aiProbability: { type: Number, required: true, min: 0, max: 100 },
   deadline: { type: Date, required: true },
+  verifyAfter: { type: Date, default: null },
   creator: { type: String, default: "" },
   isUserEvent: { type: Boolean, default: false },
   listingFeeWei: { type: String, default: "0" },

@@ -18,6 +18,7 @@ const MAX_WEEKLY_WINNERS = 1000;
 const MIN_WINNER_REWARD_WEI = 200000000000000n; // 0.0002 BNB
 const PRETRANSLATE_TIMEOUT_MS = 15000;
 const SYNC_TIMEOUT_MS = 12000;
+const RESULT_VERIFY_BUFFER_MS = 10 * 60 * 1000; // voting closes 10m before result verification
 
 let io = null;
 let generating = false;
@@ -36,6 +37,18 @@ const withTimeout = async (promise, timeoutMs, label) => {
     new Promise((_, reject) => setTimeout(() => reject(new Error(`${label || "operation"} timeout`)), timeoutMs)),
   ]);
 };
+
+function buildEventTiming(hoursToResolve) {
+  const now = Date.now();
+  const resolveMs = Math.max(6, Number(hoursToResolve || 8)) * 3600000;
+  const resultCheckAt = new Date(now + resolveMs);
+  // Vote closes 10 minutes before result verification/check.
+  const voteDeadlineMs = Math.max(now + 60_000, resultCheckAt.getTime() - RESULT_VERIFY_BUFFER_MS);
+  return {
+    deadline: new Date(voteDeadlineMs),
+    verifyAfter: resultCheckAt,
+  };
+}
 
 async function getOnChainEvent(Prediction, eventId) {
   // In ethers v6, contract.getEvent is a meta-method; call by full signature to avoid name collision.
@@ -247,10 +260,16 @@ async function publishNewBatch() {
       // Semantic override: if text strongly matches a non-crypto domain, prefer inferred category.
       const normalizedCategory =
         inferredCategory !== "CRYPTO" ? inferredCategory : modelCategory;
-      const deadline = new Date(Date.now() + (p.hoursToResolve || 8) * 3600000);
+      const timing = buildEventTiming(p.hoursToResolve || 8);
       const catIdx = CATEGORY_NAMES.indexOf(normalizedCategory);
       try {
-        const tx = await Prediction.createEvent(p.title, catIdx >= 0 ? catIdx : 3, Math.floor(deadline.getTime() / 1000), p.aiProbability, { nonce: nonce++ });
+        const tx = await Prediction.createEvent(
+          p.title,
+          catIdx >= 0 ? catIdx : 3,
+          Math.floor(timing.deadline.getTime() / 1000),
+          p.aiProbability,
+          { nonce: nonce++ }
+        );
         await tx.wait();
         const id = Number(await Prediction.eventCount());
         // Re-deploy on local chain resets eventId back to 1.
@@ -264,7 +283,8 @@ async function publishNewBatch() {
               description: p.description || "",
               category: normalizedCategory,
               aiProbability: p.aiProbability,
-              deadline,
+              deadline: timing.deadline,
+              verifyAfter: timing.verifyAfter,
               creator: "",
               isUserEvent: false,
               listingFeeWei: "0",
@@ -337,6 +357,7 @@ async function bootstrapPredictionsFromChain() {
         const evt = await getOnChainEvent(Prediction, id);
         const deadlineSec = Number(evt.deadline ?? 0n);
         const deadline = new Date(deadlineSec * 1000);
+        const verifyAfter = new Date(deadline.getTime() + RESULT_VERIFY_BUFFER_MS);
         const category = CATEGORY_NAMES[Number(evt.category ?? 3)] || "CRYPTO";
 
         await PredictionEvent.updateOne(
@@ -349,6 +370,7 @@ async function bootstrapPredictionsFromChain() {
               category,
               aiProbability: Number(evt.aiProbability ?? 50n),
               deadline,
+              verifyAfter,
               creator: String(evt.creator || "").toLowerCase(),
               isUserEvent: Boolean(evt.isUserEvent),
               listingFeeWei: String(evt.listingFee || 0n),
@@ -448,6 +470,7 @@ async function syncUnresolvedWithChain(limit = 1000) {
                 category: CATEGORY_NAMES[Number(on.category || 3)] || "CRYPTO",
                 aiProbability: Number(on.aiProbability || 50n),
                 deadline: new Date(Number(on.deadline || 0n) * 1000),
+                verifyAfter: new Date(Number(on.deadline || 0n) * 1000 + RESULT_VERIFY_BUFFER_MS),
                 creator: String(on.creator || "").toLowerCase(),
                 isUserEvent: Boolean(on.isUserEvent),
                 listingFeeWei: String(on.listingFee || 0n),
@@ -513,6 +536,7 @@ async function syncUnresolvedWithChain(limit = 1000) {
             update: {
               $set: {
                 deadline: new Date(Number(on.deadline || 0n) * 1000),
+                verifyAfter: new Date(Number(on.deadline || 0n) * 1000 + RESULT_VERIFY_BUFFER_MS),
                 totalVotesYes: Number(on.totalVotesYes || 0n),
                 totalVotesNo: Number(on.totalVotesNo || 0n),
                 creator: String(on.creator || "").toLowerCase(),
@@ -577,7 +601,8 @@ async function resolveExpired() {
     }
   } catch {}
 
-  const expired = await PredictionEvent.find({
+  const now = Date.now();
+  const expiredCandidates = await PredictionEvent.find({
     resolved: false,
     $or: [
       { nextResolveRetryAt: null },
@@ -587,6 +612,12 @@ async function resolveExpired() {
     deadline: { $lte: new Date() },
     eventId: { $lte: chainEventCount },
   }).lean();
+  const expired = expiredCandidates.filter((evt) => {
+    const verifyAt = evt.verifyAfter
+      ? new Date(evt.verifyAfter).getTime()
+      : new Date(evt.deadline).getTime() + RESULT_VERIFY_BUFFER_MS;
+    return verifyAt <= now;
+  });
   if (!expired.length) return;
 
   resolving = true;

@@ -14,6 +14,7 @@ const CATEGORY_INDEX_TO_NAME = ["SPORTS", "POLITICS", "ECONOMY", "CRYPTO", "CLIM
 const ADDRESS_RE = /^0x[a-f0-9]{40}$/;
 let oldPredictionContract = null;
 let schedulerEnsureInProgress = false;
+const RESULT_VERIFY_BUFFER_MS = 10 * 60 * 1000;
 
 function isAdminAuthorized(req) {
   const key = String(req.header("x-admin-key") || "").trim();
@@ -554,6 +555,7 @@ router.post("/user/ingest", async (req, res) => {
       category,
       aiProbability: Math.max(0, Math.min(100, Number(aiAssessment?.aiProbability ?? evt.aiProbability ?? 50n))),
       deadline: new Date(Number(evt.deadline || 0n) * 1000),
+      verifyAfter: new Date(Number(evt.deadline || 0n) * 1000 + RESULT_VERIFY_BUFFER_MS),
       creator: String(evt.creator || "").toLowerCase(),
       isUserEvent: Boolean(evt.isUserEvent),
       listingFeeWei: String(evt.listingFee || 0n),
@@ -586,7 +588,8 @@ router.post("/generate", async (req, res) => {
       for (let i = 0; i < predictions.length; i++) {
         const pred = predictions[i];
         const hours = pred.hoursToResolve || 8;
-        const deadline = new Date(Date.now() + hours * 3600000);
+        const resultCheckAt = new Date(Date.now() + hours * 3600000);
+        const deadline = new Date(Math.max(Date.now() + 60_000, resultCheckAt.getTime() - RESULT_VERIFY_BUFFER_MS));
         const catIdx = ["SPORTS", "POLITICS", "ECONOMY", "CRYPTO", "CLIMATE"].indexOf(pred.category);
         try {
           const tx = await Prediction.createEvent(pred.title, catIdx >= 0 ? catIdx : 3, Math.floor(deadline.getTime() / 1000), pred.aiProbability, { nonce: nonce++ });
@@ -599,6 +602,7 @@ router.post("/generate", async (req, res) => {
             category: pred.category,
             aiProbability: pred.aiProbability,
             deadline,
+            verifyAfter: resultCheckAt,
             translations: localized[i] || undefined,
           });
           created.push(doc);
