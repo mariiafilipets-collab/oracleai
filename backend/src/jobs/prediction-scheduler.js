@@ -28,6 +28,7 @@ let schedulerInitialized = false;
 const schedulerTimers = [];
 
 const CATEGORY_NAMES = ["SPORTS", "POLITICS", "ECONOMY", "CRYPTO", "CLIMATE"];
+const ALLOWED_CATEGORIES = new Set(CATEGORY_NAMES);
 
 async function getOnChainEvent(Prediction, eventId) {
   // In ethers v6, contract.getEvent is a meta-method; call by full signature to avoid name collision.
@@ -224,8 +225,11 @@ async function publishNewBatch() {
 
     for (let i = 0; i < unique.length; i++) {
       const p = unique[i];
+      const normalizedCategory = ALLOWED_CATEGORIES.has(String(p.category || "").toUpperCase())
+        ? String(p.category).toUpperCase()
+        : inferCategoryFromText(`${p.title || ""} ${p.description || ""}`);
       const deadline = new Date(Date.now() + (p.hoursToResolve || 8) * 3600000);
-      const catIdx = ["SPORTS", "POLITICS", "ECONOMY", "CRYPTO", "CLIMATE"].indexOf(p.category);
+      const catIdx = CATEGORY_NAMES.indexOf(normalizedCategory);
       try {
         const tx = await Prediction.createEvent(p.title, catIdx >= 0 ? catIdx : 3, Math.floor(deadline.getTime() / 1000), p.aiProbability, { nonce: nonce++ });
         await tx.wait();
@@ -239,7 +243,7 @@ async function publishNewBatch() {
               eventId: id,
               title: p.title,
               description: p.description || "",
-              category: p.category,
+              category: normalizedCategory,
               aiProbability: p.aiProbability,
               deadline,
               creator: "",
@@ -275,6 +279,26 @@ async function publishNewBatch() {
   } finally {
     generating = false;
   }
+}
+
+function inferCategoryFromText(text) {
+  const t = String(text || "").toLowerCase();
+  if (/\b(vs|match|league|cup|goal|player|team|nba|nfl|mlb|uefa|premier league|laliga|serie a|champions)\b/.test(t)) {
+    return "SPORTS";
+  }
+  if (/\b(election|president|parliament|sanction|summit|ceasefire|government|minister|vote)\b/.test(t)) {
+    return "POLITICS";
+  }
+  if (/\b(cpi|inflation|gdp|fed|ecb|interest rate|jobs report|earnings|dow|nasdaq|s&p)\b/.test(t)) {
+    return "ECONOMY";
+  }
+  if (/\b(bitcoin|btc|ethereum|eth|solana|crypto|token|etf|on-chain|wallet)\b/.test(t)) {
+    return "CRYPTO";
+  }
+  if (/\b(storm|hurricane|earthquake|wildfire|flood|temperature|heatwave|weather|climate)\b/.test(t)) {
+    return "CLIMATE";
+  }
+  return "CRYPTO";
 }
 
 async function bootstrapPredictionsFromChain() {
