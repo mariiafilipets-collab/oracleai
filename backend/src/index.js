@@ -319,6 +319,7 @@ async function setupEventListeners() {
   const storedCursorDoc = await EventSyncState.findOne({ key: EVENT_CURSOR_KEY }).lean();
   const backfillBlocks = Math.max(0, Number(config.eventBackfillBlocks || 0));
   let lastProcessedBlock = latestAtStartup;
+  let catchUpInProgress = false;
 
   if (storedCursorDoc && Number.isFinite(Number(storedCursorDoc.lastProcessedBlock))) {
     lastProcessedBlock = Math.max(0, Math.min(latestAtStartup, Number(storedCursorDoc.lastProcessedBlock)));
@@ -331,36 +332,43 @@ async function setupEventListeners() {
     }
   }
 
-  if (latestAtStartup > lastProcessedBlock) {
-    const step = Math.max(1, Number(config.eventBackfillBlockRange || config.eventMaxBlockRange || 1));
-    const backfillDelayMs = Math.max(0, Number(config.eventBackfillDelayMs || 0));
-    const maxRetries = Math.max(0, Number(config.eventBackfillMaxRetries || 0));
-    for (let cursor = lastProcessedBlock + 1; cursor <= latestAtStartup; cursor += step) {
-      const toBlock = Math.min(latestAtStartup, cursor + step - 1);
-      let attempt = 0;
-      while (true) {
-        try {
-          await processRange(cursor, toBlock);
-          lastProcessedBlock = toBlock;
-          await saveCursor(lastProcessedBlock);
-          break;
-        } catch (err) {
-          if (!isRateLimitError(err) || attempt >= maxRetries) {
-            console.error(`[Events] Catch-up range failed ${cursor}..${toBlock}:`, err?.message || err);
+  const runInitialCatchUp = async () => {
+    if (latestAtStartup <= lastProcessedBlock) return;
+    catchUpInProgress = true;
+    try {
+      const step = Math.max(1, Number(config.eventBackfillBlockRange || config.eventMaxBlockRange || 1));
+      const backfillDelayMs = Math.max(0, Number(config.eventBackfillDelayMs || 0));
+      const maxRetries = Math.max(0, Number(config.eventBackfillMaxRetries || 0));
+      for (let cursor = lastProcessedBlock + 1; cursor <= latestAtStartup; cursor += step) {
+        const toBlock = Math.min(latestAtStartup, cursor + step - 1);
+        let attempt = 0;
+        while (true) {
+          try {
+            await processRange(cursor, toBlock);
+            lastProcessedBlock = toBlock;
+            await saveCursor(lastProcessedBlock);
             break;
+          } catch (err) {
+            if (!isRateLimitError(err) || attempt >= maxRetries) {
+              console.error(`[Events] Catch-up range failed ${cursor}..${toBlock}:`, err?.message || err);
+              break;
+            }
+            const waitMs = Math.min(30_000, backfillDelayMs * Math.max(1, 2 ** attempt));
+            attempt += 1;
+            console.warn(`[Events] Catch-up rate-limited ${cursor}..${toBlock}, retry ${attempt}/${maxRetries} in ${waitMs}ms`);
+            await sleep(waitMs);
           }
-          const waitMs = Math.min(30_000, backfillDelayMs * Math.max(1, 2 ** attempt));
-          attempt += 1;
-          console.warn(`[Events] Catch-up rate-limited ${cursor}..${toBlock}, retry ${attempt}/${maxRetries} in ${waitMs}ms`);
-          await sleep(waitMs);
         }
+        if (backfillDelayMs > 0) await sleep(backfillDelayMs);
       }
-      if (backfillDelayMs > 0) await sleep(backfillDelayMs);
+    } finally {
+      catchUpInProgress = false;
     }
-  }
+  };
 
   const pollEvents = async () => {
     try {
+      if (catchUpInProgress) return;
       const latestBlock = await provider.getBlockNumber();
       if (latestBlock < lastProcessedBlock) {
         // Chain likely reset (Hardhat restart); restart cursor safely.
@@ -382,6 +390,8 @@ async function setupEventListeners() {
 
   setInterval(pollEvents, Math.max(1000, config.eventPollIntervalMs));
   console.log(`Event listeners active (polling mode): interval=${config.eventPollIntervalMs}ms range=${config.eventMaxBlockRange} blocks`);
+  // Run catch-up in background so scheduler startup is not blocked by slow RPC.
+  void runInitialCatchUp();
 }
 
 async function start() {
