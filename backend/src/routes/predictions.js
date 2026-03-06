@@ -250,7 +250,21 @@ router.get("/resolved", async (req, res) => {
 
 // Scheduler status
 router.get("/scheduler", (req, res) => {
-  res.json({ success: true, data: getSchedulerStatus() });
+  const scheduler = getSchedulerStatus();
+  res.json({
+    success: true,
+    data: {
+      ...scheduler,
+      runtime: {
+        enableScheduler: config.enableScheduler,
+        enableEventPolling: config.enableEventPolling,
+        aiProvider: config.aiProvider,
+        hasOpenRouterKey: Boolean(config.openrouterKey),
+        openrouterSearchModel: config.openrouterSearchModel,
+        openrouterResolveModel: config.openrouterResolveModel,
+      },
+    },
+  });
 });
 
 // One-time maintenance: remove all auto-generated events from MongoDB.
