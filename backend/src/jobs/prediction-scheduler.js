@@ -128,15 +128,11 @@ export function initScheduler(socketIO) {
   schedulerInitialized = true;
   io = socketIO;
 
-  setTimeout(async () => {
+  setTimeout(() => {
     console.log("[Scheduler] Starting autonomous cycle...");
     lastWeeklyReset = Date.now();
 
-    await bootstrapPredictionsFromChain();
-    await syncUnresolvedWithChain();
-    await resyncArchivedFromChain();
-    await refill();
-
+    // Register periodic jobs first so scheduler remains alive even if initial sync hits slow RPC.
     schedulerTimers.push(setInterval(resolveExpired, RESOLVE_INTERVAL));
     schedulerTimers.push(setInterval(refill, REFILL_CHECK_INTERVAL));
     schedulerTimers.push(setInterval(scheduledGenerate, GENERATE_INTERVAL));
@@ -145,6 +141,18 @@ export function initScheduler(socketIO) {
     schedulerTimers.push(setInterval(distributeProtocolFeesIfDue, PROTOCOL_FEE_DISTRIBUTION_CHECK_INTERVAL));
 
     console.log(`[Scheduler] Running. Resolve: ${RESOLVE_INTERVAL / 1000}s | Refill: ${REFILL_CHECK_INTERVAL / 60000}min | Gen: ${GENERATE_INTERVAL / 60000}min | Weekly: ${WEEKLY_CHECK_INTERVAL / 60000}min | Fees: ${PROTOCOL_FEE_DISTRIBUTION_CHECK_INTERVAL / 60000}min`);
+
+    // Run startup sync in background to avoid blocking interval registration.
+    (async () => {
+      try {
+        await bootstrapPredictionsFromChain();
+        await syncUnresolvedWithChain();
+        await resyncArchivedFromChain();
+        await refill();
+      } catch (err) {
+        console.error(`[Scheduler] Startup sync failed: ${err?.message || err}`);
+      }
+    })();
   }, 5000);
 }
 
@@ -868,6 +876,7 @@ async function weeklyCheck() {
 export function getSchedulerStatus() {
   const nextWeeklyReset = lastWeeklyReset + WEEK_SECONDS * 1000;
   return {
+    initialized: schedulerInitialized,
     generating, resolving, lastGenerate, stats, minActive: MIN_ACTIVE,
     generateIntervalMin: GENERATE_INTERVAL / 60000,
     resolveIntervalSec: RESOLVE_INTERVAL / 1000,
