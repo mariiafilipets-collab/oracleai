@@ -21,6 +21,7 @@ import aiRouter from "./routes/ai.js";
 import User from "./models/User.js";
 import CheckInRecord from "./models/CheckInRecord.js";
 import PredictionEvent from "./models/PredictionEvent.js";
+import EventSyncState from "./models/EventSyncState.js";
 
 const app = express();
 const server = createServer(app);
@@ -124,6 +125,7 @@ const isRateLimitError = (err) => {
   const msg = String(err?.message || err || "").toLowerCase();
   return msg.includes("rate limit") || msg.includes("too many requests") || msg.includes("-32005");
 };
+const EVENT_CURSOR_KEY = "event-poller";
 
 async function syncUsersFromOnChainSnapshot() {
   const { Points, CheckIn } = getContracts();
@@ -305,35 +307,56 @@ async function setupEventListeners() {
     }
   };
 
-  let lastProcessedBlock = await provider.getBlockNumber();
+  const saveCursor = async (blockNumber) => {
+    await EventSyncState.updateOne(
+      { key: EVENT_CURSOR_KEY },
+      { $set: { lastProcessedBlock: Number(blockNumber), updatedAt: new Date() } },
+      { upsert: true }
+    );
+  };
+
+  const latestAtStartup = await provider.getBlockNumber();
+  const storedCursorDoc = await EventSyncState.findOne({ key: EVENT_CURSOR_KEY }).lean();
   const backfillBlocks = Math.max(0, Number(config.eventBackfillBlocks || 0));
-  if (backfillBlocks > 0) {
-    const fromBlock = Math.max(0, lastProcessedBlock - backfillBlocks);
-    console.log(`[Events] Backfill enabled: scanning blocks ${fromBlock}..${lastProcessedBlock}`);
+  let lastProcessedBlock = latestAtStartup;
+
+  if (storedCursorDoc && Number.isFinite(Number(storedCursorDoc.lastProcessedBlock))) {
+    lastProcessedBlock = Math.max(0, Math.min(latestAtStartup, Number(storedCursorDoc.lastProcessedBlock)));
+    console.log(`[Events] Resuming from stored cursor block ${lastProcessedBlock}.`);
+  } else {
+    lastProcessedBlock = Math.max(0, latestAtStartup - backfillBlocks);
+    await saveCursor(lastProcessedBlock);
+    if (lastProcessedBlock < latestAtStartup) {
+      console.log(`[Events] Initial backfill: scanning blocks ${lastProcessedBlock + 1}..${latestAtStartup}`);
+    }
+  }
+
+  if (latestAtStartup > lastProcessedBlock) {
     const step = Math.max(1, Number(config.eventBackfillBlockRange || config.eventMaxBlockRange || 1));
     const backfillDelayMs = Math.max(0, Number(config.eventBackfillDelayMs || 0));
     const maxRetries = Math.max(0, Number(config.eventBackfillMaxRetries || 0));
-    for (let cursor = fromBlock; cursor <= lastProcessedBlock; cursor += step) {
-      const toBlock = Math.min(lastProcessedBlock, cursor + step - 1);
+    for (let cursor = lastProcessedBlock + 1; cursor <= latestAtStartup; cursor += step) {
+      const toBlock = Math.min(latestAtStartup, cursor + step - 1);
       let attempt = 0;
       while (true) {
         try {
           await processRange(cursor, toBlock);
+          lastProcessedBlock = toBlock;
+          await saveCursor(lastProcessedBlock);
           break;
         } catch (err) {
           if (!isRateLimitError(err) || attempt >= maxRetries) {
-            console.error(`[Events] Backfill range failed ${cursor}..${toBlock}:`, err?.message || err);
+            console.error(`[Events] Catch-up range failed ${cursor}..${toBlock}:`, err?.message || err);
             break;
           }
           const waitMs = Math.min(30_000, backfillDelayMs * Math.max(1, 2 ** attempt));
           attempt += 1;
-          console.warn(`[Events] Backfill rate-limited ${cursor}..${toBlock}, retry ${attempt}/${maxRetries} in ${waitMs}ms`);
+          console.warn(`[Events] Catch-up rate-limited ${cursor}..${toBlock}, retry ${attempt}/${maxRetries} in ${waitMs}ms`);
           await sleep(waitMs);
         }
       }
       if (backfillDelayMs > 0) await sleep(backfillDelayMs);
     }
-    console.log("[Events] Backfill completed.");
   }
 
   const pollEvents = async () => {
@@ -342,6 +365,7 @@ async function setupEventListeners() {
       if (latestBlock < lastProcessedBlock) {
         // Chain likely reset (Hardhat restart); restart cursor safely.
         lastProcessedBlock = latestBlock;
+        await saveCursor(lastProcessedBlock);
         return;
       }
       if (latestBlock === lastProcessedBlock) return;
@@ -350,6 +374,7 @@ async function setupEventListeners() {
       const toBlock = Math.min(latestBlock, lastProcessedBlock + Math.max(1, config.eventMaxBlockRange));
       await processRange(fromBlock, toBlock);
       lastProcessedBlock = toBlock;
+      await saveCursor(lastProcessedBlock);
     } catch (err) {
       console.error("[Events] Poll error:", err?.message || err);
     }

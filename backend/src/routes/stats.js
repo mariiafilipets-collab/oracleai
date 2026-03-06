@@ -84,7 +84,7 @@ router.get("/activity", async (req, res) => {
       timestamp: new Date(r.timestamp || Date.now()).getTime(),
     }));
 
-    if (data.length === 0) {
+    if (data.length < limit) {
       // Fallback source: user snapshots synchronized from on-chain state.
       let users = await User.find({
         totalCheckIns: { $gt: 0 },
@@ -132,7 +132,7 @@ router.get("/activity", async (req, res) => {
       }
 
       const fallbackUsers = users.length > 0 ? users : seedUsers;
-      data = fallbackUsers.map((u) => {
+      const fallbackData = fallbackUsers.map((u) => {
         const tier = String(u.tier || "BASIC");
         const defaults = TIER_ACTIVITY_DEFAULTS[tier] || TIER_ACTIVITY_DEFAULTS.BASIC;
         const timestamp = u.lastCheckIn || u.joinedAt || Date.now();
@@ -145,6 +145,19 @@ router.get("/activity", async (req, res) => {
           timestamp: new Date(timestamp).getTime(),
         };
       });
+
+      if (data.length === 0) {
+        data = fallbackData.slice(0, limit);
+      } else {
+        // Partial indexing case: keep real log entries first, then fill gaps from snapshots.
+        const seenAddresses = new Set(data.map((x) => x.address));
+        for (const item of fallbackData) {
+          if (data.length >= limit) break;
+          if (seenAddresses.has(item.address)) continue;
+          data.push(item);
+          seenAddresses.add(item.address);
+        }
+      }
     }
 
     res.json({ success: true, data });
