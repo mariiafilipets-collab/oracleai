@@ -172,6 +172,26 @@ const POPULARITY_PATTERNS = {
   CLIMATE: /\b(hurricane|storm|tornado|earthquake|wildfire|flood|heatwave|weather warning|red warning|landfall|severe weather|cyclone|air quality)\b/i,
 };
 
+function inferCategoryFromText(text) {
+  const t = String(text || "").toLowerCase();
+  if (/\b(vs|match|fixture|derby|league|cup|goal|score|scorer|assist|player|team|coach|lineup|penalty|football|soccer|basketball|tennis|hockey|baseball|cricket|mma|ufc|f1|formula 1|motogp|nba|nfl|mlb|nhl|grand prix|gp|verstappen|hamilton|uefa|fifa|premier league|la liga|laliga|serie a|bundesliga|champions league|europa league|arsenal|manchester|liverpool|chelsea|tottenham|real madrid|barcelona|atletico|bayern|psg|juventus|inter|milan|dortmund)\b/.test(t)) {
+    return "SPORTS";
+  }
+  if (/\b(election|president|parliament|sanction|summit|ceasefire|government|minister|vote|white house|congress|senate|diplomacy|unsc|united nations)\b/.test(t)) {
+    return "POLITICS";
+  }
+  if (/\b(cpi|inflation|gdp|fed|ecb|interest rate|jobs report|earnings|dow|nasdaq|s&p|gold|oil|brent|nfp|payrolls|bond|yield)\b/.test(t)) {
+    return "ECONOMY";
+  }
+  if (/\b(bitcoin|btc|ethereum|eth|solana|xrp|crypto|token|etf|on-chain|wallet|binance|coinbase|defi|staking|airdrop|halving)\b/.test(t)) {
+    return "CRYPTO";
+  }
+  if (/\b(storm|hurricane|earthquake|wildfire|flood|temperature|heatwave|weather|climate|rainfall|tornado|cyclone)\b/.test(t)) {
+    return "CLIMATE";
+  }
+  return "CRYPTO";
+}
+
 function isPopularEvent(category, title, description = "") {
   const text = `${String(title || "")} ${String(description || "")}`;
   const re = POPULARITY_PATTERNS[category];
@@ -391,6 +411,20 @@ Bad: "Will Bitcoin rise soon?"`
       }
       return null;
     };
+    const parseTitleTimingConstraint = (title) => {
+      const s = String(title || "");
+      const full = s.match(/\b(on|by|before|at|after)\s+(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2})(?:,\s*(20\d{2}))?(?:\s+(\d{1,2}):(\d{2})\s*UTC)?\b/i);
+      if (!full) return null;
+      const mode = String(full[1] || "").toLowerCase();
+      const monthIdx = monthMap[String(full[2] || "").toLowerCase()];
+      const day = Number(full[3]);
+      const year = full[4] ? Number(full[4]) : now.getUTCFullYear();
+      const hh = full[5] ? Number(full[5]) : 20;
+      const mm = full[6] ? Number(full[6]) : 0;
+      const ts = Date.UTC(year, monthIdx, day, hh, mm, 0);
+      if (!Number.isFinite(ts)) return null;
+      return { mode, ts, hasTime: Boolean(full[5]) };
+    };
     const isWithinNext30Days = (ts) => {
       const diffDays = Math.floor((ts - todayUtcMs) / DAY_MS);
       return diffDays >= 0 && diffDays <= 30;
@@ -404,6 +438,7 @@ Bad: "Will Bitcoin rise soon?"`
       const hasUtcTimeTitle = /\b\d{1,2}:\d{2}\s*UTC\b/i.test(title);
       const hasNonUtcTz = /\b(ET|EST|EDT|PT|PST|PDT|CET|CEST|BST|IST)\b/i.test(title);
       const parsedTs = parseDateFromTitle(title);
+      const inferredCategory = inferCategoryFromText(`${title} ${description}`);
       if (parsedTs !== null && !isWithinNext30Days(parsedTs)) {
         console.log(`[AI] Filtered out out-of-window event (outside next 30d): "${title}"`);
         return false;
@@ -418,6 +453,14 @@ Bad: "Will Bitcoin rise soon?"`
       }
       if (!isPopularEvent(category, title, description)) {
         console.log(`[AI] Filtered out low-popularity event: "${title}"`);
+        return false;
+      }
+      if (inferredCategory !== category && inferredCategory !== "CRYPTO") {
+        console.log(`[AI] Filtered out category-drift event (${category} -> ${inferredCategory}): "${title}"`);
+        return false;
+      }
+      if (category === "CRYPTO" && inferredCategory !== "CRYPTO") {
+        console.log(`[AI] Filtered out category-drift crypto event (${inferredCategory}): "${title}"`);
         return false;
       }
       if (hasNonUtcTz) {
@@ -478,6 +521,16 @@ Bad: "Will Bitcoin rise soon?"`
       if (/\b(today|tonight|now)\b/i.test(e.title) && e.hoursToResolve > 6) {
         e.hoursToResolve = 6;
       }
+      const titleConstraint = parseTitleTimingConstraint(e.title);
+      if (titleConstraint) {
+        if (titleConstraint.mode === "after") {
+          const currentVerify = parseVerifyAtUtc(e.verifyAtUtc) || nowTs;
+          const minTs = titleConstraint.ts + 60 * 60 * 1000;
+          e.verifyAtUtc = new Date(Math.max(currentVerify, minTs)).toISOString();
+        } else {
+          e.verifyAtUtc = new Date(titleConstraint.ts).toISOString();
+        }
+      }
       if (e.hoursToResolve > 24 && parseDateFromTitle(e.title) === null) {
         const targetTs = Date.now() + e.hoursToResolve * 3600000;
         const safeTitle = e.title.replace(/\?+$/, "").trim();
@@ -494,6 +547,15 @@ Bad: "Will Bitcoin rise soon?"`
       // Preserve explicit verify timestamp; synthesize only if missing.
       const finalVerifyTs = parseVerifyAtUtc(e.verifyAtUtc) ?? (nowTs + e.hoursToResolve * 3600000);
       e.verifyAtUtc = new Date(finalVerifyTs).toISOString();
+      // If title has an explicit date, never allow verify date before that date.
+      if (parsedTs !== null) {
+        const currentVerify = parseVerifyAtUtc(e.verifyAtUtc) || nowTs;
+        if (currentVerify < parsedTs) {
+          e.verifyAtUtc = new Date(parsedTs + 20 * 60 * 60 * 1000).toISOString();
+        }
+      }
+      const finalVerifyTs2 = parseVerifyAtUtc(e.verifyAtUtc) || nowTs;
+      e.hoursToResolve = Math.max(6, Math.min(720, Math.round((finalVerifyTs2 - nowTs) / 3600000)));
       const startTs = parseVerifyAtUtc(e.eventStartAtUtc);
       if (startTs !== null) {
         e.eventStartAtUtc = new Date(startTs).toISOString();
@@ -544,8 +606,38 @@ Bad: "Will Bitcoin rise soon?"`
       }
     }
 
+    const applyFinalTitleTimingConstraint = (e) => {
+      const nowTs = Date.now();
+      const constrained = { ...e };
+      const titleConstraint = parseTitleTimingConstraint(constrained.title);
+      if (titleConstraint) {
+        if (titleConstraint.mode === "after") {
+          const currentVerify = parseVerifyAtUtc(constrained.verifyAtUtc) || nowTs;
+          const minTs = titleConstraint.ts + 60 * 60 * 1000;
+          constrained.verifyAtUtc = new Date(Math.max(currentVerify, minTs)).toISOString();
+        } else if (titleConstraint.hasTime) {
+          constrained.verifyAtUtc = new Date(titleConstraint.ts).toISOString();
+        } else {
+          // Date-only "on/by/before" must resolve within that UTC date, not next day.
+          const d = new Date(titleConstraint.ts);
+          const eodTs = Date.UTC(
+            d.getUTCFullYear(),
+            d.getUTCMonth(),
+            d.getUTCDate(),
+            23,
+            59,
+            59
+          );
+          constrained.verifyAtUtc = new Date(eodTs).toISOString();
+        }
+      }
+      const verifyTs = parseVerifyAtUtc(constrained.verifyAtUtc) || nowTs;
+      constrained.hoursToResolve = Math.max(6, Math.min(720, Math.round((verifyTs - nowTs) / 3600000)));
+      return constrained;
+    };
+
     const vetted = await vetPredictionsWithWeb(category, normalized, { today, hour, day });
-    return vetted.filter((e) => {
+    return vetted.map(applyFinalTitleTimingConstraint).filter((e) => {
       const longHorizon = Number(e?.hoursToResolve || 0) > 24;
       if (longHorizon && !parseVerifyAtUtc(e?.verifyAtUtc)) return false;
       if (category === "SPORTS" && longHorizon && !parseVerifyAtUtc(e?.eventStartAtUtc)) return false;
