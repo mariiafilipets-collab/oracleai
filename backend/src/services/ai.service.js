@@ -194,7 +194,7 @@ Validate each candidate for:
 2) temporal correctness (event still pending, not already decided),
 3) resolvability timing consistency.
 Return ONLY JSON array:
-[{"idx":number,"accepted":true|false,"reason":"short","adjustedHoursToResolve":number|null}]
+[{"idx":number,"accepted":true|false,"reason":"short","adjustedHoursToResolve":number|null,"adjustedVerifyAtUtc":"ISO-8601 UTC or null"}]
 Rules:
 - Reject stale/incongruent events ("today/tonight" already passed).
 - Reject unrealistic or trivial market thresholds.
@@ -218,8 +218,10 @@ ${JSON.stringify(payload)}`;
       const verdict = byIdx.get(i);
       if (!verdict || !verdict.accepted) continue;
       const adjusted = Number(verdict.adjustedHoursToResolve);
+      const adjustedIso = typeof verdict.adjustedVerifyAtUtc === "string" ? verdict.adjustedVerifyAtUtc : null;
       out.push({
         ...events[i],
+        verifyAtUtc: adjustedIso || events[i].verifyAtUtc || null,
         hoursToResolve: Number.isFinite(adjusted)
           ? Math.max(6, Math.min(720, adjusted))
           : events[i].hoursToResolve,
@@ -264,6 +266,9 @@ ABSOLUTE RULES:
 - Most hoursToResolve should be 24-168 (1-7 days)
 - If hoursToResolve > 24, include explicit UTC date context in title (e.g., "on March 9", "by Mar 10 18:00 UTC")
 - Do NOT use "today/tonight/now" unless hoursToResolve <= 6
+- Always provide verifyAtUtc in strict ISO UTC format, e.g. "2026-03-22T21:30:00Z"
+- For SPORTS: use exact kickoff in UTC and set verifyAtUtc to expected final-result availability (usually kickoff + 2h to 3h)
+- Never use non-UTC timezone abbreviations (ET/PT/CET etc.) in title; convert to UTC.
 - hoursToResolve must reflect real result availability (e.g., match end, market close, official statement window)
 - For markets: will resolve when market closes today
 - For crypto: usually 6-48h, unless event is a scheduled date item
@@ -281,7 +286,7 @@ VERIFIED NEWS FOR TODAY:
 ${context || "No specific news. Use current verifiable facts: live prices, current standings, today's weather."}
 
 Create exactly 5 predictions about events in the next 30 days.
-Each: {"title":"yes/no question max 80 chars","description":"context max 150 chars","category":"${category}","aiProbability":15-85,"hoursToResolve":6-720}
+Each: {"title":"yes/no question max 80 chars","description":"context max 150 chars","category":"${category}","aiProbability":15-85,"hoursToResolve":6-720,"verifyAtUtc":"ISO UTC"}
 Required horizon mix per 5 events:
 - at least 1 event resolving within 6-24h
 - at least 3 events resolving within 24-168h (1-7 days)
@@ -330,6 +335,13 @@ Bad: "Will Bitcoin rise soon?"`
       return ts;
     };
     const normalizeYear = (y) => (y < 100 ? 2000 + y : y);
+    const parseVerifyAtUtc = (value) => {
+      const s = String(value || "").trim();
+      if (!s) return null;
+      const ts = Date.parse(s);
+      if (!Number.isFinite(ts)) return null;
+      return ts;
+    };
     const parseDateFromTitle = (title) => {
       const s = String(title || "");
       const yNow = now.getUTCFullYear();
@@ -380,9 +392,16 @@ Bad: "Will Bitcoin rise soon?"`
       const title = String(e.title || "");
       const description = String(e.description || "");
       const rawHours = Math.max(6, Math.min(720, parseInt(e.hoursToResolve) || 72));
+      const verifyTs = parseVerifyAtUtc(e.verifyAtUtc);
+      const hasUtcTimeTitle = /\b\d{1,2}:\d{2}\s*UTC\b/i.test(title);
+      const hasNonUtcTz = /\b(ET|EST|EDT|PT|PST|PDT|CET|CEST|BST|IST)\b/i.test(title);
       const parsedTs = parseDateFromTitle(title);
       if (parsedTs !== null && !isWithinNext30Days(parsedTs)) {
         console.log(`[AI] Filtered out out-of-window event (outside next 30d): "${title}"`);
+        return false;
+      }
+      if (verifyTs !== null && !isWithinNext30Days(verifyTs)) {
+        console.log(`[AI] Filtered out out-of-window verifyAtUtc: "${title}"`);
         return false;
       }
       if (/\b(yesterday|last week|last month|already happened)\b/i.test(title)) {
@@ -393,12 +412,20 @@ Bad: "Will Bitcoin rise soon?"`
         console.log(`[AI] Filtered out low-popularity event: "${title}"`);
         return false;
       }
+      if (hasNonUtcTz) {
+        console.log(`[AI] Filtered out non-UTC timezone in title: "${title}"`);
+        return false;
+      }
       if (/\b(today|tonight|now)\b/i.test(title) && rawHours > 6) {
         console.log(`[AI] Filtered out ambiguous timing event (>6h with today/tonight): "${title}"`);
         return false;
       }
-      if (rawHours > 24 && parsedTs === null) {
-        console.log(`[AI] Filtered out future-window event without explicit date: "${title}"`);
+      if (rawHours > 24 && parsedTs === null && verifyTs === null) {
+        console.log(`[AI] Filtered out future-window event without explicit date/verifyAtUtc: "${title}"`);
+        return false;
+      }
+      if (category === "SPORTS" && rawHours > 24 && verifyTs === null && !hasUtcTimeTitle) {
+        console.log(`[AI] Filtered out sports event without exact UTC time: "${title}"`);
         return false;
       }
       return true;
@@ -410,6 +437,7 @@ Bad: "Will Bitcoin rise soon?"`
       category,
       aiProbability: Math.max(15, Math.min(85, parseInt(e.aiProbability) || 50)),
       hoursToResolve: Math.max(6, Math.min(720, parseInt(e.hoursToResolve) || 72)),
+      verifyAtUtc: typeof e.verifyAtUtc === "string" ? e.verifyAtUtc : "",
     }));
 
     const fmtUtc = (ts) => {
@@ -419,6 +447,13 @@ Bad: "Will Bitcoin rise soon?"`
 
     // Keep semantic consistency: "today/tonight/now" should stay very near-term.
     for (const e of normalized) {
+      const verifyTs = parseVerifyAtUtc(e.verifyAtUtc);
+      if (verifyTs !== null) {
+        const diffH = Math.round((verifyTs - Date.now()) / 3600000);
+        if (diffH >= 6 && diffH <= 720) {
+          e.hoursToResolve = diffH;
+        }
+      }
       if (/\b(today|tonight|now)\b/i.test(e.title) && e.hoursToResolve > 6) {
         e.hoursToResolve = 6;
       }
@@ -435,6 +470,8 @@ Bad: "Will Bitcoin rise soon?"`
           e.hoursToResolve = Math.max(6, Math.min(720, diffH));
         }
       }
+      // Normalize verifyAtUtc to strict ISO UTC from final hours window.
+      e.verifyAtUtc = new Date(Date.now() + e.hoursToResolve * 3600000).toISOString();
     }
 
     // Enforce horizon mix so feed is not concentrated in same-day events.
