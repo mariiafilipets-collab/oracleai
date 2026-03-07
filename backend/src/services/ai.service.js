@@ -186,6 +186,8 @@ async function vetPredictionsWithWeb(category, events, nowInfo) {
     title: e.title,
     description: e.description || "",
     hoursToResolve: e.hoursToResolve,
+    eventStartAtUtc: e.eventStartAtUtc || null,
+    verifyAtUtc: e.verifyAtUtc || null,
     category,
   }));
   const sys = `You are a strict prediction-market QA checker with live web search.
@@ -194,7 +196,7 @@ Validate each candidate for:
 2) temporal correctness (event still pending, not already decided),
 3) resolvability timing consistency.
 Return ONLY JSON array:
-[{"idx":number,"accepted":true|false,"reason":"short","adjustedHoursToResolve":number|null,"adjustedVerifyAtUtc":"ISO-8601 UTC or null"}]
+[{"idx":number,"accepted":true|false,"reason":"short","adjustedHoursToResolve":number|null,"adjustedEventStartAtUtc":"ISO-8601 UTC or null","adjustedVerifyAtUtc":"ISO-8601 UTC or null","adjustedPopularityScore":0..100|null}]
 Rules:
 - Reject stale/incongruent events ("today/tonight" already passed).
 - Reject unrealistic or trivial market thresholds.
@@ -218,13 +220,19 @@ ${JSON.stringify(payload)}`;
       const verdict = byIdx.get(i);
       if (!verdict || !verdict.accepted) continue;
       const adjusted = Number(verdict.adjustedHoursToResolve);
+      const adjustedStartIso = typeof verdict.adjustedEventStartAtUtc === "string" ? verdict.adjustedEventStartAtUtc : null;
       const adjustedIso = typeof verdict.adjustedVerifyAtUtc === "string" ? verdict.adjustedVerifyAtUtc : null;
+      const adjustedPopularity = Number(verdict.adjustedPopularityScore);
       out.push({
         ...events[i],
+        eventStartAtUtc: adjustedStartIso || events[i].eventStartAtUtc || "",
         verifyAtUtc: adjustedIso || events[i].verifyAtUtc || null,
         hoursToResolve: Number.isFinite(adjusted)
           ? Math.max(6, Math.min(720, adjusted))
           : events[i].hoursToResolve,
+        popularityScore: Number.isFinite(adjustedPopularity)
+          ? Math.max(0, Math.min(100, adjustedPopularity))
+          : events[i].popularityScore,
       });
     }
     return out;
@@ -286,7 +294,7 @@ VERIFIED NEWS FOR TODAY:
 ${context || "No specific news. Use current verifiable facts: live prices, current standings, today's weather."}
 
 Create exactly 5 predictions about events in the next 30 days.
-Each: {"title":"yes/no question max 80 chars","description":"context max 150 chars","category":"${category}","aiProbability":15-85,"hoursToResolve":6-720,"verifyAtUtc":"ISO UTC"}
+Each: {"title":"yes/no question max 80 chars","description":"context max 150 chars","category":"${category}","aiProbability":15-85,"hoursToResolve":6-720,"eventStartAtUtc":"ISO UTC","verifyAtUtc":"ISO UTC","sources":["https://..."],"confidence":0..1,"popularityScore":0..100}
 Required horizon mix per 5 events:
 - at least 1 event resolving within 6-24h
 - at least 3 events resolving within 24-168h (1-7 days)
@@ -431,13 +439,25 @@ Bad: "Will Bitcoin rise soon?"`
       return true;
     });
 
+    const toSourceList = (v) => {
+      if (!Array.isArray(v)) return [];
+      return v
+        .map((x) => String(x || "").trim())
+        .filter((x) => /^https?:\/\//i.test(x))
+        .slice(0, 8);
+    };
     const normalized = filtered.map(e => ({
       title: String(e.title || "").slice(0, 100),
       description: String(e.description || "").slice(0, 200),
       category,
       aiProbability: Math.max(15, Math.min(85, parseInt(e.aiProbability) || 50)),
       hoursToResolve: Math.max(6, Math.min(720, parseInt(e.hoursToResolve) || 72)),
+      eventStartAtUtc: typeof e.eventStartAtUtc === "string" ? e.eventStartAtUtc : "",
       verifyAtUtc: typeof e.verifyAtUtc === "string" ? e.verifyAtUtc : "",
+      sources: toSourceList(e.sources),
+      confidence: Math.max(0, Math.min(1, Number(e.confidence ?? 0.75))),
+      popularityScore: Math.max(0, Math.min(100, Number(e.popularityScore ?? 70))),
+      hasExplicitVerifyAt: typeof e.verifyAtUtc === "string" && Boolean(String(e.verifyAtUtc).trim()),
     }));
 
     const fmtUtc = (ts) => {
@@ -447,9 +467,10 @@ Bad: "Will Bitcoin rise soon?"`
 
     // Keep semantic consistency: "today/tonight/now" should stay very near-term.
     for (const e of normalized) {
+      const nowTs = Date.now();
       const verifyTs = parseVerifyAtUtc(e.verifyAtUtc);
       if (verifyTs !== null) {
-        const diffH = Math.round((verifyTs - Date.now()) / 3600000);
+        const diffH = Math.round((verifyTs - nowTs) / 3600000);
         if (diffH >= 6 && diffH <= 720) {
           e.hoursToResolve = diffH;
         }
@@ -465,13 +486,20 @@ Bad: "Will Bitcoin rise soon?"`
       // If title includes explicit date, align hours to that date window.
       const parsedTs = parseDateFromTitle(e.title);
       if (parsedTs !== null) {
-        const diffH = Math.round((parsedTs - Date.now()) / 3600000);
+        const diffH = Math.round((parsedTs - nowTs) / 3600000);
         if (diffH > 6) {
           e.hoursToResolve = Math.max(6, Math.min(720, diffH));
         }
       }
-      // Normalize verifyAtUtc to strict ISO UTC from final hours window.
-      e.verifyAtUtc = new Date(Date.now() + e.hoursToResolve * 3600000).toISOString();
+      // Preserve explicit verify timestamp; synthesize only if missing.
+      const finalVerifyTs = parseVerifyAtUtc(e.verifyAtUtc) ?? (nowTs + e.hoursToResolve * 3600000);
+      e.verifyAtUtc = new Date(finalVerifyTs).toISOString();
+      const startTs = parseVerifyAtUtc(e.eventStartAtUtc);
+      if (startTs !== null) {
+        e.eventStartAtUtc = new Date(startTs).toISOString();
+      } else if (category === "SPORTS" && e.hoursToResolve > 24) {
+        e.eventStartAtUtc = "";
+      }
     }
 
     // Enforce horizon mix so feed is not concentrated in same-day events.
@@ -497,11 +525,11 @@ Bad: "Will Bitcoin rise soon?"`
         let need = 3 - withinWeek;
         for (const e of normalized) {
           if (need <= 0) break;
-          if (e.hoursToResolve <= 24 && !/\b(today|tonight|now)\b/i.test(e.title)) {
+          if (e.hoursToResolve <= 24 && !/\b(today|tonight|now)\b/i.test(e.title) && !e.hasExplicitVerifyAt) {
             e.hoursToResolve = 72;
             ({ withinWeek } = recalc());
             need -= 1;
-          } else if (e.hoursToResolve > 168) {
+          } else if (e.hoursToResolve > 168 && !e.hasExplicitVerifyAt) {
             e.hoursToResolve = 120;
             ({ withinWeek, withinMonth } = recalc());
             need -= 1;
@@ -509,8 +537,20 @@ Bad: "Will Bitcoin rise soon?"`
         }
       }
     }
+    // Keep timestamps coherent after any horizon rebalance.
+    for (const e of normalized) {
+      if (!parseVerifyAtUtc(e.verifyAtUtc) || !e.hasExplicitVerifyAt) {
+        e.verifyAtUtc = new Date(Date.now() + e.hoursToResolve * 3600000).toISOString();
+      }
+    }
+
     const vetted = await vetPredictionsWithWeb(category, normalized, { today, hour, day });
-    return vetted;
+    return vetted.filter((e) => {
+      const longHorizon = Number(e?.hoursToResolve || 0) > 24;
+      if (longHorizon && !parseVerifyAtUtc(e?.verifyAtUtc)) return false;
+      if (category === "SPORTS" && longHorizon && !parseVerifyAtUtc(e?.eventStartAtUtc)) return false;
+      return true;
+    }).map(({ hasExplicitVerifyAt, ...rest }) => rest);
   } catch { return []; }
 }
 

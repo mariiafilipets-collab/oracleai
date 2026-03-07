@@ -4,7 +4,7 @@ import PredictionEvent from "../models/PredictionEvent.js";
 import { assessUserEventForListing, generateDailyPredictions } from "../services/ai.service.js";
 import { getContracts, getSigner } from "../services/blockchain.service.js";
 import config from "../config/index.js";
-import { getSchedulerStatus, initScheduler, runSchedulerKick } from "../jobs/prediction-scheduler.js";
+import { buildEventTiming, getSchedulerStatus, getVerifyBufferMs, initScheduler, runSchedulerKick } from "../jobs/prediction-scheduler.js";
 import { pretranslateEvents, translateEvents, translateMissingEvents } from "../services/translate.service.js";
 
 const router = Router();
@@ -14,7 +14,6 @@ const CATEGORY_INDEX_TO_NAME = ["SPORTS", "POLITICS", "ECONOMY", "CRYPTO", "CLIM
 const ADDRESS_RE = /^0x[a-f0-9]{40}$/;
 let oldPredictionContract = null;
 let schedulerEnsureInProgress = false;
-const RESULT_VERIFY_BUFFER_MS = 10 * 60 * 1000;
 const CATEGORY_NAMES = ["SPORTS", "POLITICS", "ECONOMY", "CRYPTO", "CLIMATE"];
 
 function inferCategoryFromText(text) {
@@ -362,6 +361,40 @@ router.post("/admin/purge-generated", async (req, res) => {
   }
 });
 
+// Emergency maintenance: remove all events from MongoDB.
+// By default keeps user-created events unless keepUser=0 is passed.
+router.post("/admin/purge-all", async (req, res) => {
+  try {
+    if (!isAdminAuthorized(req)) {
+      return res.status(403).json({ success: false, error: "Forbidden" });
+    }
+    const keepUser = String(req.query.keepUser ?? "1") !== "0";
+    const beforeAll = await PredictionEvent.countDocuments();
+    const beforeUser = await PredictionEvent.countDocuments({ isUserEvent: true });
+    const beforeGenerated = await PredictionEvent.countDocuments({ isUserEvent: false });
+    const filter = keepUser ? { isUserEvent: false } : {};
+    const del = await PredictionEvent.deleteMany(filter);
+    const afterAll = await PredictionEvent.countDocuments();
+    const afterUser = await PredictionEvent.countDocuments({ isUserEvent: true });
+    const afterGenerated = await PredictionEvent.countDocuments({ isUserEvent: false });
+    return res.json({
+      success: true,
+      data: {
+        keepUser,
+        beforeAll,
+        beforeUser,
+        beforeGenerated,
+        deleted: Number(del.deletedCount || 0),
+        afterAll,
+        afterUser,
+        afterGenerated,
+      },
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 router.get("/voted/:address", async (req, res) => {
   try {
     const address = String(req.params.address || "").toLowerCase();
@@ -573,7 +606,17 @@ router.post("/user/ingest", async (req, res) => {
       category,
       aiProbability: Math.max(0, Math.min(100, Number(aiAssessment?.aiProbability ?? evt.aiProbability ?? 50n))),
       deadline: new Date(Number(evt.deadline || 0n) * 1000),
-      verifyAfter: new Date(Number(evt.deadline || 0n) * 1000 + RESULT_VERIFY_BUFFER_MS),
+      verifyAfter: new Date(
+        Number(evt.deadline || 0n) * 1000 + getVerifyBufferMs(category, Boolean(evt.isUserEvent))
+      ),
+      expectedResolveAtUtc: new Date(
+        Number(evt.deadline || 0n) * 1000 + getVerifyBufferMs(category, Boolean(evt.isUserEvent))
+      ),
+      timePrecision: "DATE_ONLY",
+      confidence: 0.75,
+      popularityScore: 60,
+      sources: [],
+      qualityVersion: "v2",
       creator: String(evt.creator || "").toLowerCase(),
       isUserEvent: Boolean(evt.isUserEvent),
       listingFeeWei: String(evt.listingFee || 0n),
@@ -605,13 +648,16 @@ router.post("/generate", async (req, res) => {
       let nonce = await signer.getNonce();
       for (let i = 0; i < predictions.length; i++) {
         const pred = predictions[i];
-        const hours = pred.hoursToResolve || 8;
-        const resultCheckAt = new Date(Date.now() + hours * 3600000);
-        const deadline = new Date(Math.max(Date.now() + 60_000, resultCheckAt.getTime() - RESULT_VERIFY_BUFFER_MS));
         const normalizedCategory = normalizeAutoCategory(pred.category, pred.title, pred.description || "");
+        const timing = buildEventTiming({
+          category: normalizedCategory,
+          hoursToResolve: pred.hoursToResolve || 8,
+          verifyAtUtc: pred.verifyAtUtc,
+          isUserEvent: false,
+        });
         const catIdx = CATEGORY_NAMES.indexOf(normalizedCategory);
         try {
-          const tx = await Prediction.createEvent(pred.title, catIdx >= 0 ? catIdx : 3, Math.floor(deadline.getTime() / 1000), pred.aiProbability, { nonce: nonce++ });
+          const tx = await Prediction.createEvent(pred.title, catIdx >= 0 ? catIdx : 3, Math.floor(timing.deadline.getTime() / 1000), pred.aiProbability, { nonce: nonce++ });
           await tx.wait();
           const id = Number(await Prediction.eventCount());
           const doc = await PredictionEvent.create({
@@ -620,8 +666,15 @@ router.post("/generate", async (req, res) => {
             description: pred.description || "",
             category: normalizedCategory,
             aiProbability: pred.aiProbability,
-            deadline,
-            verifyAfter: resultCheckAt,
+            deadline: timing.deadline,
+            verifyAfter: timing.verifyAfter,
+            expectedResolveAtUtc: timing.verifyAfter,
+            eventStartAtUtc: pred.eventStartAtUtc ? new Date(pred.eventStartAtUtc) : null,
+            timePrecision: /\d{1,2}:\d{2}\s*UTC/i.test(pred.title || "") ? "EXACT_MINUTE" : "DATE_ONLY",
+            confidence: Math.max(0, Math.min(1, Number(pred.confidence ?? 0.75))),
+            popularityScore: Math.max(0, Math.min(100, Number(pred.popularityScore ?? 70))),
+            sources: Array.isArray(pred.sources) ? pred.sources.slice(0, 8) : [],
+            qualityVersion: "v2",
             translations: localized[i] || undefined,
           });
           created.push(doc);

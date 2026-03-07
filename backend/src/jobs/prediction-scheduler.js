@@ -18,7 +18,14 @@ const MAX_WEEKLY_WINNERS = 1000;
 const MIN_WINNER_REWARD_WEI = 200000000000000n; // 0.0002 BNB
 const PRETRANSLATE_TIMEOUT_MS = 15000;
 const SYNC_TIMEOUT_MS = 12000;
-const RESULT_VERIFY_BUFFER_MS = 10 * 60 * 1000; // voting closes 10m before result verification
+const DEFAULT_RESULT_VERIFY_BUFFER_MS = 10 * 60 * 1000;
+const CATEGORY_VERIFY_BUFFER_MINUTES = {
+  SPORTS: 20,
+  POLITICS: 45,
+  ECONOMY: 30,
+  CRYPTO: 15,
+  CLIMATE: 45,
+};
 
 let io = null;
 let generating = false;
@@ -38,15 +45,41 @@ const withTimeout = async (promise, timeoutMs, label) => {
   ]);
 };
 
-function buildEventTiming(hoursToResolve) {
+export function getVerifyBufferMs(category, isUserEvent = false) {
+  if (isUserEvent) return DEFAULT_RESULT_VERIFY_BUFFER_MS;
+  const key = String(category || "CRYPTO").toUpperCase();
+  const minutes = CATEGORY_VERIFY_BUFFER_MINUTES[key] || 10;
+  return minutes * 60 * 1000;
+}
+
+function parseIsoUtc(value) {
+  const s = String(value || "").trim();
+  if (!s) return null;
+  const ts = Date.parse(s);
+  if (!Number.isFinite(ts)) return null;
+  return new Date(ts);
+}
+
+function inferTimePrecision(title, verifyAt) {
+  const t = String(title || "");
+  if (/\b\d{1,2}:\d{2}\s*UTC\b/i.test(t) || verifyAt) return "EXACT_MINUTE";
+  if (/\b\d{1,2}\s*(AM|PM)\b/i.test(t)) return "EXACT_HOUR";
+  return "DATE_ONLY";
+}
+
+export function buildEventTiming({ category, hoursToResolve, verifyAtUtc, isUserEvent = false }) {
   const now = Date.now();
   const resolveMs = Math.max(6, Number(hoursToResolve || 8)) * 3600000;
-  const resultCheckAt = new Date(now + resolveMs);
-  // Vote closes 10 minutes before result verification/check.
-  const voteDeadlineMs = Math.max(now + 60_000, resultCheckAt.getTime() - RESULT_VERIFY_BUFFER_MS);
+  const parsedVerifyAt = parseIsoUtc(verifyAtUtc);
+  const resultCheckAt = parsedVerifyAt && parsedVerifyAt.getTime() > now + 60_000
+    ? parsedVerifyAt
+    : new Date(now + resolveMs);
+  const verifyBufferMs = getVerifyBufferMs(category, isUserEvent);
+  const voteDeadlineMs = Math.max(now + 60_000, resultCheckAt.getTime() - verifyBufferMs);
   return {
     deadline: new Date(voteDeadlineMs),
     verifyAfter: resultCheckAt,
+    verifyBufferMs,
   };
 }
 
@@ -259,7 +292,12 @@ async function publishNewBatch() {
         p.description || "",
         false
       );
-      const timing = buildEventTiming(p.hoursToResolve || 8);
+      const timing = buildEventTiming({
+        category: normalizedCategory,
+        hoursToResolve: p.hoursToResolve || 8,
+        verifyAtUtc: p.verifyAtUtc,
+        isUserEvent: false,
+      });
       const catIdx = CATEGORY_NAMES.indexOf(normalizedCategory);
       try {
         const tx = await Prediction.createEvent(
@@ -284,6 +322,13 @@ async function publishNewBatch() {
               aiProbability: p.aiProbability,
               deadline: timing.deadline,
               verifyAfter: timing.verifyAfter,
+              eventStartAtUtc: parseIsoUtc(p.eventStartAtUtc),
+              expectedResolveAtUtc: timing.verifyAfter,
+              timePrecision: inferTimePrecision(p.title, p.verifyAtUtc),
+              confidence: Math.max(0, Math.min(1, Number(p.confidence ?? 0.75))),
+              popularityScore: Math.max(0, Math.min(100, Number(p.popularityScore ?? 70))),
+              sources: Array.isArray(p.sources) ? p.sources.slice(0, 8).map((x) => String(x).slice(0, 300)) : [],
+              qualityVersion: "v2",
               creator: "",
               isUserEvent: false,
               listingFeeWei: "0",
@@ -363,14 +408,16 @@ async function bootstrapPredictionsFromChain() {
     for (let id = 1; id <= total; id++) {
       try {
         const evt = await getOnChainEvent(Prediction, id);
-        const deadlineSec = Number(evt.deadline ?? 0n);
-        const deadline = new Date(deadlineSec * 1000);
-        const verifyAfter = new Date(deadline.getTime() + RESULT_VERIFY_BUFFER_MS);
         const category = normalizeStoredCategory(
           CATEGORY_NAMES[Number(evt.category ?? 3)] || "CRYPTO",
           String(evt.title || `Event #${id}`),
           "",
           Boolean(evt.isUserEvent)
+        );
+        const deadlineSec = Number(evt.deadline ?? 0n);
+        const deadline = new Date(deadlineSec * 1000);
+        const verifyAfter = new Date(
+          deadline.getTime() + getVerifyBufferMs(category, Boolean(evt.isUserEvent))
         );
 
         await PredictionEvent.updateOne(
@@ -384,6 +431,12 @@ async function bootstrapPredictionsFromChain() {
               aiProbability: Number(evt.aiProbability ?? 50n),
               deadline,
               verifyAfter,
+              expectedResolveAtUtc: verifyAfter,
+              timePrecision: "DATE_ONLY",
+              confidence: 0.7,
+              popularityScore: 60,
+              sources: [],
+              qualityVersion: "v2",
               creator: String(evt.creator || "").toLowerCase(),
               isUserEvent: Boolean(evt.isUserEvent),
               listingFeeWei: String(evt.listingFee || 0n),
@@ -474,12 +527,24 @@ async function syncUnresolvedWithChain(limit = 1000) {
     const localMaxDoc = await PredictionEvent.findOne().sort({ eventId: -1 }).select("eventId").lean();
     const localMaxEventId = Number(localMaxDoc?.eventId || 0);
     if (chainEventCount > localMaxEventId) {
-      const startId = Math.max(1, localMaxEventId + 1);
+      // Avoid repopulating very old historical events after admin purge/reset.
+      // Keep sync focused on the most recent chain window.
+      const startId = Math.max(1, localMaxEventId + 1, chainEventCount - 300 + 1);
       const importUntil = Math.min(chainEventCount, startId + 300);
       for (let id = startId; id <= importUntil; id++) {
         try {
           const on = await getOnChainEvent(Prediction, id);
           if (!on || Number(on.id || 0n) === 0) continue;
+          const normalizedCategory = normalizeStoredCategory(
+            CATEGORY_NAMES[Number(on.category || 3)] || "CRYPTO",
+            String(on.title || `Event #${id}`),
+            "",
+            Boolean(on.isUserEvent)
+          );
+          const deadline = new Date(Number(on.deadline || 0n) * 1000);
+          const verifyAfter = new Date(
+            deadline.getTime() + getVerifyBufferMs(normalizedCategory, Boolean(on.isUserEvent))
+          );
           await PredictionEvent.updateOne(
             { eventId: id },
             {
@@ -487,15 +552,16 @@ async function syncUnresolvedWithChain(limit = 1000) {
                 eventId: id,
                 title: String(on.title || `Event #${id}`),
                 description: "",
-                category: normalizeStoredCategory(
-                  CATEGORY_NAMES[Number(on.category || 3)] || "CRYPTO",
-                  String(on.title || `Event #${id}`),
-                  "",
-                  Boolean(on.isUserEvent)
-                ),
+                category: normalizedCategory,
                 aiProbability: Number(on.aiProbability || 50n),
-                deadline: new Date(Number(on.deadline || 0n) * 1000),
-                verifyAfter: new Date(Number(on.deadline || 0n) * 1000 + RESULT_VERIFY_BUFFER_MS),
+                deadline,
+                verifyAfter,
+                expectedResolveAtUtc: verifyAfter,
+                timePrecision: "DATE_ONLY",
+                confidence: 0.7,
+                popularityScore: 60,
+                sources: [],
+                qualityVersion: "v2",
                 creator: String(on.creator || "").toLowerCase(),
                 isUserEvent: Boolean(on.isUserEvent),
                 listingFeeWei: String(on.listingFee || 0n),
@@ -555,19 +621,26 @@ async function syncUnresolvedWithChain(limit = 1000) {
         }
 
         const onResolved = Boolean(on.resolved);
+        const normalizedCategory = normalizeStoredCategory(
+          CATEGORY_NAMES[Number(on.category || 3)] || "CRYPTO",
+          String(on.title || ""),
+          "",
+          Boolean(on.isUserEvent)
+        );
+        const deadline = new Date(Number(on.deadline || 0n) * 1000);
+        const verifyAfter = new Date(
+          deadline.getTime() + getVerifyBufferMs(normalizedCategory, Boolean(on.isUserEvent))
+        );
         ops.push({
           updateOne: {
             filter: { eventId: row.eventId },
             update: {
               $set: {
-                category: normalizeStoredCategory(
-                  CATEGORY_NAMES[Number(on.category || 3)] || "CRYPTO",
-                  String(on.title || ""),
-                  "",
-                  Boolean(on.isUserEvent)
-                ),
-                deadline: new Date(Number(on.deadline || 0n) * 1000),
-                verifyAfter: new Date(Number(on.deadline || 0n) * 1000 + RESULT_VERIFY_BUFFER_MS),
+                category: normalizedCategory,
+                deadline,
+                verifyAfter,
+                expectedResolveAtUtc: verifyAfter,
+                qualityVersion: "v2",
                 totalVotesYes: Number(on.totalVotesYes || 0n),
                 totalVotesNo: Number(on.totalVotesNo || 0n),
                 creator: String(on.creator || "").toLowerCase(),
@@ -646,7 +719,7 @@ async function resolveExpired() {
   const expired = expiredCandidates.filter((evt) => {
     const verifyAt = evt.verifyAfter
       ? new Date(evt.verifyAfter).getTime()
-      : new Date(evt.deadline).getTime() + RESULT_VERIFY_BUFFER_MS;
+      : new Date(evt.deadline).getTime() + getVerifyBufferMs(evt.category, Boolean(evt.isUserEvent));
     return verifyAt <= now;
   });
   if (!expired.length) return;
