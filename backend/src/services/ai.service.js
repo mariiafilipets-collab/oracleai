@@ -219,8 +219,8 @@ const CATEGORY_VERIFY_BUFFER_MINUTES = {
 const CATEGORY_VOTE_LEAD_MINUTES = {
   SPORTS: 1,
   POLITICS: 30,
-  ECONOMY: 10,
-  CRYPTO: 10,
+  ECONOMY: 60,
+  CRYPTO: 60,
   CLIMATE: 30,
 };
 
@@ -618,8 +618,8 @@ ABSOLUTE RULES:
 - For crypto: usually 6-48h, unless event is a scheduled date item
 - Timing guardrails by category:
   - SPORTS: vote closes 1 minute before kickoff; verify usually kickoff + 3-4h.
-  - ECONOMY: vote closes ~10 minutes before release/close; verify +20 minutes.
-  - CRYPTO: vote closes ~10 minutes before target candle/event; verify +20 minutes.
+  - ECONOMY: vote closes ~60 minutes before release/close; verify +20 minutes.
+  - CRYPTO: vote closes ~60 minutes before target candle/event; verify +20 minutes.
   - POLITICS: vote closes ~30 minutes before official cutoff; verify +60 to +120 minutes.
   - CLIMATE: vote closes ~30 minutes before window end; verify +60 to +120 minutes.
 - Return ONLY a JSON array of 5 objects, nothing else
