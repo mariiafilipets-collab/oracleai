@@ -1482,5 +1482,6 @@ export function getSchedulerStatus() {
 
 export async function runSchedulerKick() {
   await refill();
+  await runQualityWatchdog();
   return getSchedulerStatus();
 }
