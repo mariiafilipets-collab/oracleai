@@ -61,6 +61,13 @@ function normalizeTitle(value) {
     .trim();
 }
 
+function isNearDuplicateTitle(a, b) {
+  const na = normalizeTitle(a);
+  const nb = normalizeTitle(b);
+  if (!na || !nb) return false;
+  return na === nb || na.includes(nb) || nb.includes(na);
+}
+
 async function readPredictionValueNoArgs(prediction, fragment, methodName, fallback) {
   try {
     if (typeof prediction?.[methodName] === "function") {
@@ -642,15 +649,30 @@ router.post("/user/ingest", async (req, res) => {
 router.post("/generate", async (req, res) => {
   try {
     const predictions = await generateDailyPredictions();
-    const localized = await pretranslateEvents(predictions);
+    const activeTitles = await PredictionEvent.find({ resolved: false, deadline: { $gt: new Date() } })
+      .select("title")
+      .limit(1000)
+      .lean();
+    const existing = activeTitles.map((x) => String(x.title || ""));
+    const seen = [];
+    const filteredPredictions = predictions.filter((pred) => {
+      const t = String(pred?.title || "");
+      const d = String(pred?.description || "").trim();
+      if (!t || d.length < 80) return false;
+      if (seen.some((x) => isNearDuplicateTitle(x, t))) return false;
+      if (existing.some((x) => isNearDuplicateTitle(x, t))) return false;
+      seen.push(t);
+      return true;
+    });
+    const localized = await pretranslateEvents(filteredPredictions);
     const { Prediction } = getContracts();
     const signer = getSigner();
     const created = [];
 
     if (Prediction && signer) {
       let nonce = await signer.getNonce();
-      for (let i = 0; i < predictions.length; i++) {
-        const pred = predictions[i];
+      for (let i = 0; i < filteredPredictions.length; i++) {
+        const pred = filteredPredictions[i];
         const normalizedCategory = normalizeAutoCategory(pred.category, pred.title, pred.description || "");
         const timing = buildEventTiming({
           category: normalizedCategory,

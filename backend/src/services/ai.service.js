@@ -232,6 +232,61 @@ function parseIsoUtc(value) {
   return ts;
 }
 
+const TITLE_STOP_WORDS = new Set([
+  "will", "the", "a", "an", "on", "by", "at", "before", "after", "today", "tonight",
+  "this", "that", "in", "to", "of", "for", "and", "or", "be", "is", "are", "do", "does",
+  "did", "with", "utc", "march", "april", "may", "june", "july", "august", "september",
+  "october", "november", "december", "january", "february", "jan", "feb", "mar", "apr",
+  "jun", "jul", "aug", "sep", "oct", "nov", "dec",
+]);
+
+function normalizeTitleForSimilarity(title) {
+  return String(title || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .map((t) => t.trim())
+    .filter((t) => t.length > 1 && !TITLE_STOP_WORDS.has(t) && !/^\d+$/.test(t))
+    .join(" ");
+}
+
+function titleTokens(title) {
+  const norm = normalizeTitleForSimilarity(title);
+  return new Set(norm ? norm.split(/\s+/).filter(Boolean) : []);
+}
+
+function jaccard(aSet, bSet) {
+  if (!aSet.size || !bSet.size) return 0;
+  let inter = 0;
+  for (const x of aSet) if (bSet.has(x)) inter++;
+  const uni = aSet.size + bSet.size - inter;
+  return uni > 0 ? inter / uni : 0;
+}
+
+function isNearDuplicateTitle(a, b) {
+  const na = normalizeTitleForSimilarity(a);
+  const nb = normalizeTitleForSimilarity(b);
+  if (!na || !nb) return false;
+  if (na === nb) return true;
+  if (na.includes(nb) || nb.includes(na)) return true;
+  return jaccard(titleTokens(na), titleTokens(nb)) >= 0.78;
+}
+
+function buildDetailedDescription(event) {
+  const title = String(event?.title || "").trim();
+  const category = String(event?.category || "CRYPTO").toUpperCase();
+  const verifyAt = String(event?.verifyAtUtc || "").trim();
+  const sourceHint = Array.isArray(event?.sources) && event.sources.length > 0 ? "trusted public sources" : "official and mainstream public sources";
+  const catHint = {
+    SPORTS: "match result only (not aggregate progression)",
+    POLITICS: "official announcement or vote outcome",
+    ECONOMY: "official release or market close value",
+    CRYPTO: "exchange/market close value or official listing/regulatory outcome",
+    CLIMATE: "official agency report and measured event data",
+  }[category] || "official measurable outcome";
+  return `Resolution criterion: ${catHint}. This market asks: ${title}. Verification will use ${sourceHint} at/after ${verifyAt || "the scheduled verify window"}, and the final verdict is based on objective published data only.`;
+}
+
 function inferCategoryFromText(text) {
   const t = String(text || "").toLowerCase();
   if (/\b(vs|match|fixture|derby|league|cup|goal|score|scorer|assist|player|team|coach|lineup|penalty|football|soccer|basketball|tennis|hockey|baseball|cricket|mma|ufc|f1|formula 1|motogp|nba|nfl|mlb|nhl|grand prix|gp|verstappen|hamilton|uefa|fifa|premier league|la liga|laliga|serie a|bundesliga|champions league|europa league|arsenal|manchester|liverpool|chelsea|tottenham|real madrid|barcelona|atletico|bayern|psg|juventus|inter|milan|dortmund)\b/.test(t)) {
@@ -345,13 +400,14 @@ async function finalizePredictionsWithArbiter(category, events, nowInfo) {
       role: "system",
       content: `You are a strict final arbiter for prediction market listings.
 Return ONLY JSON array:
-[{"idx":number,"accepted":true|false,"reason":"short","verifyAtUtc":"ISO UTC|null","eventStartAtUtc":"ISO UTC|null","sources":["https://..."]}]
+[{"idx":number,"accepted":true|false,"reason":"short","verifyAtUtc":"ISO UTC|null","eventStartAtUtc":"ISO UTC|null","sources":["https://..."],"description":"120-220 chars"}]
 Hard rules:
 - Keep only events that are real, mainstream, and currently/upcoming (next 30 days).
 - Require at least 2 credible source URLs per accepted event.
 - verifyAtUtc must be after current time and after event start (if provided).
 - Reject if timing is ambiguous or likely already known.
-- Never invent fake URLs.`,
+- Never invent fake URLs.
+- Description must be concrete and useful (what exactly is checked, in what time window, by which source type).`,
     },
     {
       role: "user",
@@ -376,6 +432,7 @@ Hard rules:
         ...events[i],
         verifyAtUtc: typeof verdict.verifyAtUtc === "string" ? verdict.verifyAtUtc : events[i].verifyAtUtc,
         eventStartAtUtc: typeof verdict.eventStartAtUtc === "string" ? verdict.eventStartAtUtc : events[i].eventStartAtUtc,
+        description: typeof verdict.description === "string" ? verdict.description : events[i].description,
         sources,
       });
     }
@@ -438,7 +495,7 @@ VERIFIED NEWS FOR TODAY:
 ${context || "No specific news. Use current verifiable facts: live prices, current standings, today's weather."}
 
 Create exactly 5 predictions about events in the next 30 days.
-Each: {"title":"yes/no question max 80 chars","description":"context max 150 chars","category":"${category}","aiProbability":15-85,"hoursToResolve":6-720,"eventStartAtUtc":"ISO UTC","verifyAtUtc":"ISO UTC","sources":["https://..."],"confidence":0..1,"popularityScore":0..100}
+Each: {"title":"yes/no question max 90 chars","description":"120-220 chars, detailed and user-friendly","category":"${category}","aiProbability":15-85,"hoursToResolve":6-720,"eventStartAtUtc":"ISO UTC","verifyAtUtc":"ISO UTC","sources":["https://..."],"confidence":0..1,"popularityScore":0..100}
 Required horizon mix per 5 events:
 - at least 1 event resolving within 6-24h
 - at least 3 events resolving within 24-168h (1-7 days)
@@ -450,6 +507,7 @@ For SPORTS wording precision:
 - Good: "Will Barcelona win this match vs Atletico tonight?"
 - Bad: "Will Barcelona advance vs Atletico tonight?"
 - Bad reasoning basis: aggregate score when title asks match winner.
+- Descriptions MUST NOT be generic. Include: exact metric/outcome, verification window, and public source type.
 
 If helpful, include concrete date/time context in title for future events within 30 days.
 Good: "Will Real Madrid win on March 10?"
@@ -615,7 +673,7 @@ Bad: "Will Bitcoin rise soon?"`
     };
     const normalized = filtered.map(e => ({
       title: String(e.title || "").slice(0, 100),
-      description: String(e.description || "").slice(0, 200),
+      description: String(e.description || "").slice(0, 260),
       category,
       aiProbability: Math.max(15, Math.min(85, parseInt(e.aiProbability) || 50)),
       hoursToResolve: Math.max(6, Math.min(720, parseInt(e.hoursToResolve) || 72)),
@@ -780,6 +838,8 @@ Bad: "Will Bitcoin rise soon?"`
         if (longHorizon && !verifyTs) return false;
         if (category === "SPORTS" && !eventStartTs) return false;
         if (eventStartTs && verifyTs <= eventStartTs) return false;
+        const desc = String(e?.description || "").trim();
+        if (desc.length < 80) return false;
         const verifyBufferMs = (CATEGORY_VERIFY_BUFFER_MINUTES[String(category || "CRYPTO").toUpperCase()] || 10) * 60 * 1000;
         const voteLeadMs = (CATEGORY_VOTE_LEAD_MINUTES[String(category || "CRYPTO").toUpperCase()] || 10) * 60 * 1000;
         const voteCloseByVerify = verifyTs - verifyBufferMs;
@@ -789,8 +849,24 @@ Bad: "Will Bitcoin rise soon?"`
         if (!Number.isFinite(voteCloseTs) || voteCloseTs <= nowTs + 60 * 1000) return false;
         return true;
       })
-      .map(({ hasExplicitVerifyAt, ...rest }) => rest);
-    return final;
+      .map(({ hasExplicitVerifyAt, ...rest }) => ({
+        ...rest,
+        description: String(rest.description || "").trim(),
+        sources: Array.from(
+          new Set((Array.isArray(rest.sources) ? rest.sources : []).map((x) => String(x || "").trim()).filter((x) => /^https?:\/\//i.test(x)))
+        ).slice(0, 8),
+      }));
+
+    const deduped = [];
+    for (const evt of final) {
+      if (deduped.some((x) => isNearDuplicateTitle(x.title, evt.title))) continue;
+      const richDescription = evt.description.length >= 80 ? evt.description : buildDetailedDescription(evt);
+      deduped.push({
+        ...evt,
+        description: String(richDescription).slice(0, 260),
+      });
+    }
+    return deduped;
   } catch { return []; }
 }
 

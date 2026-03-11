@@ -52,6 +52,30 @@ const schedulerTimers = [];
 
 const CATEGORY_NAMES = ["SPORTS", "POLITICS", "ECONOMY", "CRYPTO", "CLIMATE"];
 const ALLOWED_CATEGORIES = new Set(CATEGORY_NAMES);
+const TITLE_STOP_WORDS = new Set([
+  "will", "the", "a", "an", "on", "by", "at", "before", "after", "today", "tonight",
+  "this", "that", "in", "to", "of", "for", "and", "or", "be", "is", "are", "do", "does",
+  "did", "with", "utc", "march", "april", "may", "june", "july", "august", "september",
+  "october", "november", "december", "january", "february", "jan", "feb", "mar", "apr",
+  "jun", "jul", "aug", "sep", "oct", "nov", "dec",
+]);
+
+function normalizeTitleForSimilarity(title) {
+  return String(title || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .map((t) => t.trim())
+    .filter((t) => t.length > 1 && !TITLE_STOP_WORDS.has(t) && !/^\d+$/.test(t))
+    .join(" ");
+}
+
+function isNearDuplicateTitle(a, b) {
+  const na = normalizeTitleForSimilarity(a);
+  const nb = normalizeTitleForSimilarity(b);
+  if (!na || !nb) return false;
+  return na === nb || na.includes(nb) || nb.includes(na);
+}
 const withTimeout = async (promise, timeoutMs, label) => {
   return await Promise.race([
     promise,
@@ -295,11 +319,18 @@ async function publishNewBatch() {
     // Deduplicate only within current AI batch.
     // We intentionally do NOT dedup against already-active events here,
     // otherwise refill can get stuck below MIN_ACTIVE when AI repeats top headlines.
-    const seenInBatch = new Set();
+    const seenInBatch = [];
+    const activeTitles = await PredictionEvent.find({ resolved: false, deadline: { $gt: new Date() } })
+      .select("title")
+      .limit(1000)
+      .lean();
+    const existing = activeTitles.map((x) => String(x.title || ""));
     const unique = predictions.filter((p) => {
-      const key = p.title.toLowerCase().replace(/[^a-z0-9]/g, "");
-      if (seenInBatch.has(key)) return false;
-      seenInBatch.add(key);
+      const t = String(p?.title || "");
+      if (!t) return false;
+      if (seenInBatch.some((x) => isNearDuplicateTitle(x, t))) return false;
+      if (existing.some((x) => isNearDuplicateTitle(x, t))) return false;
+      seenInBatch.push(t);
       return true;
     });
 
@@ -327,6 +358,10 @@ async function publishNewBatch() {
 
     for (let i = 0; i < unique.length; i++) {
       const p = unique[i];
+      if (!p?.description || String(p.description).trim().length < 80) {
+        console.warn(`[Scheduler] Skipping event with weak description: "${p.title}"`);
+        continue;
+      }
       const normalizedCategory = normalizeStoredCategory(
         p.category,
         p.title,
