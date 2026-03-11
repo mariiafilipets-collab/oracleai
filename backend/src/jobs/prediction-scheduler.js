@@ -10,6 +10,7 @@ const MIN_ACTIVE = 40;
 const GENERATE_INTERVAL = 90 * 60 * 1000;   // 1.5 hours
 const RESOLVE_INTERVAL = 5 * 60 * 1000;      // 5 minutes
 const REFILL_CHECK_INTERVAL = 5 * 60 * 1000; // 5 minutes
+const REFILL_AI_THROTTLE_MS = 20 * 60 * 1000; // 20 minutes
 const WEEKLY_CHECK_INTERVAL = 60 * 60 * 1000; // 1 hour
 const NIGHTLY_RETRY_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours
 const PROTOCOL_FEE_DISTRIBUTION_CHECK_INTERVAL = 10 * 60 * 1000; // 10 minutes
@@ -492,6 +493,13 @@ async function refill() {
   }
   if (active < MIN_ACTIVE) {
     const deficit = MIN_ACTIVE - active;
+    const aiRecentlyRan = Date.now() - Number(lastGenerate || 0) < REFILL_AI_THROTTLE_MS;
+    const criticallyLow = active < Math.max(5, Math.floor(MIN_ACTIVE * 0.25));
+    if (aiRecentlyRan && !criticallyLow) {
+      const leftSec = Math.max(0, Math.round((REFILL_AI_THROTTLE_MS - (Date.now() - Number(lastGenerate || 0))) / 1000));
+      console.log(`[Scheduler] Refill throttled: ${active}/${MIN_ACTIVE} active, AI cooldown ${leftSec}s`);
+      return;
+    }
     console.log(`[Scheduler] ${active}/${MIN_ACTIVE} active — refilling (need +${deficit})...`);
     await publishNewBatch({ targetToCreate: deficit, maxRounds: MAX_REFILL_BATCH_ROUNDS });
   }
@@ -1500,6 +1508,10 @@ export function getSchedulerStatus() {
       intervalMin: QA_WATCHDOG_INTERVAL / 60000,
       lastRunAt: qaLastRunAt ? new Date(qaLastRunAt).toISOString() : null,
       report: qaLastReport,
+    },
+    aiThrottle: {
+      refillThrottleSec: Math.round(REFILL_AI_THROTTLE_MS / 1000),
+      secondsSinceLastGenerate: lastGenerate ? Math.round((Date.now() - lastGenerate) / 1000) : null,
     },
   };
 }
