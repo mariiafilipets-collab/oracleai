@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { ethers } from "ethers";
 import User from "../models/User.js";
 import PredictionEvent from "../models/PredictionEvent.js";
 import CheckInRecord from "../models/CheckInRecord.js";
@@ -18,6 +19,26 @@ async function withTimeout(promise, timeoutMs = CHAIN_READ_TIMEOUT_MS) {
     promise,
     new Promise((_, reject) => setTimeout(() => reject(new Error("chain-read-timeout")), timeoutMs)),
   ]);
+}
+
+async function readPredictionValueNoArgs(prediction, fragment, methodName, fallback) {
+  try {
+    if (typeof prediction?.[methodName] === "function") {
+      return await prediction[methodName]();
+    }
+  } catch {}
+  try {
+    const provider = prediction?.runner?.provider;
+    const to = prediction?.target || prediction?.address;
+    if (!provider || !to) return fallback;
+    const iface = new ethers.Interface([fragment]);
+    const data = iface.encodeFunctionData(methodName, []);
+    const raw = await provider.call({ to, data });
+    const decoded = iface.decodeFunctionResult(methodName, raw);
+    return decoded?.[0] ?? fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 router.get("/", async (req, res) => {
@@ -51,7 +72,15 @@ router.get("/", async (req, res) => {
     }
     if (Prediction) {
       try {
-        totalVoteFeesCollected = (await withTimeout(Prediction.totalVoteFeesCollected())).toString();
+        const voteFeesRaw = await withTimeout(
+          readPredictionValueNoArgs(
+            Prediction,
+            "function totalVoteFeesCollected() view returns (uint256)",
+            "totalVoteFeesCollected",
+            0n
+          )
+        );
+        totalVoteFeesCollected = String(voteFeesRaw || 0n);
       } catch {}
     }
 
