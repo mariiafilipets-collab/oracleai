@@ -10,6 +10,7 @@ import { useContractAddresses } from "@/hooks/useContracts";
 import { PointsABI, PredictionABI, ReferralABI } from "@/lib/contracts";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
+import { formatInOffset, getEffectiveOffsetMinutes, useTimezone } from "@/lib/timezone";
 import AppIcon from "@/components/icons/AppIcon";
 
 const BADGES = [
@@ -26,6 +27,8 @@ const BADGES = [
 export default function ProfilePage() {
   const { address, isConnected } = useAccount();
   const { t } = useI18n();
+  const { mode: tzMode, fixedOffsetMinutes } = useTimezone();
+  const userOffsetMinutes = getEffectiveOffsetMinutes(tzMode, fixedOffsetMinutes);
   const tr = (key: string, fallback: string, params?: Record<string, string | number>) => {
     const val = t(key, params);
     return val === key ? fallback : val;
@@ -406,7 +409,7 @@ export default function ProfilePage() {
                 <div key={u.address} className="p-3 rounded-xl bg-dark-700/50 border border-dark-500/50 flex items-center justify-between">
                   <div>
                     <div className="text-sm text-gray-200 font-mono">{shortAddress(u.address)}</div>
-                    <div className="text-xs text-gray-500">{new Date(u.joinedAt).toLocaleDateString()}</div>
+                    <div className="text-xs text-gray-500">{formatInOffset(u.joinedAt, userOffsetMinutes)}</div>
                   </div>
                   <div className="text-right">
                     <div className="text-sm text-neon-cyan font-mono">{(u.totalPoints || 0).toLocaleString()} {t("common.pts")}</div>
@@ -572,7 +575,7 @@ export default function ProfilePage() {
               <div key={evt.eventId} className="p-3 rounded-xl bg-dark-700/50 border border-dark-500/50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <div className="min-w-0">
                   <p className="text-sm text-gray-200 truncate">#{evt.eventId} · {evt.title}</p>
-                  <p className="text-xs text-gray-500">{evt.category} · {new Date(evt.deadline).toLocaleString()}</p>
+                  <p className="text-xs text-gray-500">{evt.category} · {formatInOffset(evt.deadline, userOffsetMinutes)}</p>
                 </div>
                 <div className="text-left sm:text-right shrink-0">
                   <div className={`text-xs font-bold ${evt.resolved ? "text-neon-purple" : "text-neon-green"}`}>
@@ -646,6 +649,9 @@ export default function ProfilePage() {
                   <span className="text-sm font-mono text-neon-green">+{item.points} {t("common.pts")}</span>
                   <span className="text-xs text-gray-500 ml-2">
                     <AppIcon name="streak" className="w-3.5 h-3.5 inline text-neon-gold" />{item.streak}
+                  </span>
+                  <span className="block text-[11px] text-gray-600 mt-1 font-mono">
+                    {formatInOffset(item.timestamp, userOffsetMinutes)}
                   </span>
                 </div>
               </div>

@@ -265,7 +265,7 @@ export default function PredictionsPage() {
   const nextUserEventAt = Number(nextUserEventAtRaw ?? BigInt(0));
   const cooldownSeconds = Math.max(0, nextUserEventAt - Math.floor(Date.now() / 1000));
   const nextCreateAtText =
-    nextUserEventAt > 0 ? new Date(nextUserEventAt * 1000).toLocaleString() : "";
+    nextUserEventAt > 0 ? formatInOffset(nextUserEventAt * 1000, userOffsetMinutes) : "";
   const isVerifiedCreator = Boolean(isVerifiedCreatorRaw);
   const creatorCooldownHours = Math.round(Number(creatorCooldownRaw ?? BigInt(86400)) / 3600);
   const verifiedMinPoints = Number(verifiedMinPointsRaw ?? BigInt(5000));

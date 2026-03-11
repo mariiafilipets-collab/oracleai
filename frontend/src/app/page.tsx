@@ -14,6 +14,7 @@ import { CheckInABI, PointsABI, PrizePoolABI } from "@/lib/contracts";
 import { api } from "@/lib/api";
 import { useAppStore } from "@/lib/store";
 import { useI18n } from "@/lib/i18n";
+import { formatInOffset, getEffectiveOffsetMinutes, useTimezone } from "@/lib/timezone";
 import AppIcon from "@/components/icons/AppIcon";
 
 const TIERS = [
@@ -27,6 +28,8 @@ export default function HomePage() {
   const { addresses } = useContractAddresses();
   const { activityFeed, addActivity, setActivityFeed } = useAppStore();
   const { t } = useI18n();
+  const { mode: tzMode, fixedOffsetMinutes } = useTimezone();
+  const userOffsetMinutes = getEffectiveOffsetMinutes(tzMode, fixedOffsetMinutes);
   const [selectedTier, setSelectedTier] = useState(0);
   const [predictions, setPredictions] = useState<any[]>([]);
   const [showGuide, setShowGuide] = useState(false);
@@ -421,6 +424,9 @@ export default function HomePage() {
                     </div>
                     <div className="text-xs text-gray-500 mt-1">
                       +{item.points} {t("common.pts")} · {item.amount} BNB · <AppIcon name="streak" className="w-3.5 h-3.5 inline text-neon-gold" />{item.streak}
+                    </div>
+                    <div className="text-[11px] text-gray-600 mt-1 font-mono">
+                      {formatInOffset(item.timestamp, userOffsetMinutes)}
                     </div>
                   </motion.div>
                 ))
