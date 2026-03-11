@@ -4,7 +4,7 @@ import PredictionEvent from "../models/PredictionEvent.js";
 import { assessUserEventForListing, generateDailyPredictions } from "../services/ai.service.js";
 import { getContracts, getSigner } from "../services/blockchain.service.js";
 import config from "../config/index.js";
-import { buildEventTiming, getSchedulerStatus, getVerifyBufferMs, initScheduler, runSchedulerKick } from "../jobs/prediction-scheduler.js";
+import { buildEventTiming, getQaHistory, getSchedulerStatus, getVerifyBufferMs, initScheduler, runSchedulerKick } from "../jobs/prediction-scheduler.js";
 import { pretranslateEvents, translateEvents, translateMissingEvents } from "../services/translate.service.js";
 
 const router = Router();
@@ -495,6 +495,22 @@ router.get("/scheduler", async (req, res) => {
       },
     },
   });
+});
+
+// QA watchdog history (latest runs)
+router.get("/qa-report", async (req, res) => {
+  try {
+    const limit = Math.max(1, Math.min(100, Number(req.query.limit || 20)));
+    return res.json({
+      success: true,
+      data: {
+        limit,
+        rows: getQaHistory(limit),
+      },
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // Emergency maintenance: force-start scheduler in current process.

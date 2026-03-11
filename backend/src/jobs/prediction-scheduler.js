@@ -58,6 +58,8 @@ let qaLastReport = {
   issues: {},
   samples: [],
 };
+const qaHistory = [];
+const QA_HISTORY_MAX = 120;
 
 const CATEGORY_NAMES = ["SPORTS", "POLITICS", "ECONOMY", "CRYPTO", "CLIMATE"];
 const ALLOWED_CATEGORIES = new Set(CATEGORY_NAMES);
@@ -1288,6 +1290,17 @@ async function runQualityWatchdog() {
       issues,
       samples,
     };
+    qaHistory.unshift({
+      runAt: new Date(qaLastRunAt).toISOString(),
+      ok: qaLastReport.ok,
+      scanned: qaLastReport.scanned,
+      issues: { ...issues },
+      sampleCount: samples.length,
+      samples,
+    });
+    if (qaHistory.length > QA_HISTORY_MAX) {
+      qaHistory.length = QA_HISTORY_MAX;
+    }
     if (totalIssues === 0) {
       console.log(`[QA] PASS scanned=${active.length}`);
     } else {
@@ -1301,6 +1314,17 @@ async function runQualityWatchdog() {
       issues: { runtimeError: 1 },
       samples: [{ type: "runtimeError", message: String(e?.message || e).slice(0, 160) }],
     };
+    qaHistory.unshift({
+      runAt: new Date(qaLastRunAt).toISOString(),
+      ok: false,
+      scanned: 0,
+      issues: { runtimeError: 1 },
+      sampleCount: 1,
+      samples: qaLastReport.samples,
+    });
+    if (qaHistory.length > QA_HISTORY_MAX) {
+      qaHistory.length = QA_HISTORY_MAX;
+    }
     console.warn(`[QA] Watchdog error: ${e.message}`);
   }
 }
@@ -1484,4 +1508,9 @@ export async function runSchedulerKick() {
   await refill();
   await runQualityWatchdog();
   return getSchedulerStatus();
+}
+
+export function getQaHistory(limit = 20) {
+  const n = Math.max(1, Math.min(100, Number(limit || 20)));
+  return qaHistory.slice(0, n);
 }
