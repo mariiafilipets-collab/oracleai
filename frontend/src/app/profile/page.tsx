@@ -39,6 +39,7 @@ export default function ProfilePage() {
   const [userData, setUserData] = useState<any>(null);
   const [referralStats, setReferralStats] = useState<any>(null);
   const [creatorStats, setCreatorStats] = useState<any>(null);
+  const [platformVoteFeesBnb, setPlatformVoteFeesBnb] = useState(0);
   const { writeContract, data: withdrawHash, isPending: withdrawing } = useWriteContract();
   const { isSuccess: withdrawSuccess } = useWaitForTransactionReceipt({ hash: withdrawHash });
   const { writeContract: writeCreatorClaim, data: creatorClaimHash, isPending: creatorClaiming } = useWriteContract();
@@ -108,6 +109,12 @@ export default function ProfilePage() {
 
     api.getCreatorStats(address).then((res) => {
       if (res.success) setCreatorStats(res.data);
+    }).catch(() => {});
+
+    api.getStats().then((res) => {
+      if (!res?.success) return;
+      const raw = BigInt(String(res?.data?.totalVoteFeesCollected || "0"));
+      setPlatformVoteFeesBnb(parseFloat(formatEther(raw)));
     }).catch(() => {});
   }, [address]);
 
@@ -304,6 +311,20 @@ export default function ProfilePage() {
             </GlassCard>
           ))}
         </div>
+      </div>
+
+      <div className="grid sm:grid-cols-2 gap-3">
+        <GlassCard hover={false} className="p-4">
+          <div className="text-xs text-gray-500 mb-1">{tr("profile.voteFeesCollected", "Vote fees collected (platform)")}</div>
+          <div className="text-lg font-mono text-neon-cyan">{platformVoteFeesBnb.toFixed(6)} BNB</div>
+        </GlassCard>
+        <GlassCard hover={false} className="p-4">
+          <div className="text-xs text-gray-500 mb-1">{tr("profile.voteFeesDistributed", "Vote fees distributed (platform)")}</div>
+          <div className="text-lg font-mono text-neon-gold">{platformVoteFeesBnb.toFixed(6)} BNB</div>
+          <div className="text-[11px] text-gray-500 mt-1">
+            {tr("profile.voteFeesDistributedHint", "Distribution is executed during each vote transaction.")}
+          </div>
+        </GlassCard>
       </div>
 
       {/* Referral Section */}

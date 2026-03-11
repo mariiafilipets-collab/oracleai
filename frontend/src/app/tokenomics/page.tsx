@@ -1,9 +1,12 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import { formatEther } from "viem";
 import GlassCard from "@/components/GlassCard";
 import { useI18n } from "@/lib/i18n";
 import AppIcon from "@/components/icons/AppIcon";
+import { api } from "@/lib/api";
 
 const TOKEN_ALLOC = [
   { key: "airdrop", pct: 40, amount: "400M", color: "bg-neon-cyan" },
@@ -33,10 +36,21 @@ const TIER_KEYS = ["bronze", "silver", "gold", "diamond"];
 
 export default function TokenomicsPage() {
   const { t } = useI18n();
+  const [voteFeesBnb, setVoteFeesBnb] = useState(0);
   const tr = (key: string, fallback: string) => {
     const value = t(key);
     return value === key ? fallback : value;
   };
+
+  useEffect(() => {
+    api.getStats()
+      .then((res) => {
+        if (!res?.success) return;
+        const raw = BigInt(String(res?.data?.totalVoteFeesCollected || "0"));
+        setVoteFeesBnb(Number(formatEther(raw)));
+      })
+      .catch(() => {});
+  }, []);
 
   return (
     <div className="space-y-8">
@@ -118,6 +132,19 @@ export default function TokenomicsPage() {
         <p className="text-xs text-gray-400 mt-4">
           {tr("tokenomicsPage.votingFees.distribution", "All vote fees follow check-in distribution: 50% prizes, 15% treasury, 20% referrals, 10% burn reserve, 5% staking rewards.")}
         </p>
+        <div className="grid sm:grid-cols-2 gap-3 mt-4">
+          <div className="p-4 rounded-xl bg-dark-700/50 border border-dark-500/50">
+            <div className="text-xs text-gray-500 mb-1">{tr("tokenomicsPage.votingFees.collected", "Vote fees collected (on-chain)")}</div>
+            <div className="text-lg font-mono text-neon-cyan">{voteFeesBnb.toFixed(6)} BNB</div>
+          </div>
+          <div className="p-4 rounded-xl bg-dark-700/50 border border-dark-500/50">
+            <div className="text-xs text-gray-500 mb-1">{tr("tokenomicsPage.votingFees.distributed", "Vote fees distributed (on-chain)")}</div>
+            <div className="text-lg font-mono text-neon-gold">{voteFeesBnb.toFixed(6)} BNB</div>
+            <div className="text-[11px] text-gray-500 mt-1">
+              {tr("tokenomicsPage.votingFees.distributedHint", "Distribution is applied immediately on each vote transaction.")}
+            </div>
+          </div>
+        </div>
       </GlassCard>
 
       {/* Creator Economy */}
