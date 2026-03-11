@@ -804,7 +804,7 @@ async function syncUnresolvedWithChain(limit = 1000) {
     }
 
     const unresolved = await PredictionEvent.find({ resolved: false, eventId: { $lte: chainEventCount } })
-      .select("eventId")
+      .select("eventId verifyAfter eventStartAtUtc category isUserEvent")
       .limit(limit)
       .lean();
     if (!unresolved.length) return;
@@ -838,8 +838,19 @@ async function syncUnresolvedWithChain(limit = 1000) {
           Boolean(on.isUserEvent)
         );
         const deadline = new Date(Number(on.deadline || 0n) * 1000);
+        const derivedVerifyTs =
+          deadline.getTime() + getVerifyBufferMs(normalizedCategory, Boolean(on.isUserEvent));
+        const existingVerifyTs = row?.verifyAfter ? new Date(row.verifyAfter).getTime() : 0;
+        const eventStartTs = row?.eventStartAtUtc ? new Date(row.eventStartAtUtc).getTime() : 0;
+        const minByStartTs = eventStartTs
+          ? eventStartTs + getMinResultDelayMs(normalizedCategory)
+          : 0;
         const verifyAfter = new Date(
-          deadline.getTime() + getVerifyBufferMs(normalizedCategory, Boolean(on.isUserEvent))
+          Math.max(
+            derivedVerifyTs,
+            Number.isFinite(existingVerifyTs) ? existingVerifyTs : 0,
+            Number.isFinite(minByStartTs) ? minByStartTs : 0
+          )
         );
         ops.push({
           updateOne: {
