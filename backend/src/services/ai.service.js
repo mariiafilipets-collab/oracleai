@@ -382,10 +382,35 @@ function marketTopicKey(title, category) {
   return topicAliases.find((x) => x.re.test(s))?.key || "";
 }
 
+function climateTopicKey(title, category) {
+  const c = String(category || "").toUpperCase();
+  if (c !== "CLIMATE") return "";
+  const s = String(title || "");
+  const dateKey = extractDateKey(s) || "na";
+  const hazard =
+    (/\b(tornado|twister)\b/i.test(s) && "TORNADO")
+    || (/\b(hurricane|typhoon|cyclone)\b/i.test(s) && "CYCLONE")
+    || (/\b(storm|thunderstorm|hail)\b/i.test(s) && "STORM")
+    || (/\b(flood|flooding|rainfall|rain)\b/i.test(s) && "FLOOD")
+    || (/\b(wildfire|fire)\b/i.test(s) && "WILDFIRE")
+    || (/\b(heatwave|heat|temperature)\b/i.test(s) && "HEAT")
+    || (/\b(earthquake|quake)\b/i.test(s) && "EARTHQUAKE")
+    || (/\b(snow|blizzard)\b/i.test(s) && "SNOW")
+    || "GENERIC";
+  const ef = s.match(/\bEF\s*([0-5])\+?\b/i);
+  const cat = s.match(/\bcat(?:egory)?\s*([1-5])\b/i);
+  const mag = s.match(/\bM\s*([0-9]+(?:\.[0-9]+)?)\b/i);
+  const intensity = ef ? `EF${ef[1]}` : cat ? `CAT${cat[1]}` : mag ? `M${mag[1]}` : "na";
+  return `${c}|${hazard}|${intensity}|${dateKey}`;
+}
+
 function isNearDuplicateEvent(a, b) {
   const ca = String(a?.category || "").toUpperCase();
   const cb = String(b?.category || "").toUpperCase();
   if (ca && cb && ca === cb) {
+    const cla = climateTopicKey(a?.title, ca);
+    const clb = climateTopicKey(b?.title, cb);
+    if (cla && clb && cla === clb) return true;
     const ta = marketTopicKey(a?.title, ca);
     const tb = marketTopicKey(b?.title, cb);
     if (ta && tb && ta === tb) return true;
@@ -1040,8 +1065,14 @@ export async function generateDailyPredictions(options = {}) {
   const avoidTitles = Array.isArray(options?.avoidTitles)
     ? options.avoidTitles.map((x) => String(x || "").trim()).filter(Boolean)
     : [];
+  const requestedCategories = Array.isArray(options?.categories)
+    ? options.categories
+      .map((x) => String(x || "").toUpperCase())
+      .filter((x) => CATEGORIES.includes(x))
+    : [];
+  const selectedCategories = requestedCategories.length ? requestedCategories : CATEGORIES;
   const contexts = await Promise.all(
-    CATEGORIES.map(async cat => {
+    selectedCategories.map(async cat => {
       const ctx = await searchPopularEvents(cat);
       console.log(`[AI]   ${cat}: ${ctx.length} chars`);
       return { cat, ctx };
@@ -1054,7 +1085,7 @@ export async function generateDailyPredictions(options = {}) {
   );
 
   const all = batches.flat();
-  const dist = CATEGORIES.map(c => `${c}(${all.filter(e => e.category === c).length})`).join(" ");
+  const dist = selectedCategories.map(c => `${c}(${all.filter(e => e.category === c).length})`).join(" ");
   console.log(`[AI] Done: ${all.length} predictions — ${dist}`);
   if (all.length === 0) {
     console.warn("[AI] No production-grade predictions passed QA; returning empty set (mock fallback disabled).");

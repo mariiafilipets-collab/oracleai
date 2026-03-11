@@ -203,10 +203,35 @@ function marketTopicKey(title, category) {
   return topicAliases.find((x) => x.re.test(s))?.key || "";
 }
 
+function climateTopicKey(title, category) {
+  const c = String(category || "").toUpperCase();
+  if (c !== "CLIMATE") return "";
+  const s = String(title || "");
+  const dateKey = extractDateKey(s) || "na";
+  const hazard =
+    (/\b(tornado|twister)\b/i.test(s) && "TORNADO")
+    || (/\b(hurricane|typhoon|cyclone)\b/i.test(s) && "CYCLONE")
+    || (/\b(storm|thunderstorm|hail)\b/i.test(s) && "STORM")
+    || (/\b(flood|flooding|rainfall|rain)\b/i.test(s) && "FLOOD")
+    || (/\b(wildfire|fire)\b/i.test(s) && "WILDFIRE")
+    || (/\b(heatwave|heat|temperature)\b/i.test(s) && "HEAT")
+    || (/\b(earthquake|quake)\b/i.test(s) && "EARTHQUAKE")
+    || (/\b(snow|blizzard)\b/i.test(s) && "SNOW")
+    || "GENERIC";
+  const ef = s.match(/\bEF\s*([0-5])\+?\b/i);
+  const cat = s.match(/\bcat(?:egory)?\s*([1-5])\b/i);
+  const mag = s.match(/\bM\s*([0-9]+(?:\.[0-9]+)?)\b/i);
+  const intensity = ef ? `EF${ef[1]}` : cat ? `CAT${cat[1]}` : mag ? `M${mag[1]}` : "na";
+  return `${c}|${hazard}|${intensity}|${dateKey}`;
+}
+
 function isNearDuplicateEvent(a, b) {
   const ca = String(a?.category || "").toUpperCase();
   const cb = String(b?.category || "").toUpperCase();
   if (ca && cb && ca === cb) {
+    const cla = climateTopicKey(a?.title, ca);
+    const clb = climateTopicKey(b?.title, cb);
+    if (cla && clb && cla === clb) return true;
     const ta = marketTopicKey(a?.title, ca);
     const tb = marketTopicKey(b?.title, cb);
     if (ta && tb && ta === tb) return true;
@@ -531,13 +556,33 @@ async function publishNewBatch(options = {}) {
       title: String(x.title || ""),
       category: String(x.category || "CRYPTO").toUpperCase(),
     }));
+    const activeByCategory = Object.fromEntries(CATEGORY_NAMES.map((c) => [c, 0]));
+    for (const row of existing) {
+      if (ALLOWED_CATEGORIES.has(row.category)) {
+        activeByCategory[row.category] = (activeByCategory[row.category] || 0) + 1;
+      }
+    }
+    const categoryTarget = Math.max(1, Math.floor(MIN_ACTIVE / CATEGORY_NAMES.length));
+    const categorySoftCap = categoryTarget + 1;
+    const categoryDeficit = (cat) => Math.max(0, categoryTarget - Number(activeByCategory[String(cat || "").toUpperCase()] || 0));
+    const hasAnyCategoryDeficit = () => CATEGORY_NAMES.some((c) => categoryDeficit(c) > 0);
+    const climateTopicCounts = new Map();
+    for (const row of existing) {
+      if (row.category !== "CLIMATE") continue;
+      const key = climateTopicKey(row.title, row.category);
+      if (!key) continue;
+      climateTopicCounts.set(key, (climateTopicCounts.get(key) || 0) + 1);
+    }
     const createdTitles = [];
     let nonce = await signer.getNonce();
     let ok = 0;
 
     for (let round = 1; round <= maxRounds && ok < targetToCreate; round++) {
+      const neededCategories = CATEGORY_NAMES.filter((c) => categoryDeficit(c) > 0);
+      const generationCategories = neededCategories.length ? neededCategories : CATEGORY_NAMES;
       const predictions = await generateDailyPredictions({
         avoidTitles: [...existing, ...createdTitles].map((x) => String(x?.title || "")).filter(Boolean),
+        categories: generationCategories,
       });
       const seenInBatch = [];
       const unique = predictions.filter((p) => {
@@ -575,6 +620,27 @@ async function publishNewBatch(options = {}) {
           p.description || "",
           false
         );
+        const deficitsRemaining = hasAnyCategoryDeficit();
+        const deficitNow = categoryDeficit(normalizedCategory);
+        if (deficitsRemaining && deficitNow <= 0) {
+          let hasDeficitAhead = false;
+          for (let j = i + 1; j < unique.length; j++) {
+            const n = unique[j];
+            const nCat = normalizeStoredCategory(n?.category, n?.title, n?.description || "", false);
+            if (categoryDeficit(nCat) > 0) {
+              hasDeficitAhead = true;
+              break;
+            }
+          }
+          if (hasDeficitAhead) continue;
+          if ((activeByCategory[normalizedCategory] || 0) >= categorySoftCap) continue;
+        }
+        if (normalizedCategory === "CLIMATE") {
+          const climateKey = climateTopicKey(p.title, normalizedCategory);
+          if (climateKey && (climateTopicCounts.get(climateKey) || 0) >= 1) {
+            continue;
+          }
+        }
         const timing = buildEventTiming({
           category: normalizedCategory,
           hoursToResolve: p.hoursToResolve || 8,
@@ -634,6 +700,13 @@ async function publishNewBatch(options = {}) {
           );
           ok++;
           createdTitles.push({ title: String(p.title || ""), category: normalizedCategory });
+          activeByCategory[normalizedCategory] = (activeByCategory[normalizedCategory] || 0) + 1;
+          if (normalizedCategory === "CLIMATE") {
+            const climateKey = climateTopicKey(p.title, normalizedCategory);
+            if (climateKey) {
+              climateTopicCounts.set(climateKey, (climateTopicCounts.get(climateKey) || 0) + 1);
+            }
+          }
         } catch (e) {
           console.error(`[Scheduler] create: ${e.message?.slice(0, 80)}`);
         }
