@@ -947,6 +947,14 @@ export default function PredictionsPage() {
                     {/* Timing details in user UTC */}
                     <div className="mb-3 p-2.5 rounded-lg bg-dark-700/60 border border-dark-500/50">
                       <div className="flex items-center justify-between text-[11px] text-gray-400">
+                        <span>{tr("predictions.eventStartsAt", "Event starts at")}</span>
+                        <span className="font-mono text-gray-300">
+                          {pred.eventStartAtUtc
+                            ? formatUserTime(pred.eventStartAtUtc)
+                            : tr("predictions.eventStartTbd", "TBD")}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px] text-gray-400">
                         <span>{tr("predictions.voteClosesAt", "Voting closes at")}</span>
                         <span className="font-mono text-gray-300">{formatUserTime(pred.deadline)}</span>
                       </div>
