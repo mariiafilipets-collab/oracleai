@@ -952,6 +952,12 @@ export default function PredictionsPage() {
               const deadline = new Date(pred.deadline);
               const isExpired = deadline < new Date();
               const totalVotes = (pred.totalVotesYes || 0) + (pred.totalVotesNo || 0);
+              const startTimeIso =
+                pred.eventStartAtUtc ||
+                pred.expectedResolveAtUtc ||
+                pred.verifyAfter ||
+                pred.deadline ||
+                "";
               const isOwnUserEvent = Boolean(
                 pred.isUserEvent
                 && address
@@ -1024,8 +1030,8 @@ export default function PredictionsPage() {
                             {tr("predictions.eventStartsAt", "Event starts at")}
                           </span>
                           <span className="font-mono text-gray-300">
-                            {pred.eventStartAtUtc
-                              ? formatUserTime(pred.eventStartAtUtc)
+                            {startTimeIso
+                              ? formatUserTime(startTimeIso)
                               : tr("predictions.eventStartTbd", "TBD")}
                           </span>
                         </div>
