@@ -43,6 +43,13 @@ const CATEGORY_MIN_RESULT_DELAY_MINUTES = {
   CRYPTO: 20,
   CLIMATE: 90,
 };
+const CATEGORY_MAX_VERIFY_DEADLINE_GAP_HOURS = {
+  SPORTS: 6,
+  POLITICS: 36,
+  ECONOMY: 24,
+  CRYPTO: 24,
+  CLIMATE: 36,
+};
 
 let io = null;
 let generating = false;
@@ -268,6 +275,13 @@ function getMinResultDelayMs(category) {
   return minutes * 60 * 1000;
 }
 
+function getMaxVerifyDeadlineGapMs(category, isUserEvent = false) {
+  if (isUserEvent) return 72 * 60 * 60 * 1000;
+  const key = String(category || "CRYPTO").toUpperCase();
+  const hours = CATEGORY_MAX_VERIFY_DEADLINE_GAP_HOURS[key] || 24;
+  return hours * 60 * 60 * 1000;
+}
+
 function useEventStartAnchor(category, isUserEvent = false) {
   if (isUserEvent) return false;
   const key = String(category || "").toUpperCase();
@@ -358,7 +372,16 @@ export function buildEventTiming({ category, hoursToResolve, verifyAtUtc, eventS
     parsedEventStart && useEventStartAnchor(category, isUserEvent)
       ? parsedEventStart.getTime() - voteCloseLeadMs
       : Number.POSITIVE_INFINITY;
-  const candidateDeadlineMs = Math.min(latestByVerifyMs, latestByStartMs, latestByDayRuleMs);
+  let candidateDeadlineMs = Math.min(latestByVerifyMs, latestByStartMs, latestByDayRuleMs);
+  const maxGapMs = getMaxVerifyDeadlineGapMs(category, isUserEvent);
+  const rawGapMs = resultCheckAt.getTime() - candidateDeadlineMs;
+  if (Number.isFinite(candidateDeadlineMs) && rawGapMs > maxGapMs) {
+    // Guard against overly early vote-close windows (days before resolution).
+    // Prefer category lead policy, but keep within sane max-gap envelope.
+    const latestAllowedByGap = resultCheckAt.getTime() - maxGapMs;
+    const preferredByLead = resultCheckAt.getTime() - voteCloseLeadMs;
+    candidateDeadlineMs = Math.max(latestAllowedByGap, preferredByLead);
+  }
   const isValidWindow = Number.isFinite(candidateDeadlineMs) && candidateDeadlineMs > now + 60_000;
   const voteDeadlineMs = isValidWindow ? candidateDeadlineMs : now + 60_000;
   return {
@@ -1301,6 +1324,7 @@ async function runQualityWatchdog() {
       sportsVerifyTooEarly: 0,
       verifyLeDeadline: 0,
       dayRuleBad: 0,
+      voteWindowTooEarly: 0,
     };
     const samples = [];
     const corrections = [];
@@ -1325,6 +1349,34 @@ async function runQualityWatchdog() {
       if (verifyTs <= deadlineTs) {
         issues.verifyLeDeadline++;
         if (samples.length < 12) samples.push({ eventId: evt.eventId, type: "verify<=deadline", title });
+      }
+      const maxGapMs = getMaxVerifyDeadlineGapMs(cat, Boolean(evt?.isUserEvent));
+      const timingGapMs = verifyTs - deadlineTs;
+      if (!evt?.isUserEvent && timingGapMs > maxGapMs) {
+        issues.voteWindowTooEarly++;
+        corrections.push({
+          updateOne: {
+            filter: { eventId: evt.eventId },
+            update: {
+              $set: {
+                resolved: true,
+                resolvePending: false,
+                outcome: false,
+                aiReasoning: "Archived: vote window was mis-timed (closed too early vs verification).",
+                nextResolveRetryAt: null,
+                lastResolveError: "",
+              },
+            },
+          },
+        });
+        if (samples.length < 12) {
+          samples.push({
+            eventId: evt.eventId,
+            type: "voteWindowTooEarly",
+            gapHours: Math.round((timingGapMs / 3600000) * 100) / 100,
+            title,
+          });
+        }
       }
       if (cat === "SPORTS") {
         if (!startTs) {
