@@ -155,6 +155,10 @@ function hasCompleteLocalized(evt, localized, lang) {
   return hasTitle && hasDescription && hasReasoning;
 }
 
+export function isTranslationComplete(evt, localized, lang) {
+  return hasCompleteLocalized(evt, localized, lang);
+}
+
 function setCache(key, value) {
   cache.set(key, value);
   if (cache.size > CACHE_MAX) {

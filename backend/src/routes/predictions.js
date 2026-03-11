@@ -5,7 +5,7 @@ import { assessUserEventForListing, generateDailyPredictions } from "../services
 import { getContracts, getSigner } from "../services/blockchain.service.js";
 import config from "../config/index.js";
 import { buildEventTiming, getQaHistory, getSchedulerStatus, getVerifyBufferMs, initScheduler, runSchedulerKick } from "../jobs/prediction-scheduler.js";
-import { pretranslateEvents, translateEvents, translateMissingEvents } from "../services/translate.service.js";
+import { isTranslationComplete, pretranslateEvents, translateEvents, translateMissingEvents } from "../services/translate.service.js";
 
 const router = Router();
 const USER_EVENT_ALLOWED_CATEGORIES = new Set(["SPORTS", "POLITICS", "ECONOMY", "CRYPTO", "CLIMATE"]);
@@ -386,10 +386,7 @@ async function withTranslation(events, lang) {
   let localized = translateEvents(events, lang);
   const missing = events.filter((evt) => {
     const stored = evt.translations?.[lang];
-    const hasTitle = Boolean(stored?.title) && stored.title !== evt.title;
-    const hasDescription = !evt.description || (Boolean(stored?.description) && stored.description !== evt.description);
-    const hasReasoning = !evt.aiReasoning || (Boolean(stored?.aiReasoning) && stored.aiReasoning !== evt.aiReasoning);
-    return !(hasTitle && hasDescription && hasReasoning);
+    return !isTranslationComplete(evt, stored, lang);
   });
   if (!missing.length) return localized;
 
