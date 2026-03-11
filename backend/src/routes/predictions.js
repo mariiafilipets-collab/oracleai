@@ -68,6 +68,28 @@ function isNearDuplicateTitle(a, b) {
   return na === nb || na.includes(nb) || nb.includes(na);
 }
 
+function buildFallbackDescription(evt) {
+  const title = String(evt?.title || "").trim();
+  const category = String(evt?.category || "CRYPTO").toUpperCase();
+  const verifyAfter = evt?.verifyAfter ? new Date(evt.verifyAfter).toISOString() : "";
+  const criterion = {
+    SPORTS: "final match result only (not aggregate/tournament progression)",
+    POLITICS: "official decision, vote, or statement outcome",
+    ECONOMY: "official release value or market close figure",
+    CRYPTO: "exchange/market close value or official listing/regulatory outcome",
+    CLIMATE: "official agency report and measured event data",
+  }[category] || "objective public outcome";
+  return `Resolution criterion: ${criterion}. Market question: ${title}. Verification occurs at/after ${verifyAfter || "the scheduled verification window"} using objective public sources.`;
+}
+
+function ensureDetailedDescriptions(events) {
+  return (events || []).map((evt) => {
+    const current = String(evt?.description || "").trim();
+    if (current.length >= 80) return evt;
+    return { ...evt, description: buildFallbackDescription(evt) };
+  });
+}
+
 async function readPredictionValueNoArgs(prediction, fragment, methodName, fallback) {
   try {
     if (typeof prediction?.[methodName] === "function") {
@@ -250,6 +272,7 @@ router.get("/", async (req, res) => {
     let events = await PredictionEvent.find({ resolved: false, deadline: { $gt: new Date() } })
       .sort({ deadline: 1 }).lean();
     events = await attachUserVotes(events, req.query.address);
+    events = ensureDetailedDescriptions(events);
     events = await withTranslation(events, req.query.lang);
     res.json({ success: true, data: events });
   } catch (err) {
@@ -263,6 +286,7 @@ router.get("/all", async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = Math.min(parseInt(req.query.limit) || 50, 100);
     let events = await PredictionEvent.find().sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean();
+    events = ensureDetailedDescriptions(events);
     events = await withTranslation(events, req.query.lang);
     const total = await PredictionEvent.countDocuments();
     res.json({ success: true, data: events, total, page, pages: Math.ceil(total / limit) });
@@ -283,6 +307,7 @@ router.get("/resolved", async (req, res) => {
       events = await PredictionEvent.find({ resolved: true }).sort({ createdAt: -1 }).limit(50).lean();
     }
     events = await attachUserVotes(events, req.query.address);
+    events = ensureDetailedDescriptions(events);
     events = await withTranslation(events, req.query.lang);
     res.json({ success: true, data: events });
   } catch (err) {
