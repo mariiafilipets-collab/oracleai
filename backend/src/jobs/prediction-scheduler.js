@@ -232,6 +232,15 @@ function getMinResultDelayMs(category) {
   return minutes * 60 * 1000;
 }
 
+function useEventStartAnchor(category, isUserEvent = false) {
+  if (isUserEvent) return false;
+  const key = String(category || "").toUpperCase();
+  // Strict anti-cheat start anchoring is required for sports fixtures.
+  // For other categories, eventStartAtUtc often means "window starts" and can
+  // incorrectly force very early vote close times.
+  return key === "SPORTS";
+}
+
 function parseIsoUtc(value) {
   const s = String(value || "").trim();
   if (!s) return null;
@@ -255,7 +264,7 @@ export function buildEventTiming({ category, hoursToResolve, verifyAtUtc, eventS
   let resultCheckAt = parsedVerifyAt && parsedVerifyAt.getTime() > now + 60_000
     ? parsedVerifyAt
     : new Date(now + resolveMs);
-  if (parsedEventStart) {
+  if (parsedEventStart && useEventStartAnchor(category, isUserEvent)) {
     const minResultTs = parsedEventStart.getTime() + getMinResultDelayMs(category);
     if (resultCheckAt.getTime() < minResultTs) {
       resultCheckAt = new Date(minResultTs);
@@ -264,7 +273,10 @@ export function buildEventTiming({ category, hoursToResolve, verifyAtUtc, eventS
   const verifyBufferMs = getVerifyBufferMs(category, isUserEvent);
   const voteCloseLeadMs = getVoteCloseLeadMs(category, isUserEvent);
   const latestByVerifyMs = resultCheckAt.getTime() - verifyBufferMs;
-  const latestByStartMs = parsedEventStart ? parsedEventStart.getTime() - voteCloseLeadMs : Number.POSITIVE_INFINITY;
+  const latestByStartMs =
+    parsedEventStart && useEventStartAnchor(category, isUserEvent)
+      ? parsedEventStart.getTime() - voteCloseLeadMs
+      : Number.POSITIVE_INFINITY;
   const candidateDeadlineMs = Math.min(latestByVerifyMs, latestByStartMs);
   const isValidWindow = Number.isFinite(candidateDeadlineMs) && candidateDeadlineMs > now + 60_000;
   const voteDeadlineMs = isValidWindow ? candidateDeadlineMs : now + 60_000;
@@ -843,6 +855,7 @@ async function syncUnresolvedWithChain(limit = 1000) {
         const existingVerifyTs = row?.verifyAfter ? new Date(row.verifyAfter).getTime() : 0;
         const eventStartTs = row?.eventStartAtUtc ? new Date(row.eventStartAtUtc).getTime() : 0;
         const minByStartTs = eventStartTs
+          && useEventStartAnchor(normalizedCategory, Boolean(on.isUserEvent))
           ? eventStartTs + getMinResultDelayMs(normalizedCategory)
           : 0;
         const verifyAfter = new Date(

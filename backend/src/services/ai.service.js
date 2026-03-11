@@ -224,6 +224,10 @@ const CATEGORY_VOTE_LEAD_MINUTES = {
   CLIMATE: 30,
 };
 
+function useEventStartAnchor(category) {
+  return String(category || "").toUpperCase() === "SPORTS";
+}
+
 function parseIsoUtc(value) {
   const s = String(value || "").trim();
   if (!s) return null;
@@ -979,7 +983,10 @@ Bad: "Will Bitcoin rise soon?"${avoidBlock}`
         const verifyBufferMs = (CATEGORY_VERIFY_BUFFER_MINUTES[String(category || "CRYPTO").toUpperCase()] || 10) * 60 * 1000;
         const voteLeadMs = (CATEGORY_VOTE_LEAD_MINUTES[String(category || "CRYPTO").toUpperCase()] || 10) * 60 * 1000;
         const voteCloseByVerify = verifyTs - verifyBufferMs;
-        const voteCloseByStart = eventStartTs ? eventStartTs - voteLeadMs : Number.POSITIVE_INFINITY;
+        const voteCloseByStart =
+          eventStartTs && useEventStartAnchor(category)
+            ? eventStartTs - voteLeadMs
+            : Number.POSITIVE_INFINITY;
         const voteCloseTs = Math.min(voteCloseByVerify, voteCloseByStart);
         // Reject events where voting window is already unsafe/closed.
         if (!Number.isFinite(voteCloseTs) || voteCloseTs <= nowTs + 60 * 1000) return false;
