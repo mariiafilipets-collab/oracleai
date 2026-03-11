@@ -1,0 +1,30 @@
+version: 1
+agents:
+  - id: ChiefEngineer
+    prompt: ops/agents/chief-engineer.system.md
+    contract: ops/agents/agent-contract.md
+    modelProfile: strong_reasoning_low_temp
+  - id: BlockchainEngineer
+    prompt: ops/agents/blockchain-engineer.system.md
+    contract: ops/agents/agent-contract.md
+    modelProfile: strong_reasoning_deterministic
+  - id: FullstackEngineer
+    prompt: ops/agents/fullstack-engineer.system.md
+    contract: ops/agents/agent-contract.md
+    modelProfile: fast_code_with_strong_fallback
+  - id: QAEngineer
+    prompt: ops/agents/qa-engineer.system.md
+    contract: ops/agents/agent-contract.md
+    modelProfile: fast_validation
+  - id: MarketingLead
+    prompt: ops/agents/marketing-lead.system.md
+    contract: ops/agents/agent-contract.md
+    modelProfile: multilingual_content
+  - id: DesignLead
+    prompt: ops/agents/design-lead.system.md
+    contract: ops/agents/agent-contract.md
+    modelProfile: image_generation
+  - id: MeetingMode
+    prompt: ops/agents/meeting-mode.system.md
+    contract: ops/agents/agent-contract.md
+    modelProfile: executive_summary

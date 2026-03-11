@@ -15,7 +15,11 @@
     "contracts:deploy": "npm run deploy:local --workspace=contracts",
     "backend:dev": "npm run dev --workspace=backend",
     "frontend:dev": "npm run dev --workspace=frontend",
-    "dev": "concurrently \"npm run contracts:node\" \"npm run backend:dev\" \"npm run frontend:dev\""
+    "dev": "concurrently \"npm run contracts:node\" \"npm run backend:dev\" \"npm run frontend:dev\"",
+    "social:publish": "node scripts/social/publish.mjs",
+    "social:creative-prompts": "node scripts/social/generate-creative-prompts.mjs",
+    "meeting:brief": "node scripts/meetings/build-brief.mjs",
+    "meeting:agenda": "node scripts/meetings/generate-agenda.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"

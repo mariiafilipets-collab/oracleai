@@ -1,0 +1,45 @@
+name: meeting-cockpit
+
+on:
+  workflow_dispatch:
+    inputs:
+      meeting_type:
+        description: "daily | weekly | release | incident"
+        required: true
+        default: "daily"
+        type: choice
+        options:
+          - daily
+          - weekly
+          - release
+          - incident
+  schedule:
+    - cron: "0 9 * * 1-5"
+
+jobs:
+  meeting-brief:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Generate agenda
+        env:
+          MEETING_MODE: ${{ github.event.inputs.meeting_type == 'incident' && 'incident-mode' || 'daily-standup' }}
+        run: node scripts/meetings/generate-agenda.mjs
+
+      - name: Generate meeting brief
+        env:
+          MEETING_TYPE: ${{ github.event.inputs.meeting_type || 'daily' }}
+        run: node scripts/meetings/build-brief.mjs
+
+      - name: Upload generated briefs
+        uses: actions/upload-artifact@v4
+        with:
+          name: meeting-brief
+          path: ops/meetings/generated/*.md

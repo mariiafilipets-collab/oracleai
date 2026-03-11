@@ -1,0 +1,52 @@
+name: social-publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      campaign:
+        description: "Campaign slug"
+        required: true
+        default: "oracleai-update"
+        type: string
+      locale:
+        description: "Primary locale"
+        required: true
+        default: "en"
+        type: string
+      dry_run:
+        description: "Run without external posting"
+        required: true
+        default: true
+        type: boolean
+  schedule:
+    - cron: "0 14 * * 1,3,5"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: prod
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Publish social content
+        env:
+          SOCIAL_CAMPAIGN: ${{ github.event.inputs.campaign || 'oracleai-scheduled' }}
+          SOCIAL_LOCALE: ${{ github.event.inputs.locale || 'en' }}
+          SOCIAL_DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+          SOCIAL_CHANNELS: x,telegram,discord,instagram,tiktok
+          X_API_POST_URL: ${{ secrets.X_API_POST_URL }}
+          X_API_BEARER_TOKEN: ${{ secrets.X_API_BEARER_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          INSTAGRAM_GRAPH_POST_URL: ${{ secrets.INSTAGRAM_GRAPH_POST_URL }}
+          INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+          TIKTOK_POST_URL: ${{ secrets.TIKTOK_POST_URL }}
+          TIKTOK_ACCESS_TOKEN: ${{ secrets.TIKTOK_ACCESS_TOKEN }}
+        run: node scripts/social/publish.mjs
