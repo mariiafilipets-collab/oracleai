@@ -28,9 +28,8 @@ function inferCategoryFromText(text) {
 
 function normalizeAutoCategory(category, title, description = "") {
   const model = String(category || "").toUpperCase();
-  if (!CATEGORY_NAMES.includes(model)) return inferCategoryFromText(`${title} ${description}`);
-  const inferred = inferCategoryFromText(`${title} ${description}`);
-  return inferred !== "CRYPTO" ? inferred : model;
+  if (CATEGORY_NAMES.includes(model)) return model;
+  return inferCategoryFromText(`${title} ${description}`);
 }
 
 function isAdminAuthorized(req) {
@@ -227,14 +226,8 @@ function dedupeNearDuplicateEvents(events) {
 }
 
 function recategorizeByTitle(events) {
-  return (events || []).map((evt) => {
-    if (evt?.isUserEvent) return evt;
-    const inferred = inferCategoryFromText(`${evt?.title || ""} ${evt?.description || ""}`);
-    if (!inferred || inferred === "CRYPTO") return evt;
-    if (inferred === "SPORTS" && !evt?.eventStartAtUtc) return evt;
-    if (String(evt?.category || "").toUpperCase() === inferred) return evt;
-    return { ...evt, category: inferred };
-  });
+  // Keep stored categories stable; category assignment is fixed at generation time.
+  return events || [];
 }
 
 async function readPredictionValueNoArgs(prediction, fragment, methodName, fallback) {

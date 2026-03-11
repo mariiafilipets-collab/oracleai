@@ -265,6 +265,10 @@ function parseTitleDateEndOfDayUtc(title) {
   return Date.UTC(year, month, day, 23, 59, 59);
 }
 
+function hasExplicitUtcTime(title) {
+  return /\b\d{1,2}:\d{2}\s*UTC\b/i.test(String(title || ""));
+}
+
 function inferTimePrecision(title, verifyAt) {
   const t = String(title || "");
   if (/\b\d{1,2}:\d{2}\s*UTC\b/i.test(t) || verifyAt) return "EXACT_MINUTE";
@@ -290,8 +294,14 @@ export function buildEventTiming({ category, hoursToResolve, verifyAtUtc, eventS
     ? parsedVerifyAt
     : new Date(now + resolveMs);
   const cat = String(category || "").toUpperCase();
-  const hasExplicitTimeInTitle = /\b\d{1,2}:\d{2}\s*UTC\b/i.test(String(title || ""));
+  const hasExplicitTimeInTitle = hasExplicitUtcTime(title);
   const hasCloseKeyword = /\b(close|closing|settle|settlement)\b/i.test(String(title || ""));
+  const dateOnlyEodTs = (!hasExplicitTimeInTitle && (cat === "ECONOMY" || cat === "CLIMATE"))
+    ? parseTitleDateEndOfDayUtc(title)
+    : 0;
+  if (dateOnlyEodTs > now + 60_000 && resultCheckAt.getTime() < dateOnlyEodTs) {
+    resultCheckAt = new Date(dateOnlyEodTs);
+  }
   if (!isUserEvent && (cat === "ECONOMY" || cat === "CRYPTO") && hasCloseKeyword && !hasExplicitTimeInTitle) {
     const eodTs = parseTitleDateEndOfDayUtc(title);
     if (eodTs > now + 60_000 && resultCheckAt.getTime() < eodTs) {
@@ -307,11 +317,12 @@ export function buildEventTiming({ category, hoursToResolve, verifyAtUtc, eventS
   const verifyBufferMs = getVerifyBufferMs(category, isUserEvent);
   const voteCloseLeadMs = getVoteCloseLeadMs(category, isUserEvent);
   const latestByVerifyMs = resultCheckAt.getTime() - verifyBufferMs;
+  const latestByDayRuleMs = dateOnlyEodTs > 0 ? dateOnlyEodTs - 12 * 60 * 60 * 1000 : Number.POSITIVE_INFINITY;
   const latestByStartMs =
     parsedEventStart && useEventStartAnchor(category, isUserEvent)
       ? parsedEventStart.getTime() - voteCloseLeadMs
       : Number.POSITIVE_INFINITY;
-  const candidateDeadlineMs = Math.min(latestByVerifyMs, latestByStartMs);
+  const candidateDeadlineMs = Math.min(latestByVerifyMs, latestByStartMs, latestByDayRuleMs);
   const isValidWindow = Number.isFinite(candidateDeadlineMs) && candidateDeadlineMs > now + 60_000;
   const voteDeadlineMs = isValidWindow ? candidateDeadlineMs : now + 60_000;
   return {
@@ -646,8 +657,9 @@ function normalizeStoredCategory(eventCategory, title, description, isUserEvent)
     ? String(eventCategory).toUpperCase()
     : "CRYPTO";
   if (isUserEvent) return modelCategory;
-  const inferredCategory = inferCategoryFromText(`${title || ""} ${description || ""}`);
-  return inferredCategory !== "CRYPTO" ? inferredCategory : modelCategory;
+  // Keep the model's explicit category for auto-events to prevent heuristic drift
+  // (e.g. climate/economy terms being over-mapped to sports/crypto).
+  return modelCategory;
 }
 
 async function bootstrapPredictionsFromChain() {

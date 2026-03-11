@@ -428,7 +428,7 @@ function inferCategoryFromText(text) {
   if (/\b(storm|hurricane|earthquake|wildfire|flood|temperature|heatwave|weather|climate|rainfall|tornado|cyclone)\b/.test(t)) {
     return "CLIMATE";
   }
-  return "CRYPTO";
+  return "UNKNOWN";
 }
 
 function isPopularEvent(category, title, description = "") {
@@ -611,6 +611,7 @@ ABSOLUTE RULES:
 - Do NOT use "today/tonight/now" unless hoursToResolve <= 6
 - Always provide verifyAtUtc in strict ISO UTC format, e.g. "2026-03-22T21:30:00Z"
 - For SPORTS: use exact kickoff in UTC and set verifyAtUtc to expected final-result availability (prefer kickoff + 3h to 4h to handle delays/overtime)
+- For SPORTS diversity: do NOT output only football. Include at least 2 events from non-football sports (NBA/NHL/tennis/MMA/F1/etc.) when such mainstream fixtures exist in the next 7 days.
 - Never use non-UTC timezone abbreviations (ET/PT/CET etc.) in title; convert to UTC.
 - hoursToResolve must reflect real result availability (e.g., match end, market close, official statement window)
 - For markets: will resolve when market closes today
@@ -777,12 +778,8 @@ Bad: "Will Bitcoin rise soon?"${avoidBlock}`
         console.log(`[AI] Filtered out low-popularity event: "${title}"`);
         return false;
       }
-      if (inferredCategory !== category && inferredCategory !== "CRYPTO") {
+      if (inferredCategory !== category) {
         console.log(`[AI] Filtered out category-drift event (${category} -> ${inferredCategory}): "${title}"`);
-        return false;
-      }
-      if (category === "CRYPTO" && inferredCategory !== "CRYPTO") {
-        console.log(`[AI] Filtered out category-drift crypto event (${inferredCategory}): "${title}"`);
         return false;
       }
       if (hasNonUtcTz) {
@@ -834,6 +831,7 @@ Bad: "Will Bitcoin rise soon?"${avoidBlock}`
     for (const e of normalized) {
       const nowTs = Date.now();
       const verifyTs = parseVerifyAtUtc(e.verifyAtUtc);
+      const hasExplicitTimeInTitle = /\b\d{1,2}:\d{2}\s*UTC\b/i.test(String(e.title || ""));
       if (verifyTs !== null) {
         const diffH = Math.round((verifyTs - nowTs) / 3600000);
         if (diffH >= 6 && diffH <= 720) {
@@ -869,6 +867,14 @@ Bad: "Will Bitcoin rise soon?"${avoidBlock}`
       // Preserve explicit verify timestamp; synthesize only if missing.
       const finalVerifyTs = parseVerifyAtUtc(e.verifyAtUtc) ?? (nowTs + e.hoursToResolve * 3600000);
       e.verifyAtUtc = new Date(finalVerifyTs).toISOString();
+      // For date-only ECONOMY/CLIMATE events, verify no earlier than end of that day.
+      if ((category === "ECONOMY" || category === "CLIMATE") && parsedTs !== null && !hasExplicitTimeInTitle) {
+        const dayEndTs = parsedTs + (24 * 60 * 60 * 1000) - 1000;
+        const currentVerify = parseVerifyAtUtc(e.verifyAtUtc) || nowTs;
+        if (currentVerify < dayEndTs) {
+          e.verifyAtUtc = new Date(dayEndTs).toISOString();
+        }
+      }
       // If title has an explicit date, never allow verify date before that date.
       if (parsedTs !== null) {
         const currentVerify = parseVerifyAtUtc(e.verifyAtUtc) || nowTs;
@@ -983,11 +989,17 @@ Bad: "Will Bitcoin rise soon?"${avoidBlock}`
         const verifyBufferMs = (CATEGORY_VERIFY_BUFFER_MINUTES[String(category || "CRYPTO").toUpperCase()] || 10) * 60 * 1000;
         const voteLeadMs = (CATEGORY_VOTE_LEAD_MINUTES[String(category || "CRYPTO").toUpperCase()] || 10) * 60 * 1000;
         const voteCloseByVerify = verifyTs - verifyBufferMs;
+        const parsedDateTs = parseDateFromTitle(e?.title);
+        const hasTitleUtcTime = /\b\d{1,2}:\d{2}\s*UTC\b/i.test(String(e?.title || ""));
+        const voteCloseByDateRule =
+          (category === "ECONOMY" || category === "CLIMATE") && parsedDateTs !== null && !hasTitleUtcTime
+            ? (parsedDateTs + (24 * 60 * 60 * 1000) - 1000) - (12 * 60 * 60 * 1000)
+            : Number.POSITIVE_INFINITY;
         const voteCloseByStart =
           eventStartTs && useEventStartAnchor(category)
             ? eventStartTs - voteLeadMs
             : Number.POSITIVE_INFINITY;
-        const voteCloseTs = Math.min(voteCloseByVerify, voteCloseByStart);
+        const voteCloseTs = Math.min(voteCloseByVerify, voteCloseByStart, voteCloseByDateRule);
         // Reject events where voting window is already unsafe/closed.
         if (!Number.isFinite(voteCloseTs) || voteCloseTs <= nowTs + 60 * 1000) return false;
         return true;
