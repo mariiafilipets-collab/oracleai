@@ -65,7 +65,14 @@ function isNearDuplicateTitle(a, b) {
   const na = normalizeTitle(a);
   const nb = normalizeTitle(b);
   if (!na || !nb) return false;
-  return na === nb || na.includes(nb) || nb.includes(na);
+  if (na === nb || na.includes(nb) || nb.includes(na)) return true;
+  const aSet = new Set(na.split(/\s+/).filter(Boolean));
+  const bSet = new Set(nb.split(/\s+/).filter(Boolean));
+  if (!aSet.size || !bSet.size) return false;
+  let inter = 0;
+  for (const t of aSet) if (bSet.has(t)) inter++;
+  const uni = aSet.size + bSet.size - inter;
+  return uni > 0 ? inter / uni >= 0.82 : false;
 }
 
 function buildFallbackDescription(evt) {
@@ -88,6 +95,20 @@ function ensureDetailedDescriptions(events) {
     if (current.length >= 80) return evt;
     return { ...evt, description: buildFallbackDescription(evt) };
   });
+}
+
+function dedupeNearDuplicateEvents(events) {
+  const out = [];
+  for (const evt of events || []) {
+    const exists = out.some(
+      (x) =>
+        String(x.category || "").toUpperCase() === String(evt.category || "").toUpperCase() &&
+        isNearDuplicateTitle(x.title, evt.title)
+    );
+    if (exists) continue;
+    out.push(evt);
+  }
+  return out;
 }
 
 async function readPredictionValueNoArgs(prediction, fragment, methodName, fallback) {
@@ -273,6 +294,7 @@ router.get("/", async (req, res) => {
       .sort({ deadline: 1 }).lean();
     events = await attachUserVotes(events, req.query.address);
     events = ensureDetailedDescriptions(events);
+    events = dedupeNearDuplicateEvents(events);
     events = await withTranslation(events, req.query.lang);
     res.json({ success: true, data: events });
   } catch (err) {
