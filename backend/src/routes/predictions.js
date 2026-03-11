@@ -295,6 +295,9 @@ router.get("/scheduler", async (req, res) => {
         enableEventPolling: config.enableEventPolling,
         aiProvider: config.aiProvider,
         hasOpenRouterKey: Boolean(config.openrouterKey),
+        openrouterRetrieverModel: config.openrouterRetrieverModel || config.openrouterSearchModel,
+        openrouterNormalizerModel: config.openrouterNormalizerModel || config.openrouterModel,
+        openrouterArbiterModel: config.openrouterArbiterModel || config.openrouterFallback || config.openrouterModel,
         openrouterSearchModel: config.openrouterSearchModel,
         openrouterResolveModel: config.openrouterResolveModel,
       },
@@ -653,8 +656,13 @@ router.post("/generate", async (req, res) => {
           category: normalizedCategory,
           hoursToResolve: pred.hoursToResolve || 8,
           verifyAtUtc: pred.verifyAtUtc,
+          eventStartAtUtc: pred.eventStartAtUtc,
           isUserEvent: false,
         });
+        if (!timing.isValidWindow) {
+          console.warn(`[Predictions] Skipping generated event with unsafe/closed vote window: "${pred.title}"`);
+          continue;
+        }
         const catIdx = CATEGORY_NAMES.indexOf(normalizedCategory);
         try {
           const tx = await Prediction.createEvent(pred.title, catIdx >= 0 ? catIdx : 3, Math.floor(timing.deadline.getTime() / 1000), pred.aiProbability, { nonce: nonce++ });

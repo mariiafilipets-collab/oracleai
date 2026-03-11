@@ -26,6 +26,13 @@ const CATEGORY_VERIFY_BUFFER_MINUTES = {
   CRYPTO: 15,
   CLIMATE: 45,
 };
+const CATEGORY_VOTE_CLOSE_LEAD_MINUTES = {
+  SPORTS: 30,
+  POLITICS: 15,
+  ECONOMY: 15,
+  CRYPTO: 10,
+  CLIMATE: 20,
+};
 
 let io = null;
 let generating = false;
@@ -52,6 +59,13 @@ export function getVerifyBufferMs(category, isUserEvent = false) {
   return minutes * 60 * 1000;
 }
 
+export function getVoteCloseLeadMs(category, isUserEvent = false) {
+  if (isUserEvent) return 10 * 60 * 1000;
+  const key = String(category || "CRYPTO").toUpperCase();
+  const minutes = CATEGORY_VOTE_CLOSE_LEAD_MINUTES[key] || 10;
+  return minutes * 60 * 1000;
+}
+
 function parseIsoUtc(value) {
   const s = String(value || "").trim();
   if (!s) return null;
@@ -67,19 +81,27 @@ function inferTimePrecision(title, verifyAt) {
   return "DATE_ONLY";
 }
 
-export function buildEventTiming({ category, hoursToResolve, verifyAtUtc, isUserEvent = false }) {
+export function buildEventTiming({ category, hoursToResolve, verifyAtUtc, eventStartAtUtc, isUserEvent = false }) {
   const now = Date.now();
   const resolveMs = Math.max(6, Number(hoursToResolve || 8)) * 3600000;
   const parsedVerifyAt = parseIsoUtc(verifyAtUtc);
+  const parsedEventStart = parseIsoUtc(eventStartAtUtc);
   const resultCheckAt = parsedVerifyAt && parsedVerifyAt.getTime() > now + 60_000
     ? parsedVerifyAt
     : new Date(now + resolveMs);
   const verifyBufferMs = getVerifyBufferMs(category, isUserEvent);
-  const voteDeadlineMs = Math.max(now + 60_000, resultCheckAt.getTime() - verifyBufferMs);
+  const voteCloseLeadMs = getVoteCloseLeadMs(category, isUserEvent);
+  const latestByVerifyMs = resultCheckAt.getTime() - verifyBufferMs;
+  const latestByStartMs = parsedEventStart ? parsedEventStart.getTime() - voteCloseLeadMs : Number.POSITIVE_INFINITY;
+  const candidateDeadlineMs = Math.min(latestByVerifyMs, latestByStartMs);
+  const isValidWindow = Number.isFinite(candidateDeadlineMs) && candidateDeadlineMs > now + 60_000;
+  const voteDeadlineMs = isValidWindow ? candidateDeadlineMs : now + 60_000;
   return {
     deadline: new Date(voteDeadlineMs),
     verifyAfter: resultCheckAt,
     verifyBufferMs,
+    voteCloseLeadMs,
+    isValidWindow,
   };
 }
 
@@ -296,8 +318,13 @@ async function publishNewBatch() {
         category: normalizedCategory,
         hoursToResolve: p.hoursToResolve || 8,
         verifyAtUtc: p.verifyAtUtc,
+        eventStartAtUtc: p.eventStartAtUtc,
         isUserEvent: false,
       });
+      if (!timing.isValidWindow) {
+        console.warn(`[Scheduler] Skipping event with unsafe/closed vote window: "${p.title}"`);
+        continue;
+      }
       const catIdx = CATEGORY_NAMES.indexOf(normalizedCategory);
       try {
         const tx = await Prediction.createEvent(

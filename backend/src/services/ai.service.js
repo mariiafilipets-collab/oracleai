@@ -103,26 +103,62 @@ async function ask(model, messages, temp = 0.5, tokens = 2048, operation = "gene
   }
 }
 
+async function askWithFallbackModels(models, messages, temp, tokens, operation) {
+  const tried = new Set();
+  let lastErr = null;
+  for (const model of (models || []).map((m) => String(m || "").trim()).filter(Boolean)) {
+    if (tried.has(model)) continue;
+    tried.add(model);
+    try {
+      const out = await ask(model, messages, temp, tokens, operation);
+      if (out) return out;
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  if (lastErr) throw lastErr;
+  return null;
+}
+
+function modelList(...items) {
+  const out = [];
+  const seen = new Set();
+  for (const m of items) {
+    const s = String(m || "").trim();
+    if (!s || seen.has(s)) continue;
+    seen.add(s);
+    out.push(s);
+  }
+  return out;
+}
+
 async function search(query) {
-  return ask(config.openrouterSearchModel, [
+  const retrieverModels = modelList(
+    config.openrouterRetrieverModel,
+    config.openrouterSearchModel,
+    config.openrouterFallback
+  );
+  return askWithFallbackModels(retrieverModels, [
     { role: "system", content: "You have live web search. Return only verified, factual, current information. Be specific: names, numbers, times, scores. Focus on mainstream/high-interest topics with reliable sources. Include both currently running events and upcoming events in the next 30 days, prioritizing the next 1-7 days." },
     { role: "user", content: query },
   ], 0.1, 2000, "search");
 }
 
 async function generate(sysPrompt, userPrompt) {
+  const normalizerModels = modelList(
+    config.openrouterNormalizerModel,
+    config.openrouterModel,
+    config.openrouterFallback
+  );
   try {
-    return await ask(config.openrouterModel, [
+    return await askWithFallbackModels(normalizerModels, [
       { role: "system", content: sysPrompt },
       { role: "user", content: userPrompt },
     ], 0.7, 2500, "generate");
   } catch (e) {
     if (isInsufficientCreditsError(e)) return null;
-    console.error(`[AI] Primary failed: ${e.message}`);
-    return ask(config.openrouterFallback, [
-      { role: "system", content: sysPrompt },
-      { role: "user", content: userPrompt },
-    ], 0.7, 2500, "generate");
+    console.error(`[AI] Generate failed: ${e.message}`);
+    return null;
   }
 }
 
@@ -171,6 +207,30 @@ const POPULARITY_PATTERNS = {
   CRYPTO: /\b(bitcoin|btc|ethereum|eth|solana|xrp|bnb|doge|ton|sec|etf|coinbase|binance|blackrock|grayscale|ark|token unlock|airdrop|listing)\b/i,
   CLIMATE: /\b(hurricane|storm|tornado|earthquake|wildfire|flood|heatwave|weather warning|red warning|landfall|severe weather|cyclone|air quality)\b/i,
 };
+
+const CATEGORY_VERIFY_BUFFER_MINUTES = {
+  SPORTS: 20,
+  POLITICS: 45,
+  ECONOMY: 30,
+  CRYPTO: 15,
+  CLIMATE: 45,
+};
+
+const CATEGORY_VOTE_LEAD_MINUTES = {
+  SPORTS: 30,
+  POLITICS: 15,
+  ECONOMY: 15,
+  CRYPTO: 10,
+  CLIMATE: 20,
+};
+
+function parseIsoUtc(value) {
+  const s = String(value || "").trim();
+  if (!s) return null;
+  const ts = Date.parse(s);
+  if (!Number.isFinite(ts)) return null;
+  return ts;
+}
 
 function inferCategoryFromText(text) {
   const t = String(text || "").toLowerCase();
@@ -253,6 +313,70 @@ ${JSON.stringify(payload)}`;
         popularityScore: Number.isFinite(adjustedPopularity)
           ? Math.max(0, Math.min(100, adjustedPopularity))
           : events[i].popularityScore,
+      });
+    }
+    return out;
+  } catch {
+    return events;
+  }
+}
+
+async function finalizePredictionsWithArbiter(category, events, nowInfo) {
+  if (!Array.isArray(events) || !events.length) return [];
+  const arbiterModels = modelList(
+    config.openrouterArbiterModel,
+    config.openrouterFallback,
+    config.openrouterModel
+  );
+  const payload = events.map((e, idx) => ({
+    idx,
+    title: e.title,
+    description: e.description || "",
+    category,
+    eventStartAtUtc: e.eventStartAtUtc || null,
+    verifyAtUtc: e.verifyAtUtc || null,
+    hoursToResolve: Number(e.hoursToResolve || 0),
+    sources: Array.isArray(e.sources) ? e.sources : [],
+    popularityScore: Number(e.popularityScore ?? 0),
+    confidence: Number(e.confidence ?? 0),
+  }));
+  const messages = [
+    {
+      role: "system",
+      content: `You are a strict final arbiter for prediction market listings.
+Return ONLY JSON array:
+[{"idx":number,"accepted":true|false,"reason":"short","verifyAtUtc":"ISO UTC|null","eventStartAtUtc":"ISO UTC|null","sources":["https://..."]}]
+Hard rules:
+- Keep only events that are real, mainstream, and currently/upcoming (next 30 days).
+- Require at least 2 credible source URLs per accepted event.
+- verifyAtUtc must be after current time and after event start (if provided).
+- Reject if timing is ambiguous or likely already known.
+- Never invent fake URLs.`,
+    },
+    {
+      role: "user",
+      content: `Now UTC: ${nowInfo.day}, ${nowInfo.today}, ${nowInfo.hour}:00 UTC\nCandidates:\n${JSON.stringify(payload)}`,
+    },
+  ];
+  try {
+    const raw = await askWithFallbackModels(arbiterModels, messages, 0.1, 1800, "arbiter");
+    if (!raw) return events;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return events;
+    const byIdx = new Map(
+      parsed.filter((x) => Number.isFinite(Number(x?.idx))).map((x) => [Number(x.idx), x])
+    );
+    const out = [];
+    for (let i = 0; i < events.length; i++) {
+      const verdict = byIdx.get(i);
+      if (!verdict || !verdict.accepted) continue;
+      const src = Array.isArray(verdict.sources) ? verdict.sources : events[i].sources;
+      const sources = Array.from(new Set(src.map((x) => String(x || "").trim()).filter((x) => /^https?:\/\//i.test(x))));
+      out.push({
+        ...events[i],
+        verifyAtUtc: typeof verdict.verifyAtUtc === "string" ? verdict.verifyAtUtc : events[i].verifyAtUtc,
+        eventStartAtUtc: typeof verdict.eventStartAtUtc === "string" ? verdict.eventStartAtUtc : events[i].eventStartAtUtc,
+        sources,
       });
     }
     return out;
@@ -637,12 +761,36 @@ Bad: "Will Bitcoin rise soon?"`
     };
 
     const vetted = await vetPredictionsWithWeb(category, normalized, { today, hour, day });
-    return vetted.map(applyFinalTitleTimingConstraint).filter((e) => {
-      const longHorizon = Number(e?.hoursToResolve || 0) > 24;
-      if (longHorizon && !parseVerifyAtUtc(e?.verifyAtUtc)) return false;
-      if (category === "SPORTS" && longHorizon && !parseVerifyAtUtc(e?.eventStartAtUtc)) return false;
-      return true;
-    }).map(({ hasExplicitVerifyAt, ...rest }) => rest);
+    const arbitrated = await finalizePredictionsWithArbiter(category, vetted, { today, hour, day });
+    const nowTs = Date.now();
+    const final = arbitrated
+      .map(applyFinalTitleTimingConstraint)
+      .filter((e) => {
+        const longHorizon = Number(e?.hoursToResolve || 0) > 24;
+        const verifyTs = parseIsoUtc(e?.verifyAtUtc);
+        const eventStartTs = parseIsoUtc(e?.eventStartAtUtc);
+        const sources = Array.isArray(e?.sources) ? e.sources : [];
+        const uniqueSources = Array.from(
+          new Set(sources.map((x) => String(x || "").trim()).filter((x) => /^https?:\/\//i.test(x)))
+        );
+        // Require at least two URLs to reduce hallucinated events.
+        if (uniqueSources.length < 2) return false;
+        if (!verifyTs) return false;
+        if (verifyTs <= nowTs + 10 * 60 * 1000) return false;
+        if (longHorizon && !verifyTs) return false;
+        if (category === "SPORTS" && !eventStartTs) return false;
+        if (eventStartTs && verifyTs <= eventStartTs) return false;
+        const verifyBufferMs = (CATEGORY_VERIFY_BUFFER_MINUTES[String(category || "CRYPTO").toUpperCase()] || 10) * 60 * 1000;
+        const voteLeadMs = (CATEGORY_VOTE_LEAD_MINUTES[String(category || "CRYPTO").toUpperCase()] || 10) * 60 * 1000;
+        const voteCloseByVerify = verifyTs - verifyBufferMs;
+        const voteCloseByStart = eventStartTs ? eventStartTs - voteLeadMs : Number.POSITIVE_INFINITY;
+        const voteCloseTs = Math.min(voteCloseByVerify, voteCloseByStart);
+        // Reject events where voting window is already unsafe/closed.
+        if (!Number.isFinite(voteCloseTs) || voteCloseTs <= nowTs + 60 * 1000) return false;
+        return true;
+      })
+      .map(({ hasExplicitVerifyAt, ...rest }) => rest);
+    return final;
   } catch { return []; }
 }
 
