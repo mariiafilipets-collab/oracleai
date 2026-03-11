@@ -231,6 +231,7 @@ function recategorizeByTitle(events) {
     if (evt?.isUserEvent) return evt;
     const inferred = inferCategoryFromText(`${evt?.title || ""} ${evt?.description || ""}`);
     if (!inferred || inferred === "CRYPTO") return evt;
+    if (inferred === "SPORTS" && !evt?.eventStartAtUtc) return evt;
     if (String(evt?.category || "").toUpperCase() === inferred) return evt;
     return { ...evt, category: inferred };
   });
@@ -858,6 +859,7 @@ router.post("/generate", async (req, res) => {
           verifyAtUtc: pred.verifyAtUtc,
           eventStartAtUtc: pred.eventStartAtUtc,
           isUserEvent: false,
+          title: pred.title,
         });
         if (!timing.isValidWindow) {
           console.warn(`[Predictions] Skipping generated event with unsafe/closed vote window: "${pred.title}"`);

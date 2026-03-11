@@ -249,6 +249,22 @@ function parseIsoUtc(value) {
   return new Date(ts);
 }
 
+function parseTitleDateEndOfDayUtc(title) {
+  const s = String(title || "");
+  const monthMap = {
+    january: 0, jan: 0, february: 1, feb: 1, march: 2, mar: 2, april: 3, apr: 3, may: 4,
+    june: 5, jun: 5, july: 6, jul: 6, august: 7, aug: 7, september: 8, sep: 8,
+    october: 9, oct: 9, november: 10, nov: 10, december: 11, dec: 11,
+  };
+  const m = s.match(/\b(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec)\s+(\d{1,2})(?:,\s*(20\d{2}))?\b/i);
+  if (!m) return 0;
+  const month = monthMap[String(m[1] || "").toLowerCase()];
+  const day = Number(m[2] || 0);
+  if (!Number.isFinite(month) || day < 1 || day > 31) return 0;
+  const year = m[3] ? Number(m[3]) : new Date().getUTCFullYear();
+  return Date.UTC(year, month, day, 23, 59, 59);
+}
+
 function inferTimePrecision(title, verifyAt) {
   const t = String(title || "");
   if (/\b\d{1,2}:\d{2}\s*UTC\b/i.test(t) || verifyAt) return "EXACT_MINUTE";
@@ -256,7 +272,7 @@ function inferTimePrecision(title, verifyAt) {
   return "DATE_ONLY";
 }
 
-export function buildEventTiming({ category, hoursToResolve, verifyAtUtc, eventStartAtUtc, isUserEvent = false }) {
+export function buildEventTiming({ category, hoursToResolve, verifyAtUtc, eventStartAtUtc, isUserEvent = false, title = "" }) {
   const now = Date.now();
   const resolveMs = Math.max(6, Number(hoursToResolve || 8)) * 3600000;
   const parsedVerifyAt = parseIsoUtc(verifyAtUtc);
@@ -273,6 +289,15 @@ export function buildEventTiming({ category, hoursToResolve, verifyAtUtc, eventS
   let resultCheckAt = parsedVerifyAt && parsedVerifyAt.getTime() > now + 60_000
     ? parsedVerifyAt
     : new Date(now + resolveMs);
+  const cat = String(category || "").toUpperCase();
+  const hasExplicitTimeInTitle = /\b\d{1,2}:\d{2}\s*UTC\b/i.test(String(title || ""));
+  const hasCloseKeyword = /\b(close|closing|settle|settlement)\b/i.test(String(title || ""));
+  if (!isUserEvent && (cat === "ECONOMY" || cat === "CRYPTO") && hasCloseKeyword && !hasExplicitTimeInTitle) {
+    const eodTs = parseTitleDateEndOfDayUtc(title);
+    if (eodTs > now + 60_000 && resultCheckAt.getTime() < eodTs) {
+      resultCheckAt = new Date(eodTs);
+    }
+  }
   if (parsedEventStart && useEventStartAnchor(category, isUserEvent)) {
     const minResultTs = parsedEventStart.getTime() + getMinResultDelayMs(category);
     if (resultCheckAt.getTime() < minResultTs) {
@@ -525,6 +550,7 @@ async function publishNewBatch(options = {}) {
           verifyAtUtc: p.verifyAtUtc,
           eventStartAtUtc: p.eventStartAtUtc,
           isUserEvent: false,
+          title: p.title,
         });
         if (!timing.isValidWindow) {
           continue;
