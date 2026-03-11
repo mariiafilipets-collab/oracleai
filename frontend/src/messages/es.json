@@ -217,6 +217,17 @@
       "protocolDesc": "La parte del protocolo sigue la misma distribucion: premios/tesoreria/referidos/quema/staking.",
       "batchTitle": "Distribucion por lotes cada 12h",
       "batchDesc": "La parte del protocolo de los votos en eventos de usuario se distribuye cada 12 horas para reducir gas por voto."
+    },
+    "votingFees": {
+      "title": "Comisiones de voto y puntos",
+      "desc": "El voto usa comisiones por nivel en BNB y multiplicadores dinamicos de puntos.",
+      "tiersTitle": "Niveles de voto",
+      "formulaTitle": "Formula",
+      "distribution": "Todas las comisiones de voto siguen la distribucion del check-in: 50% premios, 15% tesoreria, 20% referidos, 10% quema, 5% staking.",
+      "collected": "Comisiones de voto recolectadas (on-chain)",
+      "distributed": "Comisiones de voto distribuidas (on-chain)",
+      "distributedHint": "La distribucion se aplica en cada transaccion de voto.",
+      "breakdown": "Desglose distribuido"
     }
   },
   "litepaperPage": {
@@ -479,6 +490,13 @@
     "verifyAt": "Verificacion a las",
     "voteCloseIn": "La votacion cierra en",
     "verifyIn": "Verificacion en",
+    "voteMultiplier": "Multiplicador",
+    "expectedPointsIfCorrect": "Si aciertas",
+    "pointsIfWrong": "Si fallas",
+    "votePointsCalculator": "Puntos base = 50 x multiplicador. La prediccion correcta da +100% bonus (x2).",
+    "whaleFormulaLabel": "Multiplicador Whale: 10 x sqrt(amount / 0.05).",
+    "basePointsLabel": "Base",
+    "voteButtonRewardHint": "+{points} pts si aciertas",
     "alreadyVoted": "Ya votaste en este evento",
     "alreadyVotedCard": "Ya votaste en este evento",
     "checkInAlreadyToday": "Ya hiciste el check-in hoy"
@@ -592,6 +610,10 @@
     "creatorClaimSuccess": "Recompensas del creador retiradas",
     "creatorVotes": "votos",
     "creatorNoEvents": "Aun no hay eventos creados por usuarios",
+    "voteFeesCollected": "Comisiones de voto recolectadas (plataforma)",
+    "voteFeesDistributed": "Comisiones de voto distribuidas (plataforma)",
+    "voteFeesDistributedHint": "La distribucion se ejecuta en cada transaccion de voto.",
+    "voteFeesBreakdown": "Desglose de comisiones de voto (plataforma)",
     "creativeCards": {
       "x": {
         "title": "Post para X"

@@ -217,6 +217,17 @@
       "protocolDesc": "Протокольная доля распределяется в prizes/treasury/referrals/burn/staking.",
       "batchTitle": "Пакетное распределение каждые 12ч",
       "batchDesc": "Протокольная часть vote fee по user-событиям распределяется раз в 12 часов, чтобы снизить газ на каждый голос."
+    },
+    "votingFees": {
+      "title": "Комиссии за голосование и очки",
+      "desc": "Голосование использует уровни комиссии в BNB и динамические множители очков.",
+      "tiersTitle": "Уровни голосования",
+      "formulaTitle": "Формула",
+      "distribution": "Все комиссии за голосование распределяются как check-in: 50% призы, 15% казна, 20% рефералы, 10% burn reserve, 5% стейкинг.",
+      "collected": "Собрано комиссий за голосование (on-chain)",
+      "distributed": "Распределено комиссий за голосование (on-chain)",
+      "distributedHint": "Распределение выполняется сразу в каждой транзакции голосования.",
+      "breakdown": "Детализация распределения"
     }
   },
   "litepaperPage": {
@@ -427,6 +438,13 @@
     "verifyAt": "Проверка результата",
     "voteCloseIn": "До закрытия голосования",
     "verifyIn": "До проверки результата",
+    "voteMultiplier": "Множитель",
+    "expectedPointsIfCorrect": "Если угадали",
+    "pointsIfWrong": "Если не угадали",
+    "votePointsCalculator": "Базовые очки = 50 x множитель. За правильный прогноз дается +100% бонус (x2).",
+    "whaleFormulaLabel": "Множитель Whale: 10 x sqrt(amount / 0.05).",
+    "basePointsLabel": "База",
+    "voteButtonRewardHint": "+{points} очк при верном прогнозе",
     "nextCreateIn": "Следующее создание через",
     "userCreateTitleInput": "Закроется ли BTC выше 80k к пятнице?",
     "deadlineIn": "Дедлайн через",
@@ -592,6 +610,10 @@
     "creatorTotalVotes": "Всего голосов",
     "creatorVotes": "голосов",
     "creatorNoEvents": "Пока нет пользовательских событий",
+    "voteFeesCollected": "Собрано комиссий за голосование (платформа)",
+    "voteFeesDistributed": "Распределено комиссий за голосование (платформа)",
+    "voteFeesDistributedHint": "Распределение выполняется в каждой транзакции голосования.",
+    "voteFeesBreakdown": "Разбивка комиссий за голосование (платформа)",
     "creativeCards": {
       "x": {
         "title": "Пост для X"

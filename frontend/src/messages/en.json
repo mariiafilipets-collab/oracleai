@@ -217,6 +217,17 @@
       "protocolDesc": "Protocol share follows prizes/treasury/referrals/burn/staking distribution.",
       "batchTitle": "12h batched distribution",
       "batchDesc": "Protocol-side vote fees from user-created events are distributed every 12 hours to reduce gas overhead per vote."
+    },
+    "votingFees": {
+      "title": "Voting Fees and Points",
+      "desc": "Voting uses tiered BNB fees and dynamic point multipliers.",
+      "tiersTitle": "Vote tiers",
+      "formulaTitle": "Formula",
+      "distribution": "All vote fees follow check-in distribution: 50% prizes, 15% treasury, 20% referrals, 10% burn reserve, 5% staking rewards.",
+      "collected": "Vote fees collected (on-chain)",
+      "distributed": "Vote fees distributed (on-chain)",
+      "distributedHint": "Distribution is applied immediately on each vote transaction.",
+      "breakdown": "Distributed breakdown"
     }
   },
   "litepaperPage": {
@@ -427,6 +438,13 @@
     "verifyAt": "Verification at",
     "voteCloseIn": "Voting closes in",
     "verifyIn": "Verification in",
+    "voteMultiplier": "Multiplier",
+    "expectedPointsIfCorrect": "If correct",
+    "pointsIfWrong": "If wrong",
+    "votePointsCalculator": "Base points = 50 x multiplier. Correct prediction gives +100% bonus (x2).",
+    "whaleFormulaLabel": "Whale multiplier: 10 x sqrt(amount / 0.05).",
+    "basePointsLabel": "Base",
+    "voteButtonRewardHint": "+{points} pts if correct",
     "nextCreateIn": "Next event in",
     "userCreateTitleInput": "Will BTC close above 80k by Friday?",
     "deadlineIn": "Deadline in",
@@ -592,6 +610,10 @@
     "creatorClaimSuccess": "Creator rewards withdrawn",
     "creatorVotes": "votes",
     "creatorNoEvents": "No user-created events yet",
+    "voteFeesCollected": "Vote fees collected (platform)",
+    "voteFeesDistributed": "Vote fees distributed (platform)",
+    "voteFeesDistributedHint": "Distribution is executed during each vote transaction.",
+    "voteFeesBreakdown": "Vote fees breakdown (platform)",
     "creativeCards": {
       "x": {
         "title": "Post for X"

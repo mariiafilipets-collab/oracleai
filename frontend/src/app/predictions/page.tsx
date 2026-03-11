@@ -271,6 +271,28 @@ export default function PredictionsPage() {
       return null;
     }
   }, [voteTier, whaleVoteAmount]);
+  const voteTierMultiplier = useMemo(() => {
+    const whaleAmount = Number(whaleVoteAmount || "0");
+    if (voteTier === "basic") return 1;
+    if (voteTier === "pro") return 3;
+    if (!Number.isFinite(whaleAmount) || whaleAmount < Number(VOTE_TIERS.whaleMin)) return 0;
+    return 10 * Math.sqrt(whaleAmount / Number(VOTE_TIERS.whaleMin));
+  }, [voteTier, whaleVoteAmount]);
+  const expectedPointsCorrect = useMemo(() => {
+    if (voteTierMultiplier <= 0) return 0;
+    return Math.max(0, Math.floor(50 * voteTierMultiplier * 2));
+  }, [voteTierMultiplier]);
+  const expectedPointsBase = useMemo(() => {
+    if (voteTierMultiplier <= 0) return 0;
+    return Math.max(0, Math.floor(50 * voteTierMultiplier));
+  }, [voteTierMultiplier]);
+  const voteButtonRewardHint = useMemo(() => {
+    const msg = t("predictions.voteButtonRewardHint", { points: expectedPointsCorrect });
+    if (msg === "predictions.voteButtonRewardHint") {
+      return `+${expectedPointsCorrect} ${t("common.pts")} if correct`;
+    }
+    return msg;
+  }, [t, expectedPointsCorrect]);
 
   const loadPredictions = useCallback(async (lang?: string) => {
     const seq = ++requestSeqRef.current;
@@ -842,6 +864,27 @@ export default function PredictionsPage() {
             </span>
           </div>
         )}
+        <div className="rounded-lg border border-neon-cyan/20 bg-neon-cyan/5 px-2.5 py-2 text-xs">
+          <div className="flex flex-wrap items-center gap-3 text-gray-300">
+            <span>
+              {tr("predictions.voteMultiplier", "Multiplier")}:{" "}
+              <span className="font-mono text-neon-cyan">{voteTierMultiplier.toFixed(2)}x</span>
+            </span>
+            <span>
+              {tr("predictions.expectedPointsIfCorrect", "If correct")}:{" "}
+              <span className="font-mono text-neon-gold">+{expectedPointsCorrect} {t("common.pts")}</span>
+            </span>
+            <span>
+              {tr("predictions.pointsIfWrong", "If wrong")}:{" "}
+              <span className="font-mono text-gray-400">+0 {t("common.pts")}</span>
+            </span>
+          </div>
+          <div className="mt-1 text-[11px] text-gray-500">
+            {tr("predictions.votePointsCalculator", "Base points = 50 x multiplier. Correct prediction gives +100% bonus (x2).")}
+            {voteTier === "whale" ? ` ${tr("predictions.whaleFormulaLabel", "Whale multiplier: 10 x sqrt(amount / 0.05).")}` : ""}
+            {expectedPointsBase > 0 ? ` ${tr("predictions.basePointsLabel", "Base")}: ${expectedPointsBase} ${t("common.pts")}.` : ""}
+          </div>
+        </div>
       </GlassCard>
 
       {/* Category Tabs */}
@@ -1130,14 +1173,20 @@ export default function PredictionsPage() {
                             disabled={isVotePending || isCheckInPending || isCheckInConfirming}
                             className="min-h-11 py-2.5 rounded-xl bg-neon-green/10 border border-neon-green/30 text-neon-green text-sm font-bold hover:bg-neon-green/20 transition disabled:opacity-50"
                           >
-                          👍 {t("predictions.agree")}
+                          <div className="leading-tight">
+                            <div>👍 {t("predictions.agree")}</div>
+                            <div className="text-[10px] font-mono text-neon-green/80">{voteButtonRewardHint}</div>
+                          </div>
                         </button>
                         <button
                           onClick={() => handleVote(pred.eventId, false)}
                           disabled={isVotePending || isCheckInPending || isCheckInConfirming}
                           className="min-h-11 py-2.5 rounded-xl bg-neon-red/10 border border-neon-red/30 text-neon-red text-sm font-bold hover:bg-neon-red/20 transition disabled:opacity-50"
                         >
-                          👎 {t("predictions.disagree")}
+                          <div className="leading-tight">
+                            <div>👎 {t("predictions.disagree")}</div>
+                            <div className="text-[10px] font-mono text-neon-red/80">{voteButtonRewardHint}</div>
+                          </div>
                           </button>
                         </div>
                       )

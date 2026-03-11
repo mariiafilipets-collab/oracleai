@@ -217,6 +217,17 @@
       "protocolDesc": "La part protocole suit la meme logique : prizes/treasury/referrals/burn/staking.",
       "batchTitle": "Distribution par lots toutes les 12h",
       "batchDesc": "La part protocole des votes sur evenements utilisateur est distribuee toutes les 12 heures pour reduire le gas par vote."
+    },
+    "votingFees": {
+      "title": "Frais de vote et points",
+      "desc": "Le vote utilise des frais BNB par niveau et des multiplicateurs de points dynamiques.",
+      "tiersTitle": "Niveaux de vote",
+      "formulaTitle": "Formule",
+      "distribution": "Tous les frais de vote suivent la distribution du check-in: 50% prizes, 15% treasury, 20% referrals, 10% burn, 5% staking.",
+      "collected": "Frais de vote collectes (on-chain)",
+      "distributed": "Frais de vote distribues (on-chain)",
+      "distributedHint": "La distribution est appliquee a chaque transaction de vote.",
+      "breakdown": "Detail de distribution"
     }
   },
   "litepaperPage": {
@@ -479,6 +490,13 @@
     "verifyAt": "Verification a",
     "voteCloseIn": "Le vote se ferme dans",
     "verifyIn": "Verification dans",
+    "voteMultiplier": "Multiplicateur",
+    "expectedPointsIfCorrect": "Si correct",
+    "pointsIfWrong": "Si incorrect",
+    "votePointsCalculator": "Points de base = 50 x multiplicateur. Une prediction correcte donne +100% bonus (x2).",
+    "whaleFormulaLabel": "Multiplicateur Whale: 10 x sqrt(amount / 0.05).",
+    "basePointsLabel": "Base",
+    "voteButtonRewardHint": "+{points} pts si correct",
     "alreadyVoted": "Vous avez deja vote sur cet evenement",
     "alreadyVotedCard": "Vous avez deja vote sur cet evenement",
     "checkInAlreadyToday": "Vous avez deja effectue le check-in aujourd'hui"
@@ -592,6 +610,10 @@
     "creatorClaimSuccess": "Recompenses createur retirees",
     "creatorVotes": "votes",
     "creatorNoEvents": "Aucun evenement utilisateur pour le moment",
+    "voteFeesCollected": "Frais de vote collectes (plateforme)",
+    "voteFeesDistributed": "Frais de vote distribues (plateforme)",
+    "voteFeesDistributedHint": "La distribution est executee a chaque transaction de vote.",
+    "voteFeesBreakdown": "Repartition des frais de vote (plateforme)",
     "creativeCards": {
       "x": {
         "title": "Post pour X"

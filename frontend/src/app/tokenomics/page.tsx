@@ -163,11 +163,11 @@ export default function TokenomicsPage() {
         <div className="mt-4 p-4 rounded-xl bg-dark-700/50 border border-dark-500/50">
           <div className="text-xs text-gray-500 mb-2">{tr("tokenomicsPage.votingFees.breakdown", "Distributed breakdown")}</div>
           <div className="grid sm:grid-cols-5 gap-2 text-xs">
-            <div className="text-gray-300">Prizes: <span className="font-mono text-neon-cyan">{voteBreakdown.prizes.toFixed(6)} BNB</span></div>
-            <div className="text-gray-300">Treasury: <span className="font-mono text-neon-cyan">{voteBreakdown.treasury.toFixed(6)} BNB</span></div>
-            <div className="text-gray-300">Referrals: <span className="font-mono text-neon-cyan">{voteBreakdown.referrals.toFixed(6)} BNB</span></div>
-            <div className="text-gray-300">Burn: <span className="font-mono text-neon-cyan">{voteBreakdown.burn.toFixed(6)} BNB</span></div>
-            <div className="text-gray-300">Stakers: <span className="font-mono text-neon-cyan">{voteBreakdown.stakers.toFixed(6)} BNB</span></div>
+            <div className="text-gray-300">{t("checkin.fees.prizes")}: <span className="font-mono text-neon-cyan">{voteBreakdown.prizes.toFixed(6)} BNB</span></div>
+            <div className="text-gray-300">{t("checkin.fees.treasury")}: <span className="font-mono text-neon-cyan">{voteBreakdown.treasury.toFixed(6)} BNB</span></div>
+            <div className="text-gray-300">{t("checkin.fees.referrals")}: <span className="font-mono text-neon-cyan">{voteBreakdown.referrals.toFixed(6)} BNB</span></div>
+            <div className="text-gray-300">{t("checkin.fees.burn")}: <span className="font-mono text-neon-cyan">{voteBreakdown.burn.toFixed(6)} BNB</span></div>
+            <div className="text-gray-300">{t("checkin.fees.stakers")}: <span className="font-mono text-neon-cyan">{voteBreakdown.stakers.toFixed(6)} BNB</span></div>
           </div>
         </div>
       </GlassCard>

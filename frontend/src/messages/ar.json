@@ -217,6 +217,17 @@
       "protocolDesc": "حصة البروتوكول تتبع توزيع prizes/treasury/referrals/burn/staking.",
       "batchTitle": "توزيع مجمّع كل 12 ساعة",
       "batchDesc": "رسوم جانب البروتوكول من تصويت أحداث المستخدمين تُوزّع كل 12 ساعة لتقليل كلفة الغاز لكل تصويت."
+    },
+    "votingFees": {
+      "title": "رسوم التصويت والنقاط",
+      "desc": "يعتمد التصويت على شرائح رسوم BNB ومضاعفات نقاط ديناميكية.",
+      "tiersTitle": "شرائح التصويت",
+      "formulaTitle": "المعادلة",
+      "distribution": "جميع رسوم التصويت تتبع توزيع check-in: ‏50% جوائز، 15% خزينة، 20% إحالات، 10% حرق، 5% للمخزّنين.",
+      "collected": "رسوم التصويت المحصّلة (على السلسلة)",
+      "distributed": "رسوم التصويت الموزعة (على السلسلة)",
+      "distributedHint": "يتم تطبيق التوزيع مباشرة مع كل معاملة تصويت.",
+      "breakdown": "تفصيل التوزيع"
     }
   },
   "litepaperPage": {
@@ -479,6 +490,13 @@
     "verifyAt": "التحقق عند",
     "voteCloseIn": "إغلاق التصويت خلال",
     "verifyIn": "التحقق خلال",
+    "voteMultiplier": "المضاعف",
+    "expectedPointsIfCorrect": "عند التوقع الصحيح",
+    "pointsIfWrong": "عند التوقع الخاطئ",
+    "votePointsCalculator": "النقاط الأساسية = 50 x المضاعف. التوقع الصحيح يمنح مكافأة +100% (x2).",
+    "whaleFormulaLabel": "مضاعف Whale: ‏10 x sqrt(amount / 0.05).",
+    "basePointsLabel": "الأساس",
+    "voteButtonRewardHint": "+{points} نقطة عند التوقع الصحيح",
     "alreadyVoted": "لقد صوّت بالفعل على هذا الحدث",
     "alreadyVotedCard": "لقد صوّت بالفعل على هذا الحدث",
     "checkInAlreadyToday": "لقد أكملت تسجيل الدخول اليوم"
@@ -592,6 +610,10 @@
     "creatorClaimSuccess": "تم سحب مكافآت المنشئ",
     "creatorVotes": "أصوات",
     "creatorNoEvents": "لا توجد أحداث منشأة من المستخدم بعد",
+    "voteFeesCollected": "رسوم التصويت المحصّلة (المنصة)",
+    "voteFeesDistributed": "رسوم التصويت الموزعة (المنصة)",
+    "voteFeesDistributedHint": "يتم تنفيذ التوزيع في كل معاملة تصويت.",
+    "voteFeesBreakdown": "تفصيل رسوم التصويت (المنصة)",
     "creativeCards": {
       "x": {
         "title": "منشور لـ X"

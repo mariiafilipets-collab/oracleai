@@ -217,6 +217,17 @@
       "protocolDesc": "协议侧按 prizes/treasury/referrals/burn/staking 逻辑分配。",
       "batchTitle": "每 12 小时批量分配",
       "batchDesc": "用户事件投票的协议侧费用每 12 小时分配一次，降低单票 gas 成本。"
+    },
+    "votingFees": {
+      "title": "投票费用与积分",
+      "desc": "投票使用分级 BNB 费用与动态积分倍数。",
+      "tiersTitle": "投票档位",
+      "formulaTitle": "公式",
+      "distribution": "所有投票费用按签到规则分配：50% 奖池、15% 国库、20% 推荐、10% 销毁、5% 质押奖励。",
+      "collected": "已收取投票费用（链上）",
+      "distributed": "已分配投票费用（链上）",
+      "distributedHint": "每笔投票交易都会立即执行分配。",
+      "breakdown": "分配明细"
     }
   },
   "litepaperPage": {
@@ -479,6 +490,13 @@
     "verifyAt": "结果验证时间",
     "voteCloseIn": "距离投票截止",
     "verifyIn": "距离结果验证",
+    "voteMultiplier": "倍数",
+    "expectedPointsIfCorrect": "若预测正确",
+    "pointsIfWrong": "若预测错误",
+    "votePointsCalculator": "基础积分 = 50 x 倍数。预测正确额外 +100% 奖励（x2）。",
+    "whaleFormulaLabel": "Whale 倍数：10 x sqrt(amount / 0.05)。",
+    "basePointsLabel": "基础",
+    "voteButtonRewardHint": "若预测正确：+{points} 分",
     "alreadyVoted": "你已在该事件中投过票",
     "alreadyVotedCard": "你已为该事件投过票",
     "checkInAlreadyToday": "你今天已经完成签到"
@@ -592,6 +610,10 @@
     "creatorClaimSuccess": "创作者奖励已提现",
     "creatorVotes": "票",
     "creatorNoEvents": "暂无用户创建事件",
+    "voteFeesCollected": "已收取投票费用（平台）",
+    "voteFeesDistributed": "已分配投票费用（平台）",
+    "voteFeesDistributedHint": "分配在每笔投票交易中执行。",
+    "voteFeesBreakdown": "投票费用分配明细（平台）",
     "creativeCards": {
       "x": {
         "title": "X 发帖文案"
