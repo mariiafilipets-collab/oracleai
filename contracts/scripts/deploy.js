@@ -91,30 +91,39 @@ async function main() {
   const OPERATOR_ROLE = ethers.keccak256(ethers.toUtf8Bytes("OPERATOR_ROLE"));
 
   // Points: grant OPERATOR to CheckIn and Prediction
-  await points.grantRole(OPERATOR_ROLE, await checkIn.getAddress());
-  await points.grantRole(OPERATOR_ROLE, await prediction.getAddress());
+  let tx = await points.grantRole(OPERATOR_ROLE, await checkIn.getAddress());
+  await tx.wait();
+  tx = await points.grantRole(OPERATOR_ROLE, await prediction.getAddress());
+  await tx.wait();
   console.log("Points: OPERATOR granted to CheckIn & Prediction");
 
   // Referral: grant OPERATOR to CheckIn and Prediction
-  await referral.grantRole(OPERATOR_ROLE, await checkIn.getAddress());
-  await referral.grantRole(OPERATOR_ROLE, await prediction.getAddress());
+  tx = await referral.grantRole(OPERATOR_ROLE, await checkIn.getAddress());
+  await tx.wait();
+  tx = await referral.grantRole(OPERATOR_ROLE, await prediction.getAddress());
+  await tx.wait();
   // Also grant deployer to support backend referral onboarding registration flow.
-  await referral.grantRole(OPERATOR_ROLE, deployer.address);
+  tx = await referral.grantRole(OPERATOR_ROLE, deployer.address);
+  await tx.wait();
   console.log("Referral: OPERATOR granted to CheckIn, Prediction & deployer");
 
   // PrizePool: grant DISTRIBUTOR to deployer (for weekly distribution)
   const DISTRIBUTOR_ROLE = ethers.keccak256(ethers.toUtf8Bytes("DISTRIBUTOR_ROLE"));
-  await prizePool.grantRole(DISTRIBUTOR_ROLE, deployer.address);
+  tx = await prizePool.grantRole(DISTRIBUTOR_ROLE, deployer.address);
+  await tx.wait();
   console.log("PrizePool: DISTRIBUTOR granted to deployer");
-  await prizePoolV2.grantRole(DISTRIBUTOR_ROLE, deployer.address);
+  tx = await prizePoolV2.grantRole(DISTRIBUTOR_ROLE, deployer.address);
+  await tx.wait();
   console.log("PrizePoolV2: DISTRIBUTOR granted to deployer");
 
   // CheckIn: set staking contract
-  await checkIn.setStakingContract(await staking.getAddress());
+  tx = await checkIn.setStakingContract(await staking.getAddress());
+  await tx.wait();
   console.log("CheckIn: Staking contract linked");
 
   // Referral: set staking contract (for referral boost)
-  await referral.setStakingContract(await staking.getAddress());
+  tx = await referral.setStakingContract(await staking.getAddress());
+  await tx.wait();
   console.log("Referral: Staking contract linked");
 
   // --- Save deployment addresses ---
