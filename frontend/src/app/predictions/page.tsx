@@ -10,6 +10,7 @@ import { useContractAddresses } from "@/hooks/useContracts";
 import { CheckInABI, PointsABI, PredictionABI } from "@/lib/contracts";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
+import { formatInOffset, getEffectiveOffsetMinutes, useTimezone } from "@/lib/timezone";
 import AppIcon from "@/components/icons/AppIcon";
 
 const CAT_KEYS = ["ALL", "SPORTS", "POLITICS", "ECONOMY", "CRYPTO", "CLIMATE"];
@@ -38,7 +39,7 @@ function formatSeconds(total: number) {
   return `${m}m`;
 }
 
-function CountdownTimer({ deadline }: { deadline: string }) {
+function CountdownTimer({ deadline, compact = false }: { deadline: string; compact?: boolean }) {
   const [timeLeft, setTimeLeft] = useState("");
 
   useEffect(() => {
@@ -63,7 +64,7 @@ function CountdownTimer({ deadline }: { deadline: string }) {
     new Date(deadline).getTime() - Date.now() > 0;
 
   return (
-    <span className={`font-mono text-xs ${isUrgent ? "text-neon-red animate-pulse" : "text-neon-gold"}`}>
+    <span className={`font-mono ${compact ? "text-[11px]" : "text-xs"} ${isUrgent ? "text-neon-red animate-pulse" : "text-neon-gold"}`}>
       {timeLeft}
     </span>
   );
@@ -104,6 +105,8 @@ export default function PredictionsPage() {
   const predictionsRef = useRef<any[]>([]);
 
   const { t, locale } = useI18n();
+  const { mode: tzMode, fixedOffsetMinutes } = useTimezone();
+  const userOffsetMinutes = getEffectiveOffsetMinutes(tzMode, fixedOffsetMinutes);
   const tr = useCallback((key: string, fallback: string) => {
     const translated = t(key);
     return translated === key ? fallback : translated;
@@ -636,6 +639,11 @@ export default function PredictionsPage() {
     return Boolean(p.isUserEvent);
   });
 
+  const formatUserTime = useCallback(
+    (iso: string) => formatInOffset(iso, userOffsetMinutes),
+    [userOffsetMinutes]
+  );
+
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Points info banner */}
@@ -918,9 +926,7 @@ export default function PredictionsPage() {
                           {hasCreatorEconomy ? ` · ${userEventVoteFeeDisplay} BNB` : ""}
                         </span>
                       )}
-                      {!pred.resolved && !isExpired && (
-                        <CountdownTimer deadline={pred.deadline} />
-                      )}
+                      {!pred.resolved && !isExpired && <CountdownTimer deadline={pred.deadline} />}
                       {!pred.resolved && isExpired && (
                         <span className="text-xs text-neon-gold animate-pulse font-mono">
                           ⏳ {t("predictions.resolving")}
@@ -937,6 +943,30 @@ export default function PredictionsPage() {
                     {pred.description && (
                       <ExpandableDesc text={pred.description} />
                     )}
+
+                    {/* Timing details in user UTC */}
+                    <div className="mb-3 p-2.5 rounded-lg bg-dark-700/60 border border-dark-500/50">
+                      <div className="flex items-center justify-between text-[11px] text-gray-400">
+                        <span>{tr("predictions.voteClosesAt", "Voting closes at")}</span>
+                        <span className="font-mono text-gray-300">{formatUserTime(pred.deadline)}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px] text-gray-400 mt-1">
+                        <span>{tr("predictions.verifyAt", "Verification at")}</span>
+                        <span className="font-mono text-gray-300">{formatUserTime(pred.verifyAfter || pred.deadline)}</span>
+                      </div>
+                      {!pred.resolved && (
+                        <div className="mt-2 grid grid-cols-1 gap-1">
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="text-gray-500">{tr("predictions.voteCloseIn", "Voting closes in")}</span>
+                            <CountdownTimer deadline={pred.deadline} compact />
+                          </div>
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className="text-gray-500">{tr("predictions.verifyIn", "Verification in")}</span>
+                            <CountdownTimer deadline={pred.verifyAfter || pred.deadline} compact />
+                          </div>
+                        </div>
+                      )}
+                    </div>
 
                     {/* Share with referral tracking */}
                     <div className="mb-3 flex flex-wrap gap-2">

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import LanguageSwitcher from "./LanguageSwitcher";
+import TimezoneSwitcher from "./TimezoneSwitcher";
 import { useI18n } from "@/lib/i18n";
 import Image from "next/image";
 import AppIcon, { type IconName } from "./icons/AppIcon";
@@ -59,6 +60,7 @@ export default function Sidebar() {
         </nav>
 
         <div className="p-4 space-y-3">
+          <TimezoneSwitcher />
           <LanguageSwitcher />
           <ConnectButton.Custom>
             {({ account, chain, openConnectModal, openAccountModal, mounted }) => {
@@ -107,7 +109,8 @@ export default function Sidebar() {
           className="h-7 sm:h-8 w-auto"
           priority
         />
-        <div className="shrink-0">
+        <div className="shrink-0 flex items-center gap-2">
+          <TimezoneSwitcher compact />
           <LanguageSwitcher compact />
         </div>
         <ConnectButton.Custom>
