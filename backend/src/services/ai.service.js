@@ -4,6 +4,26 @@ import { trackAICall } from "./ai-metrics.service.js";
 
 const CATEGORIES = ["SPORTS", "POLITICS", "ECONOMY", "CRYPTO", "CLIMATE"];
 const RESOLVE_RETRIES = 3;
+const CATEGORY_REPROMPT_MIN_INTERVAL_MS = Math.max(
+  60 * 1000,
+  Number(process.env.AI_CATEGORY_REPROMPT_MIN_INTERVAL_MS || 15 * 60 * 1000)
+);
+const MAX_CATEGORY_REPROMPTS_PER_CYCLE = Math.max(
+  0,
+  Number(process.env.AI_MAX_CATEGORY_REPROMPTS_PER_CYCLE || 2)
+);
+const categoryRepromptLastAt = new Map();
+const STAGE_NAMES = ["vet", "arbiter"];
+const STAGE_NO_GAIN_STREAK_LIMIT = Math.max(
+  1,
+  Number(process.env.AI_STAGE_NO_GAIN_STREAK_LIMIT || 2)
+);
+const STAGE_COOLDOWN_CYCLES = Math.max(
+  1,
+  Number(process.env.AI_STAGE_COOLDOWN_CYCLES || 1)
+);
+const stageNoGainStreak = new Map();
+const stageCooldownCyclesLeft = new Map();
 
 let client = null;
 let aiPauseUntil = 0;
@@ -132,6 +152,94 @@ function modelList(...items) {
   return out;
 }
 
+function parseJsonArrayLenient(raw) {
+  if (typeof raw !== "string" || !raw.trim()) return null;
+  const text = raw.trim();
+  try {
+    const direct = JSON.parse(text);
+    return Array.isArray(direct) ? direct : null;
+  } catch {}
+  const start = text.indexOf("[");
+  const end = text.lastIndexOf("]");
+  if (start >= 0 && end > start) {
+    const slice = text.slice(start, end + 1);
+    try {
+      const parsed = JSON.parse(slice);
+      return Array.isArray(parsed) ? parsed : null;
+    } catch {}
+  }
+  return null;
+}
+
+function canRunCategoryReprompt(category, nowTs) {
+  const key = String(category || "").toUpperCase();
+  const lastTs = Number(categoryRepromptLastAt.get(key) || 0);
+  if (!lastTs) return true;
+  return nowTs - lastTs >= CATEGORY_REPROMPT_MIN_INTERVAL_MS;
+}
+
+function stageKey(stage, category) {
+  return `${String(stage || "").toLowerCase()}:${String(category || "").toUpperCase()}`;
+}
+
+function eventFingerprint(e) {
+  return [
+    String(e?.title || "").trim().toLowerCase(),
+    String(e?.verifyAtUtc || "").trim(),
+    String(e?.eventStartAtUtc || "").trim(),
+    String(e?.category || "").trim().toUpperCase(),
+  ].join("|");
+}
+
+function sameEventSet(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b)) return false;
+  if (a.length !== b.length) return false;
+  const aa = a.map(eventFingerprint).sort();
+  const bb = b.map(eventFingerprint).sort();
+  for (let i = 0; i < aa.length; i++) {
+    if (aa[i] !== bb[i]) return false;
+  }
+  return true;
+}
+
+function shouldRunStage(stage, category) {
+  const key = stageKey(stage, category);
+  return Number(stageCooldownCyclesLeft.get(key) || 0) <= 0;
+}
+
+function markStageResult(stage, category, { noGain }) {
+  const key = stageKey(stage, category);
+  if (!noGain) {
+    stageNoGainStreak.set(key, 0);
+    return;
+  }
+  const next = Number(stageNoGainStreak.get(key) || 0) + 1;
+  if (next >= STAGE_NO_GAIN_STREAK_LIMIT) {
+    stageNoGainStreak.set(key, 0);
+    stageCooldownCyclesLeft.set(key, STAGE_COOLDOWN_CYCLES);
+    console.log(
+      `[AI] ${String(category).toUpperCase()} ${stage} cooldown armed for ${STAGE_COOLDOWN_CYCLES} cycle(s) after ${next} no-gain runs`
+    );
+    return;
+  }
+  stageNoGainStreak.set(key, next);
+}
+
+function decayStageCooldowns(categories = []) {
+  const cats = categories.map((x) => String(x || "").toUpperCase());
+  for (const stage of STAGE_NAMES) {
+    for (const cat of cats) {
+      const key = stageKey(stage, cat);
+      const left = Number(stageCooldownCyclesLeft.get(key) || 0);
+      if (left > 0) {
+        const next = left - 1;
+        if (next <= 0) stageCooldownCyclesLeft.delete(key);
+        else stageCooldownCyclesLeft.set(key, next);
+      }
+    }
+  }
+}
+
 async function search(query) {
   const retrieverModels = modelList(
     config.openrouterRetrieverModel,
@@ -154,7 +262,7 @@ async function generate(sysPrompt, userPrompt) {
     return await askWithFallbackModels(normalizerModels, [
       { role: "system", content: sysPrompt },
       { role: "user", content: userPrompt },
-    ], 0.7, 2500, "generate");
+    ], 0.35, 2500, "generate");
   } catch (e) {
     if (isInsufficientCreditsError(e)) return null;
     console.error(`[AI] Generate failed: ${e.message}`);
@@ -252,6 +360,13 @@ function normalizeTitleForSimilarity(title) {
     .map((t) => t.trim())
     .filter((t) => t.length > 1 && !TITLE_STOP_WORDS.has(t) && !/^\d+$/.test(t))
     .join(" ");
+}
+
+function removeNonUtcTimezoneTokens(text) {
+  return String(text || "")
+    .replace(/\b(ET|EST|EDT|PT|PST|PDT|CET|CEST|BST|IST)\b/gi, "UTC")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 }
 
 function titleTokens(title) {
@@ -492,8 +607,8 @@ ${JSON.stringify(payload)}`;
   try {
     const raw = await search(`${sys}\n\n${user}`);
     if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
+    const parsed = parseJsonArrayLenient(raw);
+    if (!Array.isArray(parsed) || parsed.length === 0) return events;
     const byIdx = new Map(
       parsed
         .filter((x) => Number.isFinite(Number(x?.idx)))
@@ -518,6 +633,17 @@ ${JSON.stringify(payload)}`;
           ? Math.max(0, Math.min(100, adjustedPopularity))
           : events[i].popularityScore,
       });
+    }
+    const targetMin = Math.min(3, events.length);
+    if (out.length >= targetMin) return out;
+    // If web QA is too strict/noisy, keep best untouched candidates to avoid empty expensive loops.
+    const used = new Set(out.map((x) => String(x.title || "").trim().toLowerCase()));
+    for (const candidate of events) {
+      if (out.length >= targetMin) break;
+      const key = String(candidate?.title || "").trim().toLowerCase();
+      if (!key || used.has(key)) continue;
+      used.add(key);
+      out.push(candidate);
     }
     return out;
   } catch {
@@ -566,8 +692,8 @@ Hard rules:
   try {
     const raw = await askWithFallbackModels(arbiterModels, messages, 0.1, 1800, "arbiter");
     if (!raw) return events;
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return events;
+    const parsed = parseJsonArrayLenient(raw);
+    if (!Array.isArray(parsed) || parsed.length === 0) return events;
     const byIdx = new Map(
       parsed.filter((x) => Number.isFinite(Number(x?.idx))).map((x) => [Number(x.idx), x])
     );
@@ -584,6 +710,20 @@ Hard rules:
         description: typeof verdict.description === "string" ? verdict.description : events[i].description,
         sources,
       });
+    }
+    const targetMin = Math.min(3, events.length);
+    if (out.length >= targetMin) return out;
+    // Avoid over-pruning by arbiter: preserve top candidates for downstream deterministic checks.
+    const used = new Set(out.map((x) => String(x.title || "").trim().toLowerCase()));
+    const sorted = [...events].sort(
+      (a, b) => Number(b?.popularityScore ?? 0) - Number(a?.popularityScore ?? 0)
+    );
+    for (const candidate of sorted) {
+      if (out.length >= targetMin) break;
+      const key = String(candidate?.title || "").trim().toLowerCase();
+      if (!key || used.has(key)) continue;
+      used.add(key);
+      out.push(candidate);
     }
     return out;
   } catch {
@@ -607,6 +747,8 @@ async function searchPopularEvents(category) {
 async function generateCategoryPredictions(category, context, options = {}) {
   const { today, hour, day } = getTimeInfo();
   const avoidTitles = Array.isArray(options?.avoidTitles) ? options.avoidTitles : [];
+  const strictReprompt = Boolean(options?.strictReprompt);
+  const repromptReason = String(options?.repromptReason || "").trim();
   const avoidBlock = avoidTitles.length
     ? `\nDO NOT repeat, paraphrase, or closely mirror these already active markets.
 For SPORTS: never propose the same fixture (same teams and date) with different wording.
@@ -615,6 +757,18 @@ For POLITICS/CLIMATE: never propose the same decision/event window with rephrase
         .slice(0, 80)
         .map((t, i) => `${i + 1}. ${String(t).slice(0, 120)}`)
         .join("\n")}`
+    : "";
+
+  const strictBlock = strictReprompt
+    ? `
+STRICT RECOVERY MODE (LOW-YIELD CATEGORY):
+- This is a retry because previous pass produced too few valid events.
+- Prioritize exact compliance over creativity.
+- Do not output borderline items that can drift category.
+- Include mainstream source-backed events only.
+- Prefer events with explicit UTC timing and clearly measurable outcomes.
+- Make description concrete and specific to the exact metric/result.
+${repromptReason ? `- Previous pass issue focus: ${repromptReason}` : ""}`
     : "";
 
   const r = await generate(
@@ -648,6 +802,12 @@ ABSOLUTE RULES:
   - POLITICS: vote closes ~30 minutes before official cutoff; verify +60 to +120 minutes.
   - CLIMATE: vote closes ~30 minutes before window end; verify +60 to +120 minutes.
 - Return ONLY a JSON array of 5 objects, nothing else
+- Category lock is strict: every object.category MUST be exactly "${category}"
+- Never output non-UTC timezone labels in title/description
+- For SPORTS: eventStartAtUtc is mandatory and must be exact kickoff UTC
+- For non-SPORTS: eventStartAtUtc must be null or omitted unless truly needed
+- If exact timing is uncertain, do NOT include that event
+${strictBlock}
 
 REJECT these types of predictions:
 - Events with deadlines beyond 30 days
@@ -661,7 +821,7 @@ VERIFIED NEWS FOR TODAY:
 ${context || "No specific news. Use current verifiable facts: live prices, current standings, today's weather."}
 
 Create exactly 5 predictions about events in the next 30 days.
-Each: {"title":"yes/no question max 90 chars","description":"120-220 chars, detailed and user-friendly","category":"${category}","aiProbability":15-85,"hoursToResolve":6-720,"eventStartAtUtc":"ISO UTC","verifyAtUtc":"ISO UTC","sources":["https://..."],"confidence":0..1,"popularityScore":0..100}
+Each: {"title":"yes/no question max 90 chars","description":"120-220 chars, detailed and user-friendly","category":"${category}","aiProbability":15-85,"hoursToResolve":6-720,"eventStartAtUtc":"ISO UTC or null","verifyAtUtc":"ISO UTC","sources":["https://..."],"confidence":0..1,"popularityScore":0..100}
 Required horizon mix per 5 events:
 - at least 1 event resolving within 6-24h
 - at least 3 events resolving within 24-168h (1-7 days)
@@ -678,12 +838,18 @@ For SPORTS wording precision:
 If helpful, include concrete date/time context in title for future events within 30 days.
 Good: "Will Real Madrid win on March 10?"
 Good: "Will Bitcoin close above $90k this week?"
-Bad: "Will Bitcoin rise soon?"${avoidBlock}`
+Bad: "Will Bitcoin rise soon?"
+Before returning, self-check each candidate against:
+1) in next 30 days,
+2) verifiable by >=2 credible URLs,
+3) no category drift,
+4) no "today/tonight" with horizon > 6h,
+5) verifyAtUtc after now and after eventStartAtUtc (if present).${avoidBlock}`
   );
 
   if (!r) return [];
   try {
-    const events = JSON.parse(r);
+    const events = parseJsonArrayLenient(r);
     if (!Array.isArray(events)) return [];
 
     // Filter out events with obviously stale timing semantics.
@@ -778,7 +944,65 @@ Bad: "Will Bitcoin rise soon?"${avoidBlock}`
       return diffDays >= 0 && diffDays <= 30;
     };
 
-    const filtered = events.filter(e => {
+    const preprocessed = events.map((raw) => {
+      const prepared = { ...(raw || {}) };
+      let title = removeNonUtcTimezoneTokens(String(prepared.title || ""));
+      const rawHours = Math.max(6, Math.min(720, parseInt(prepared.hoursToResolve) || 72));
+      const parsedTs = parseDateFromTitle(title);
+      let verifyTs = parseVerifyAtUtc(prepared.verifyAtUtc);
+      let eventStartTs = parseVerifyAtUtc(prepared.eventStartAtUtc);
+
+      // Repair missing verify timestamp using hoursToResolve to reduce avoidable rejects.
+      if (verifyTs === null && Number.isFinite(rawHours)) {
+        verifyTs = Date.now() + rawHours * 60 * 60 * 1000;
+        prepared.verifyAtUtc = new Date(verifyTs).toISOString();
+      }
+
+      // Keep title semantics aligned with horizon.
+      if (/\b(today|tonight|now)\b/i.test(title) && rawHours > 6 && verifyTs !== null) {
+        const dayHint = new Date(verifyTs).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          timeZone: "UTC",
+        });
+        title = title.replace(/\b(today|tonight|now)\b/gi, `by ${dayHint} UTC`);
+      }
+
+      // Add explicit date context for long-horizon markets if model omitted it.
+      if (rawHours > 24 && parsedTs === null && verifyTs !== null) {
+        const safeTitle = title.replace(/\?+$/, "").trim();
+        const dayHint = new Date(verifyTs).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          timeZone: "UTC",
+        });
+        title = `${safeTitle} by ${dayHint} UTC?`.slice(0, 100);
+      }
+
+      // For sports, infer event start if omitted but verify is present.
+      if (String(category).toUpperCase() === "SPORTS" && eventStartTs === null && verifyTs !== null) {
+        eventStartTs = verifyTs - 3 * 60 * 60 * 1000;
+        prepared.eventStartAtUtc = new Date(eventStartTs).toISOString();
+      }
+
+      prepared.title = title;
+      prepared.hoursToResolve = rawHours;
+      return prepared;
+    });
+
+    const rejectionStats = {
+      outOfWindowTitle: 0,
+      outOfWindowVerify: 0,
+      stale: 0,
+      lowPopularity: 0,
+      categoryDrift: 0,
+      nonUtcTz: 0,
+      ambiguousToday: 0,
+      missingDateOrVerify: 0,
+      sportsNoTime: 0,
+    };
+
+    const filtered = preprocessed.filter(e => {
       const title = String(e.title || "");
       const description = String(e.description || "");
       const rawHours = Math.max(6, Math.min(720, parseInt(e.hoursToResolve) || 72));
@@ -788,43 +1012,58 @@ Bad: "Will Bitcoin rise soon?"${avoidBlock}`
       const parsedTs = parseDateFromTitle(title);
       const inferredCategory = inferCategoryFromText(`${title} ${description}`);
       if (parsedTs !== null && !isWithinNext30Days(parsedTs)) {
+        rejectionStats.outOfWindowTitle += 1;
         console.log(`[AI] Filtered out out-of-window event (outside next 30d): "${title}"`);
         return false;
       }
       if (verifyTs !== null && !isWithinNext30Days(verifyTs)) {
+        rejectionStats.outOfWindowVerify += 1;
         console.log(`[AI] Filtered out out-of-window verifyAtUtc: "${title}"`);
         return false;
       }
       if (/\b(yesterday|last week|last month|already happened)\b/i.test(title)) {
+        rejectionStats.stale += 1;
         console.log(`[AI] Filtered out stale timing event: "${title}"`);
         return false;
       }
-      if (!isPopularEvent(category, title, description)) {
+      const modelPopularity = Math.max(0, Math.min(100, Number(e.popularityScore ?? 0)));
+      if (!isPopularEvent(category, title, description) && modelPopularity < 70) {
+        rejectionStats.lowPopularity += 1;
         console.log(`[AI] Filtered out low-popularity event: "${title}"`);
         return false;
       }
       if (inferredCategory !== category) {
+        rejectionStats.categoryDrift += 1;
         console.log(`[AI] Filtered out category-drift event (${category} -> ${inferredCategory}): "${title}"`);
         return false;
       }
       if (hasNonUtcTz) {
+        rejectionStats.nonUtcTz += 1;
         console.log(`[AI] Filtered out non-UTC timezone in title: "${title}"`);
         return false;
       }
       if (/\b(today|tonight|now)\b/i.test(title) && rawHours > 6) {
+        rejectionStats.ambiguousToday += 1;
         console.log(`[AI] Filtered out ambiguous timing event (>6h with today/tonight): "${title}"`);
         return false;
       }
       if (rawHours > 24 && parsedTs === null && verifyTs === null) {
+        rejectionStats.missingDateOrVerify += 1;
         console.log(`[AI] Filtered out future-window event without explicit date/verifyAtUtc: "${title}"`);
         return false;
       }
       if (category === "SPORTS" && rawHours > 24 && verifyTs === null && !hasUtcTimeTitle) {
+        rejectionStats.sportsNoTime += 1;
         console.log(`[AI] Filtered out sports event without exact UTC time: "${title}"`);
         return false;
       }
       return true;
     });
+    if (events.length > 0) {
+      console.log(
+        `[AI] ${category} raw=${events.length} kept=${filtered.length} rejected=${events.length - filtered.length} reasons=${JSON.stringify(rejectionStats)}`
+      );
+    }
 
     const toSourceList = (v) => {
       if (!Array.isArray(v)) return [];
@@ -985,13 +1224,42 @@ Bad: "Will Bitcoin rise soon?"${avoidBlock}`
         }
       }
       const verifyTs = parseVerifyAtUtc(constrained.verifyAtUtc) || nowTs;
-      constrained.hoursToResolve = Math.max(6, Math.min(720, Math.round((verifyTs - nowTs) / 3600000)));
+      const eventStartTs = parseVerifyAtUtc(constrained.eventStartAtUtc);
+      if (eventStartTs && verifyTs <= eventStartTs) {
+        const verifyBufferMs = (CATEGORY_VERIFY_BUFFER_MINUTES[String(category || "CRYPTO").toUpperCase()] || 10) * 60 * 1000;
+        constrained.verifyAtUtc = new Date(eventStartTs + verifyBufferMs).toISOString();
+      }
+      const verifyTs2 = parseVerifyAtUtc(constrained.verifyAtUtc) || nowTs;
+      constrained.hoursToResolve = Math.max(6, Math.min(720, Math.round((verifyTs2 - nowTs) / 3600000)));
       return constrained;
     };
 
-    const vetted = await vetPredictionsWithWeb(category, normalized, { today, hour, day });
-    const arbitrated = await finalizePredictionsWithArbiter(category, vetted, { today, hour, day });
+    let vetted = normalized;
+    if (shouldRunStage("vet", category)) {
+      vetted = await vetPredictionsWithWeb(category, normalized, { today, hour, day });
+      markStageResult("vet", category, { noGain: sameEventSet(normalized, vetted) });
+    } else {
+      console.log(`[AI] ${category} vet skipped by cooldown`);
+    }
+
+    let arbitrated = vetted;
+    if (shouldRunStage("arbiter", category)) {
+      arbitrated = await finalizePredictionsWithArbiter(category, vetted, { today, hour, day });
+      markStageResult("arbiter", category, { noGain: sameEventSet(vetted, arbitrated) });
+    } else {
+      console.log(`[AI] ${category} arbiter skipped by cooldown`);
+    }
     const nowTs = Date.now();
+    const finalRejectStats = {
+      notEnoughSources: 0,
+      missingVerify: 0,
+      verifyTooSoon: 0,
+      sportsMissingStart: 0,
+      verifyBeforeStart: 0,
+      shortDescription: 0,
+      unsafeVoteWindow: 0,
+    };
+
     const final = arbitrated
       .map(applyFinalTitleTimingConstraint)
       .filter((e) => {
@@ -1003,14 +1271,35 @@ Bad: "Will Bitcoin rise soon?"${avoidBlock}`
           new Set(sources.map((x) => String(x || "").trim()).filter((x) => /^https?:\/\//i.test(x)))
         );
         // Require at least two URLs to reduce hallucinated events.
-        if (uniqueSources.length < 2) return false;
-        if (!verifyTs) return false;
-        if (verifyTs <= nowTs + 10 * 60 * 1000) return false;
-        if (longHorizon && !verifyTs) return false;
-        if (category === "SPORTS" && !eventStartTs) return false;
-        if (eventStartTs && verifyTs <= eventStartTs) return false;
+        if (uniqueSources.length < 2) {
+          finalRejectStats.notEnoughSources += 1;
+          return false;
+        }
+        if (!verifyTs) {
+          finalRejectStats.missingVerify += 1;
+          return false;
+        }
+        if (verifyTs <= nowTs + 10 * 60 * 1000) {
+          finalRejectStats.verifyTooSoon += 1;
+          return false;
+        }
+        if (longHorizon && !verifyTs) {
+          finalRejectStats.missingVerify += 1;
+          return false;
+        }
+        if (category === "SPORTS" && !eventStartTs) {
+          finalRejectStats.sportsMissingStart += 1;
+          return false;
+        }
+        if (eventStartTs && verifyTs <= eventStartTs) {
+          finalRejectStats.verifyBeforeStart += 1;
+          return false;
+        }
         const desc = String(e?.description || "").trim();
-        if (desc.length < 80) return false;
+        if (desc.length < 80) {
+          finalRejectStats.shortDescription += 1;
+          return false;
+        }
         const verifyBufferMs = (CATEGORY_VERIFY_BUFFER_MINUTES[String(category || "CRYPTO").toUpperCase()] || 10) * 60 * 1000;
         const voteLeadMs = (CATEGORY_VOTE_LEAD_MINUTES[String(category || "CRYPTO").toUpperCase()] || 10) * 60 * 1000;
         const voteCloseByVerify = verifyTs - verifyBufferMs;
@@ -1026,7 +1315,10 @@ Bad: "Will Bitcoin rise soon?"${avoidBlock}`
             : Number.POSITIVE_INFINITY;
         const voteCloseTs = Math.min(voteCloseByVerify, voteCloseByStart, voteCloseByDateRule);
         // Reject events where voting window is already unsafe/closed.
-        if (!Number.isFinite(voteCloseTs) || voteCloseTs <= nowTs + 60 * 1000) return false;
+        if (!Number.isFinite(voteCloseTs) || voteCloseTs <= nowTs + 60 * 1000) {
+          finalRejectStats.unsafeVoteWindow += 1;
+          return false;
+        }
         return true;
       })
       .map(({ hasExplicitVerifyAt, ...rest }) => ({
@@ -1046,8 +1338,17 @@ Bad: "Will Bitcoin rise soon?"${avoidBlock}`
         description: String(richDescription).slice(0, 260),
       });
     }
+    console.log(
+      `[AI] ${category} pipeline: rawModel=${events.length} preFilter=${filtered.length} normalized=${normalized.length} vetted=${vetted.length} arbitrated=${arbitrated.length} final=${final.length} deduped=${deduped.length}`
+    );
+    if (arbitrated.length > final.length) {
+      console.log(`[AI] ${category} final-rejects: ${JSON.stringify(finalRejectStats)}`);
+    }
     return deduped;
-  } catch { return []; }
+  } catch (err) {
+    console.warn(`[AI] ${category} generation parse/normalize failed: ${String(err?.message || err)}`);
+    return [];
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1071,6 +1372,7 @@ export async function generateDailyPredictions(options = {}) {
       .filter((x) => CATEGORIES.includes(x))
     : [];
   const selectedCategories = requestedCategories.length ? requestedCategories : CATEGORIES;
+  decayStageCooldowns(selectedCategories);
   const contexts = await Promise.all(
     selectedCategories.map(async cat => {
       const ctx = await searchPopularEvents(cat);
@@ -1080,11 +1382,59 @@ export async function generateDailyPredictions(options = {}) {
   );
 
   console.log("[AI] Generating predictions from today's real news...");
-  const batches = await Promise.all(
+  const initialBatches = await Promise.all(
     contexts.map(({ cat, ctx }) => generateCategoryPredictions(cat, ctx, { avoidTitles }))
   );
 
-  const all = batches.flat();
+  const allByCategory = new Map();
+  selectedCategories.forEach((cat, idx) => {
+    allByCategory.set(cat, Array.isArray(initialBatches[idx]) ? initialBatches[idx] : []);
+  });
+
+  // Adaptive targeted reprompt: retry only low-yield categories.
+  let repromptCount = 0;
+  for (const { cat, ctx } of contexts) {
+    const current = allByCategory.get(cat) || [];
+    if (current.length >= 3) continue;
+    if (repromptCount >= MAX_CATEGORY_REPROMPTS_PER_CYCLE) {
+      console.log(
+        `[AI] ${cat} adaptive-reprompt skipped: cycle limit reached (${MAX_CATEGORY_REPROMPTS_PER_CYCLE})`
+      );
+      continue;
+    }
+    const nowTs = Date.now();
+    if (!canRunCategoryReprompt(cat, nowTs)) {
+      const lastTs = Number(categoryRepromptLastAt.get(cat) || 0);
+      const retryInSec = Math.max(
+        0,
+        Math.ceil((CATEGORY_REPROMPT_MIN_INTERVAL_MS - (nowTs - lastTs)) / 1000)
+      );
+      console.log(
+        `[AI] ${cat} adaptive-reprompt skipped: cooldown active, retry in ${retryInSec}s`
+      );
+      continue;
+    }
+    const repromptAvoid = [
+      ...avoidTitles,
+      ...current.map((x) => String(x?.title || "").trim()).filter(Boolean),
+    ];
+    const extra = await generateCategoryPredictions(cat, ctx, {
+      avoidTitles: repromptAvoid,
+      strictReprompt: true,
+      repromptReason: `Category produced only ${current.length} valid events in first pass`,
+    });
+    const merged = [];
+    for (const evt of [...current, ...extra]) {
+      if (merged.some((x) => isNearDuplicateEvent(x, evt))) continue;
+      merged.push(evt);
+    }
+    allByCategory.set(cat, merged);
+    categoryRepromptLastAt.set(cat, nowTs);
+    repromptCount += 1;
+    console.log(`[AI] ${cat} adaptive-reprompt: before=${current.length} extra=${extra.length} merged=${merged.length}`);
+  }
+
+  const all = selectedCategories.flatMap((cat) => allByCategory.get(cat) || []);
   const dist = selectedCategories.map(c => `${c}(${all.filter(e => e.category === c).length})`).join(" ");
   console.log(`[AI] Done: ${all.length} predictions — ${dist}`);
   if (all.length === 0) {
