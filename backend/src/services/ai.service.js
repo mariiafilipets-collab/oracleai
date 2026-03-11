@@ -455,8 +455,15 @@ async function searchPopularEvents(category) {
 
 // ═══════════════════════════════════════════════════════════════════════════
 
-async function generateCategoryPredictions(category, context) {
+async function generateCategoryPredictions(category, context, options = {}) {
   const { today, hour, day } = getTimeInfo();
+  const avoidTitles = Array.isArray(options?.avoidTitles) ? options.avoidTitles : [];
+  const avoidBlock = avoidTitles.length
+    ? `\nDO NOT repeat, paraphrase, or closely mirror these already active markets:\n${avoidTitles
+        .slice(0, 80)
+        .map((t, i) => `${i + 1}. ${String(t).slice(0, 120)}`)
+        .join("\n")}`
+    : "";
 
   const r = await generate(
     `You create prediction market events. You are strict about timing and verifiability.
@@ -512,7 +519,7 @@ For SPORTS wording precision:
 If helpful, include concrete date/time context in title for future events within 30 days.
 Good: "Will Real Madrid win on March 10?"
 Good: "Will Bitcoin close above $90k this week?"
-Bad: "Will Bitcoin rise soon?"`
+Bad: "Will Bitcoin rise soon?"${avoidBlock}`
   );
 
   if (!r) return [];
@@ -872,7 +879,7 @@ Bad: "Will Bitcoin rise soon?"`
 
 // ═══════════════════════════════════════════════════════════════════════════
 
-export async function generateDailyPredictions() {
+export async function generateDailyPredictions(options = {}) {
   if (config.aiProvider === "mock" || !config.openrouterKey) {
     console.warn("[AI] Generation skipped: production mock generation is disabled.");
     return [];
@@ -882,6 +889,9 @@ export async function generateDailyPredictions() {
   console.log(`[AI] Generating for ${day} ${today} ${hour}:00 UTC`);
   console.log("[AI] Searching today's real news in 5 categories...");
 
+  const avoidTitles = Array.isArray(options?.avoidTitles)
+    ? options.avoidTitles.map((x) => String(x || "").trim()).filter(Boolean)
+    : [];
   const contexts = await Promise.all(
     CATEGORIES.map(async cat => {
       const ctx = await searchPopularEvents(cat);
@@ -892,7 +902,7 @@ export async function generateDailyPredictions() {
 
   console.log("[AI] Generating predictions from today's real news...");
   const batches = await Promise.all(
-    contexts.map(({ cat, ctx }) => generateCategoryPredictions(cat, ctx))
+    contexts.map(({ cat, ctx }) => generateCategoryPredictions(cat, ctx, { avoidTitles }))
   );
 
   const all = batches.flat();

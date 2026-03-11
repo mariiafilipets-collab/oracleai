@@ -13,6 +13,7 @@ const REFILL_CHECK_INTERVAL = 5 * 60 * 1000; // 5 minutes
 const WEEKLY_CHECK_INTERVAL = 60 * 60 * 1000; // 1 hour
 const NIGHTLY_RETRY_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours
 const PROTOCOL_FEE_DISTRIBUTION_CHECK_INTERVAL = 10 * 60 * 1000; // 10 minutes
+const MAX_REFILL_BATCH_ROUNDS = 4;
 const WEEK_SECONDS = 7 * 24 * 60 * 60;
 const MAX_WEEKLY_WINNERS = 1000;
 const MIN_WINNER_REWARD_WEI = 200000000000000n; // 0.0002 BNB
@@ -74,7 +75,16 @@ function isNearDuplicateTitle(a, b) {
   const na = normalizeTitleForSimilarity(a);
   const nb = normalizeTitleForSimilarity(b);
   if (!na || !nb) return false;
-  return na === nb || na.includes(nb) || nb.includes(na);
+  if (na === nb) return true;
+  if (na.includes(nb) || nb.includes(na)) return true;
+  const aTokens = new Set(na.split(/\s+/).filter(Boolean));
+  const bTokens = new Set(nb.split(/\s+/).filter(Boolean));
+  if (!aTokens.size || !bTokens.size) return false;
+  let inter = 0;
+  for (const t of aTokens) if (bTokens.has(t)) inter++;
+  const uni = aTokens.size + bTokens.size - inter;
+  const similarity = uni > 0 ? inter / uni : 0;
+  return similarity >= 0.82;
 }
 const withTimeout = async (promise, timeoutMs, label) => {
   return await Promise.race([
@@ -293,8 +303,9 @@ async function refill() {
     active = await PredictionEvent.countDocuments({ resolved: false, deadline: { $gt: new Date() } });
   }
   if (active < MIN_ACTIVE) {
-    console.log(`[Scheduler] ${active}/${MIN_ACTIVE} active — refilling...`);
-    await publishNewBatch();
+    const deficit = MIN_ACTIVE - active;
+    console.log(`[Scheduler] ${active}/${MIN_ACTIVE} active — refilling (need +${deficit})...`);
+    await publishNewBatch({ targetToCreate: deficit, maxRounds: MAX_REFILL_BATCH_ROUNDS });
   }
 }
 
@@ -302,141 +313,135 @@ async function scheduledGenerate() {
   const active = await PredictionEvent.countDocuments({ resolved: false, deadline: { $gt: new Date() } });
   if (active < MIN_ACTIVE * 2) {
     console.log(`[Scheduler] Scheduled generation (${active} active)...`);
-    await publishNewBatch();
+    await publishNewBatch({ targetToCreate: Math.max(5, MIN_ACTIVE - active), maxRounds: 2 });
   }
 }
 
-async function publishNewBatch() {
+async function publishNewBatch(options = {}) {
   if (generating) return;
   generating = true;
 
   try {
-    const predictions = await generateDailyPredictions();
     const { Prediction } = getContracts();
     const signer = getSigner();
     if (!Prediction || !signer) { generating = false; return; }
-
-    // Deduplicate only within current AI batch.
-    // We intentionally do NOT dedup against already-active events here,
-    // otherwise refill can get stuck below MIN_ACTIVE when AI repeats top headlines.
-    const seenInBatch = [];
+    const targetToCreate = Math.max(1, Number(options?.targetToCreate || 5));
+    const maxRounds = Math.max(1, Number(options?.maxRounds || 1));
     const activeTitles = await PredictionEvent.find({ resolved: false, deadline: { $gt: new Date() } })
       .select("title")
       .limit(1000)
       .lean();
     const existing = activeTitles.map((x) => String(x.title || ""));
-    const unique = predictions.filter((p) => {
-      const t = String(p?.title || "");
-      if (!t) return false;
-      if (seenInBatch.some((x) => isNearDuplicateTitle(x, t))) return false;
-      if (existing.some((x) => isNearDuplicateTitle(x, t))) return false;
-      seenInBatch.push(t);
-      return true;
-    });
-
-    if (unique.length < predictions.length) {
-      console.log(`[Scheduler] Dedup: ${predictions.length - unique.length} duplicates removed`);
-    }
-    let localized = [];
-    try {
-      // Do not block event publishing on slow translation calls.
-      localized = await Promise.race([
-        pretranslateEvents(unique),
-        new Promise((resolve) => setTimeout(() => resolve([]), PRETRANSLATE_TIMEOUT_MS)),
-      ]);
-      if (!Array.isArray(localized)) localized = [];
-      if (localized.length === 0) {
-        console.warn("[Scheduler] Pretranslate timeout/fallback: publishing with source text");
-      }
-    } catch (e) {
-      console.warn(`[Scheduler] Pretranslate skipped: ${e.message}`);
-      localized = [];
-    }
-
+    const createdTitles = [];
     let nonce = await signer.getNonce();
     let ok = 0;
 
-    for (let i = 0; i < unique.length; i++) {
-      const p = unique[i];
-      if (!p?.description || String(p.description).trim().length < 80) {
-        console.warn(`[Scheduler] Skipping event with weak description: "${p.title}"`);
-        continue;
-      }
-      const normalizedCategory = normalizeStoredCategory(
-        p.category,
-        p.title,
-        p.description || "",
-        false
-      );
-      const timing = buildEventTiming({
-        category: normalizedCategory,
-        hoursToResolve: p.hoursToResolve || 8,
-        verifyAtUtc: p.verifyAtUtc,
-        eventStartAtUtc: p.eventStartAtUtc,
-        isUserEvent: false,
+    for (let round = 1; round <= maxRounds && ok < targetToCreate; round++) {
+      const predictions = await generateDailyPredictions({ avoidTitles: [...existing, ...createdTitles] });
+      const seenInBatch = [];
+      const unique = predictions.filter((p) => {
+        const t = String(p?.title || "");
+        if (!t) return false;
+        if (seenInBatch.some((x) => isNearDuplicateTitle(x, t))) return false;
+        if (existing.some((x) => isNearDuplicateTitle(x, t))) return false;
+        if (createdTitles.some((x) => isNearDuplicateTitle(x, t))) return false;
+        seenInBatch.push(t);
+        return true;
       });
-      if (!timing.isValidWindow) {
-        console.warn(`[Scheduler] Skipping event with unsafe/closed vote window: "${p.title}"`);
+      if (!unique.length) {
+        console.warn(`[Scheduler] Round ${round}/${maxRounds}: no unique candidates`);
         continue;
       }
-      const catIdx = CATEGORY_NAMES.indexOf(normalizedCategory);
+      let localized = [];
       try {
-        const tx = await Prediction.createEvent(
+        localized = await Promise.race([
+          pretranslateEvents(unique),
+          new Promise((resolve) => setTimeout(() => resolve([]), PRETRANSLATE_TIMEOUT_MS)),
+        ]);
+        if (!Array.isArray(localized)) localized = [];
+      } catch {
+        localized = [];
+      }
+
+      for (let i = 0; i < unique.length && ok < targetToCreate; i++) {
+        const p = unique[i];
+        if (!p?.description || String(p.description).trim().length < 80) {
+          continue;
+        }
+        const normalizedCategory = normalizeStoredCategory(
+          p.category,
           p.title,
-          catIdx >= 0 ? catIdx : 3,
-          Math.floor(timing.deadline.getTime() / 1000),
-          p.aiProbability,
-          { nonce: nonce++ }
+          p.description || "",
+          false
         );
-        await tx.wait();
-        const id = Number(await Prediction.eventCount());
-        // Re-deploy on local chain resets eventId back to 1.
-        // Use upsert to overwrite stale docs with same eventId instead of failing on unique index.
-        await PredictionEvent.updateOne(
-          { eventId: id },
-          {
-            $set: {
-              eventId: id,
-              title: p.title,
-              description: p.description || "",
-              category: normalizedCategory,
-              aiProbability: p.aiProbability,
-              deadline: timing.deadline,
-              verifyAfter: timing.verifyAfter,
-              eventStartAtUtc: parseIsoUtc(p.eventStartAtUtc),
-              expectedResolveAtUtc: timing.verifyAfter,
-              timePrecision: inferTimePrecision(p.title, p.verifyAtUtc),
-              confidence: Math.max(0, Math.min(1, Number(p.confidence ?? 0.75))),
-              popularityScore: Math.max(0, Math.min(100, Number(p.popularityScore ?? 70))),
-              sources: Array.isArray(p.sources) ? p.sources.slice(0, 8).map((x) => String(x).slice(0, 300)) : [],
-              qualityVersion: "v2",
-              creator: "",
-              isUserEvent: false,
-              listingFeeWei: "0",
-              sourcePolicy: "",
-              resolved: false,
-              resolvePending: false,
-              outcome: null,
-              aiReasoning: "",
-              nextResolveRetryAt: null,
-              resolveAttempts: 0,
-              lastResolveError: "",
-              lastResolveTriedAt: null,
-              translations: localized[i] || {},
+        const timing = buildEventTiming({
+          category: normalizedCategory,
+          hoursToResolve: p.hoursToResolve || 8,
+          verifyAtUtc: p.verifyAtUtc,
+          eventStartAtUtc: p.eventStartAtUtc,
+          isUserEvent: false,
+        });
+        if (!timing.isValidWindow) {
+          continue;
+        }
+        const catIdx = CATEGORY_NAMES.indexOf(normalizedCategory);
+        try {
+          const tx = await Prediction.createEvent(
+            p.title,
+            catIdx >= 0 ? catIdx : 3,
+            Math.floor(timing.deadline.getTime() / 1000),
+            p.aiProbability,
+            { nonce: nonce++ }
+          );
+          await tx.wait();
+          const id = Number(await Prediction.eventCount());
+          await PredictionEvent.updateOne(
+            { eventId: id },
+            {
+              $set: {
+                eventId: id,
+                title: p.title,
+                description: p.description || "",
+                category: normalizedCategory,
+                aiProbability: p.aiProbability,
+                deadline: timing.deadline,
+                verifyAfter: timing.verifyAfter,
+                eventStartAtUtc: parseIsoUtc(p.eventStartAtUtc),
+                expectedResolveAtUtc: timing.verifyAfter,
+                timePrecision: inferTimePrecision(p.title, p.verifyAtUtc),
+                confidence: Math.max(0, Math.min(1, Number(p.confidence ?? 0.75))),
+                popularityScore: Math.max(0, Math.min(100, Number(p.popularityScore ?? 70))),
+                sources: Array.isArray(p.sources) ? p.sources.slice(0, 8).map((x) => String(x).slice(0, 300)) : [],
+                qualityVersion: "v2",
+                creator: "",
+                isUserEvent: false,
+                listingFeeWei: "0",
+                sourcePolicy: "",
+                resolved: false,
+                resolvePending: false,
+                outcome: null,
+                aiReasoning: "",
+                nextResolveRetryAt: null,
+                resolveAttempts: 0,
+                lastResolveError: "",
+                lastResolveTriedAt: null,
+                translations: localized[i] || {},
+              },
             },
-          },
-          { upsert: true }
-        );
-        ok++;
-      } catch (e) {
-        console.error(`[Scheduler] create: ${e.message?.slice(0, 80)}`);
+            { upsert: true }
+          );
+          ok++;
+          createdTitles.push(String(p.title || ""));
+        } catch (e) {
+          console.error(`[Scheduler] create: ${e.message?.slice(0, 80)}`);
+        }
       }
     }
 
     lastGenerate = Date.now();
     stats.generated += ok;
     stats.cycles++;
-    console.log(`[Scheduler] Published ${ok}/${unique.length}`);
+    console.log(`[Scheduler] Published ${ok} (target ${targetToCreate}, rounds ${maxRounds})`);
     if (io) io.emit("prediction:new", { count: ok });
   } catch (e) {
     console.error(`[Scheduler] gen error: ${e.message}`);
