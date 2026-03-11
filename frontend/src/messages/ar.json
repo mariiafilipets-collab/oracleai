@@ -472,7 +472,9 @@
     "userVoteFeeInfo": "رسوم التصويت على حدث المستخدم",
     "creatorGets": "حصة المنشئ",
     "creatorPayoutVotesMin": "فتح الدفعة عند",
-    "alreadyVoted": "لقد صوّت بالفعل على هذا الحدث"
+    "alreadyVoted": "لقد صوّت بالفعل على هذا الحدث",
+    "alreadyVotedCard": "لقد صوّت بالفعل على هذا الحدث",
+    "checkInAlreadyToday": "لقد أكملت تسجيل الدخول اليوم"
   },
   "leaderboard": {
     "title": "ترتيب الأسبوع",

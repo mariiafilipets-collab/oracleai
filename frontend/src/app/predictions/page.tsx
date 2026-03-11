@@ -193,6 +193,8 @@ export default function PredictionsPage() {
     query: { enabled: !!address && !!pointsAddress },
   });
   const up = userPoints as any;
+  const lastCheckIn = Number(up?.lastCheckIn ?? up?.[3] ?? 0);
+  const checkedToday = Math.floor(lastCheckIn / 86400) === Math.floor(Date.now() / 1000 / 86400);
   const { data: userEventFeeRaw } = useReadContract({
     address: predictionAddress,
     abi: PredictionABI,
@@ -434,8 +436,6 @@ export default function PredictionsPage() {
       toast.error(t("predictions.contractsNotLoaded"));
       return;
     }
-    const lastCheckIn = Number(up?.lastCheckIn ?? up?.[3] ?? 0);
-    const checkedToday = Math.floor(lastCheckIn / 86400) === Math.floor(Date.now() / 1000 / 86400);
     if (!checkedToday) {
       setPendingVote({ eventId, prediction });
       setCheckInModalOpen(true);
@@ -470,6 +470,10 @@ export default function PredictionsPage() {
   const handleCheckInFromModal = () => {
     if (!checkInAddress) {
       toast.error(t("predictions.contractsNotLoaded"));
+      return;
+    }
+    if (checkedToday) {
+      toast(tr("predictions.checkInAlreadyToday", "You already completed check-in today"));
       return;
     }
     writeCheckIn({
@@ -1038,6 +1042,10 @@ export default function PredictionsPage() {
                         <p className="text-xs text-gray-400 text-center mt-2">
                           {tr("predictions.creatorCannotVoteOwn", "You cannot vote on your own event")}
                         </p>
+                      ) : typeof pred.userPrediction === "boolean" ? (
+                        <p className="text-xs text-neon-cyan text-center mt-2">
+                          {tr("predictions.alreadyVotedCard", "You already voted on this event")}
+                        </p>
                       ) : (
                         <div className="grid grid-cols-2 gap-2 mt-2">
                           <button
@@ -1092,6 +1100,11 @@ export default function PredictionsPage() {
               <p className="text-sm text-gray-400 mb-4">
                 {tr("predictions.checkInModalSubtitle", "You must complete today's check-in before voting. Choose a tier:")}
               </p>
+              {checkedToday && (
+                <p className="text-xs text-neon-cyan mb-3">
+                  {tr("predictions.checkInAlreadyToday", "You already completed check-in today")}
+                </p>
+              )}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4">
                 {CHECKIN_TIERS.map((tier, idx) => (
                   <button
@@ -1109,13 +1122,15 @@ export default function PredictionsPage() {
               </div>
               <button
                 onClick={handleCheckInFromModal}
-                disabled={isCheckInPending || isCheckInConfirming}
+                disabled={checkedToday || isCheckInPending || isCheckInConfirming}
                 className="w-full min-h-11 py-3 rounded-xl bg-gradient-to-r from-neon-cyan to-neon-purple text-dark-900 font-bold disabled:opacity-50"
               >
                 {isCheckInPending
                   ? tr("checkin.confirming", "Confirm in wallet...")
                   : isCheckInConfirming
                     ? tr("checkin.processing", "Processing on-chain...")
+                    : checkedToday
+                      ? tr("predictions.checkInAlreadyToday", "You already completed check-in today")
                     : t("predictions.checkInModalAction", { amount: CHECKIN_TIERS[selectedTier].amount })}
               </button>
             </motion.div>

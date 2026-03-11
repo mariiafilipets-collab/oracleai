@@ -472,7 +472,9 @@
       "newswire": "Newswire",
       "oracle": "Oracle feed"
     },
-    "alreadyVoted": "You already voted on this event"
+    "alreadyVoted": "You already voted on this event",
+    "alreadyVotedCard": "You already voted on this event",
+    "checkInAlreadyToday": "You already completed check-in today"
   },
   "leaderboard": {
     "title": "Weekly Leaderboard",

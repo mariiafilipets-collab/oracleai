@@ -472,7 +472,9 @@
     "userVoteFeeInfo": "用户事件投票费",
     "creatorGets": "创作者获得",
     "creatorPayoutVotesMin": "解锁门槛",
-    "alreadyVoted": "你已在该事件中投过票"
+    "alreadyVoted": "你已在该事件中投过票",
+    "alreadyVotedCard": "你已为该事件投过票",
+    "checkInAlreadyToday": "你今天已经完成签到"
   },
   "leaderboard": {
     "title": "每周排行榜",

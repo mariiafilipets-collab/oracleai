@@ -472,7 +472,9 @@
     "userVoteFeeInfo": "Frais de vote sur evenement utilisateur",
     "creatorGets": "le createur recoit",
     "creatorPayoutVotesMin": "deblocage du paiement",
-    "alreadyVoted": "Vous avez deja vote sur cet evenement"
+    "alreadyVoted": "Vous avez deja vote sur cet evenement",
+    "alreadyVotedCard": "Vous avez deja vote sur cet evenement",
+    "checkInAlreadyToday": "Vous avez deja effectue le check-in aujourd'hui"
   },
   "leaderboard": {
     "title": "Classement Hebdo",
