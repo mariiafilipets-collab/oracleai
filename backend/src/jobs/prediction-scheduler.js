@@ -261,6 +261,15 @@ export function buildEventTiming({ category, hoursToResolve, verifyAtUtc, eventS
   const resolveMs = Math.max(6, Number(hoursToResolve || 8)) * 3600000;
   const parsedVerifyAt = parseIsoUtc(verifyAtUtc);
   const parsedEventStart = parseIsoUtc(eventStartAtUtc);
+  if (!isUserEvent && useEventStartAnchor(category, isUserEvent) && !parsedEventStart) {
+    return {
+      deadline: new Date(now + 60_000),
+      verifyAfter: parsedVerifyAt && parsedVerifyAt.getTime() > now + 60_000 ? parsedVerifyAt : new Date(now + resolveMs),
+      verifyBufferMs: getVerifyBufferMs(category, isUserEvent),
+      voteCloseLeadMs: getVoteCloseLeadMs(category, isUserEvent),
+      isValidWindow: false,
+    };
+  }
   let resultCheckAt = parsedVerifyAt && parsedVerifyAt.getTime() > now + 60_000
     ? parsedVerifyAt
     : new Date(now + resolveMs);
