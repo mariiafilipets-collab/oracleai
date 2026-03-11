@@ -334,6 +334,17 @@ function genericCategorySignature(title, category) {
   const c = String(category || "").toUpperCase();
   const norm = normalizeTitleForSimilarity(title);
   if (!norm) return "";
+  const topicAliases = [
+    { key: "SP500", re: /\b(s&p|sp 500|s 500)\b/i },
+    { key: "NASDAQ", re: /\b(nasdaq)\b/i },
+    { key: "DOW", re: /\b(dow|dow jones)\b/i },
+    { key: "BTC", re: /\b(bitcoin|btc)\b/i },
+    { key: "ETH", re: /\b(ethereum|eth)\b/i },
+    { key: "GOLD", re: /\b(gold)\b/i },
+    { key: "WTI", re: /\b(wti|crude oil|oil)\b/i },
+    { key: "US_CPI", re: /\b(cpi|inflation)\b/i },
+  ];
+  const topic = topicAliases.find((x) => x.re.test(String(title || "")))?.key || "";
   const tokens = norm
     .split(/\s+/)
     .filter(Boolean)
@@ -343,7 +354,8 @@ function genericCategorySignature(title, category) {
   const nums = Array.from(new Set((String(title || "").match(/\d+(?:\.\d+)?/g) || []).slice(0, 3)));
   const numKey = nums.join(",") || "na";
   if (c === "ECONOMY" || c === "CRYPTO") {
-    // For market-like questions, numeric threshold + date + top terms is the strongest similarity signal.
+    // Strong anti-repeat for same asset/metric in same window regardless of small threshold changes.
+    if (topic) return `${c}|${topic}|${dateKey}`;
     return `${c}|${dateKey}|${numKey}|${tokens.slice(0, 5).join(" ")}`;
   }
   return `${c}|${dateKey}|${tokens.slice(0, 6).join(" ")}`;

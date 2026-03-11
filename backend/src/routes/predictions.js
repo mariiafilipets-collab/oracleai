@@ -137,6 +137,17 @@ function genericCategorySignature(title, category) {
   const c = String(category || "").toUpperCase();
   const norm = normalizeTitle(title);
   if (!norm) return "";
+  const topicAliases = [
+    { key: "SP500", re: /\b(s&p|sp 500|s 500)\b/i },
+    { key: "NASDAQ", re: /\b(nasdaq)\b/i },
+    { key: "DOW", re: /\b(dow|dow jones)\b/i },
+    { key: "BTC", re: /\b(bitcoin|btc)\b/i },
+    { key: "ETH", re: /\b(ethereum|eth)\b/i },
+    { key: "GOLD", re: /\b(gold)\b/i },
+    { key: "WTI", re: /\b(wti|crude oil|oil)\b/i },
+    { key: "US_CPI", re: /\b(cpi|inflation)\b/i },
+  ];
+  const topic = topicAliases.find((x) => x.re.test(String(title || "")))?.key || "";
   const tokens = norm
     .split(/\s+/)
     .filter(Boolean)
@@ -146,6 +157,7 @@ function genericCategorySignature(title, category) {
   const nums = Array.from(new Set((String(title || "").match(/\d+(?:\.\d+)?/g) || []).slice(0, 3)));
   const numKey = nums.join(",") || "na";
   if (c === "ECONOMY" || c === "CRYPTO") {
+    if (topic) return `${c}|${topic}|${dateKey}`;
     return `${c}|${dateKey}|${numKey}|${tokens.slice(0, 5).join(" ")}`;
   }
   return `${c}|${dateKey}|${tokens.slice(0, 6).join(" ")}`;
@@ -192,6 +204,16 @@ function dedupeNearDuplicateEvents(events) {
     out.push(evt);
   }
   return out;
+}
+
+function recategorizeByTitle(events) {
+  return (events || []).map((evt) => {
+    if (evt?.isUserEvent) return evt;
+    const inferred = inferCategoryFromText(`${evt?.title || ""} ${evt?.description || ""}`);
+    if (!inferred || inferred === "CRYPTO") return evt;
+    if (String(evt?.category || "").toUpperCase() === inferred) return evt;
+    return { ...evt, category: inferred };
+  });
 }
 
 async function readPredictionValueNoArgs(prediction, fragment, methodName, fallback) {
@@ -376,6 +398,7 @@ router.get("/", async (req, res) => {
     let events = await PredictionEvent.find({ resolved: false, deadline: { $gt: new Date() } })
       .sort({ deadline: 1 }).lean();
     events = await attachUserVotes(events, req.query.address);
+    events = recategorizeByTitle(events);
     events = ensureDetailedDescriptions(events);
     events = dedupeNearDuplicateEvents(events);
     events = await withTranslation(events, req.query.lang);
@@ -391,6 +414,7 @@ router.get("/all", async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = Math.min(parseInt(req.query.limit) || 50, 100);
     let events = await PredictionEvent.find().sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean();
+    events = recategorizeByTitle(events);
     events = ensureDetailedDescriptions(events);
     events = await withTranslation(events, req.query.lang);
     const total = await PredictionEvent.countDocuments();
@@ -412,6 +436,7 @@ router.get("/resolved", async (req, res) => {
       events = await PredictionEvent.find({ resolved: true }).sort({ createdAt: -1 }).limit(50).lean();
     }
     events = await attachUserVotes(events, req.query.address);
+    events = recategorizeByTitle(events);
     events = ensureDetailedDescriptions(events);
     events = await withTranslation(events, req.query.lang);
     res.json({ success: true, data: events });
