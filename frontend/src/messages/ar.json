@@ -70,6 +70,7 @@
     "button": "تسجيل {tier} ({amount} BNB) — اربح {pts}",
     "confirming": "أكد في المحفظة...",
     "processing": "جار المعالجة...",
+    "alreadyToday": "لقد أكملت تسجيل الدخول اليوم",
     "streak": "سلسلة {count} يوم",
     "fees": {
       "prizes": "50% جوائز",

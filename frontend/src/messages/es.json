@@ -70,6 +70,7 @@
     "button": "Check-In {tier} ({amount} BNB) — Ganar {pts}",
     "confirming": "Confirma en tu wallet...",
     "processing": "Procesando en cadena...",
+    "alreadyToday": "Ya hiciste el check-in hoy",
     "streak": "Racha de {count} dias",
     "fees": {
       "prizes": "50% Premios",

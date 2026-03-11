@@ -70,6 +70,7 @@
     "button": "Чек-ин {tier} ({amount} BNB) — Получить {pts}",
     "confirming": "Подтвердите в кошельке...",
     "processing": "Обработка на блокчейне...",
+    "alreadyToday": "Вы уже прошли чек-ин сегодня",
     "streak": "Серия: {count} дней",
     "fees": {
       "prizes": "50% Призы",

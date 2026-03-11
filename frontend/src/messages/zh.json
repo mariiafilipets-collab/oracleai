@@ -70,6 +70,7 @@
     "button": "以{tier}签到 ({amount} BNB) — 赚取{pts}",
     "confirming": "在钱包中确认...",
     "processing": "链上处理中...",
+    "alreadyToday": "你今天已经完成签到",
     "streak": "{count}天连续签到",
     "fees": {
       "prizes": "50% 奖金",

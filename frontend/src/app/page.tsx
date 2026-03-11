@@ -30,6 +30,7 @@ export default function HomePage() {
   const [selectedTier, setSelectedTier] = useState(0);
   const [predictions, setPredictions] = useState<any[]>([]);
   const [showGuide, setShowGuide] = useState(false);
+  const [checkedInThisSession, setCheckedInThisSession] = useState(false);
 
   const checkInAddress = addresses?.CheckIn as `0x${string}` | undefined;
   const pointsAddress = addresses?.Points as `0x${string}` | undefined;
@@ -43,6 +44,9 @@ export default function HomePage() {
     query: { enabled: !!address && !!pointsAddress },
   });
   const up = userPoints as any;
+  const lastCheckIn = Number(up?.lastCheckIn ?? up?.[3] ?? 0);
+  const checkedTodayOnChain = Math.floor(lastCheckIn / 86400) === Math.floor(Date.now() / 1000 / 86400);
+  const checkedToday = checkedTodayOnChain || checkedInThisSession;
   const { data: prizeBalance } = useReadContract({
     address: prizePoolAddress,
     abi: PrizePoolABI,
@@ -57,16 +61,21 @@ export default function HomePage() {
       toast.error(t("predictions.contractsNotLoaded"));
       return;
     }
+    if (checkedToday) {
+      toast(t("checkin.alreadyToday"));
+      return;
+    }
     writeContract({
       address: checkInAddress,
       abi: CheckInABI,
       functionName: "checkIn",
       value: parseEther(TIERS[selectedTier].amount),
     });
-  }, [checkInAddress, selectedTier, t, writeContract]);
+  }, [checkInAddress, checkedToday, selectedTier, t, writeContract]);
 
   useEffect(() => {
     if (isSuccess) {
+      setCheckedInThisSession(true);
       const tierLabel = t(`tiers.${TIERS[selectedTier].key}`);
       toast.success(`${tierLabel}! +${TIERS[selectedTier].pts} ${t("common.pts")}!`);
       addActivity({
@@ -80,6 +89,10 @@ export default function HomePage() {
       });
     }
   }, [isSuccess, t, addActivity, address, selectedTier, up?.streak, up]);
+
+  useEffect(() => {
+    setCheckedInThisSession(false);
+  }, [address]);
 
   const refreshData = useCallback(() => {
     api
@@ -293,9 +306,9 @@ export default function HomePage() {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={handleCheckIn}
-              disabled={isPending || isConfirming}
+              disabled={checkedToday || isPending || isConfirming}
               className={`w-full min-h-12 py-4 rounded-xl font-bold text-base sm:text-lg transition-all duration-300 ${
-                isPending || isConfirming
+                checkedToday || isPending || isConfirming
                   ? "bg-dark-600 text-gray-500 cursor-wait"
                   : "bg-gradient-to-r from-neon-cyan to-neon-purple text-dark-900 hover:opacity-90 animate-pulse-glow"
               }`}
@@ -304,6 +317,8 @@ export default function HomePage() {
                 ? t("checkin.confirming")
                 : isConfirming
                   ? t("checkin.processing")
+                  : checkedToday
+                    ? t("checkin.alreadyToday")
                   : t("checkin.button", {
                       tier: t(`tiers.${TIERS[selectedTier].key}`),
                       amount: TIERS[selectedTier].amount,
