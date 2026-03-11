@@ -33,6 +33,13 @@ const CATEGORY_VOTE_CLOSE_LEAD_MINUTES = {
   CRYPTO: 10,
   CLIMATE: 20,
 };
+const CATEGORY_MIN_RESULT_DELAY_MINUTES = {
+  SPORTS: 120,
+  POLITICS: 30,
+  ECONOMY: 15,
+  CRYPTO: 15,
+  CLIMATE: 30,
+};
 
 let io = null;
 let generating = false;
@@ -66,6 +73,12 @@ export function getVoteCloseLeadMs(category, isUserEvent = false) {
   return minutes * 60 * 1000;
 }
 
+function getMinResultDelayMs(category) {
+  const key = String(category || "CRYPTO").toUpperCase();
+  const minutes = CATEGORY_MIN_RESULT_DELAY_MINUTES[key] || 15;
+  return minutes * 60 * 1000;
+}
+
 function parseIsoUtc(value) {
   const s = String(value || "").trim();
   if (!s) return null;
@@ -86,9 +99,15 @@ export function buildEventTiming({ category, hoursToResolve, verifyAtUtc, eventS
   const resolveMs = Math.max(6, Number(hoursToResolve || 8)) * 3600000;
   const parsedVerifyAt = parseIsoUtc(verifyAtUtc);
   const parsedEventStart = parseIsoUtc(eventStartAtUtc);
-  const resultCheckAt = parsedVerifyAt && parsedVerifyAt.getTime() > now + 60_000
+  let resultCheckAt = parsedVerifyAt && parsedVerifyAt.getTime() > now + 60_000
     ? parsedVerifyAt
     : new Date(now + resolveMs);
+  if (parsedEventStart) {
+    const minResultTs = parsedEventStart.getTime() + getMinResultDelayMs(category);
+    if (resultCheckAt.getTime() < minResultTs) {
+      resultCheckAt = new Date(minResultTs);
+    }
+  }
   const verifyBufferMs = getVerifyBufferMs(category, isUserEvent);
   const voteCloseLeadMs = getVoteCloseLeadMs(category, isUserEvent);
   const latestByVerifyMs = resultCheckAt.getTime() - verifyBufferMs;
