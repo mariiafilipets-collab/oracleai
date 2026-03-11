@@ -28,6 +28,11 @@ const CHECKIN_TIERS = [
   { key: "pro", amount: "0.01", pts: "300", color: "text-neon-cyan" },
   { key: "whale", amount: "0.05", pts: "1000", color: "text-neon-gold" },
 ];
+const VOTE_TIERS = {
+  basic: "0.00015",
+  pro: "0.005",
+  whaleMin: "0.05",
+} as const;
 const USER_EVENT_CATEGORIES = ["SPORTS", "POLITICS", "ECONOMY", "CRYPTO", "CLIMATE"] as const;
 const USER_EVENT_SOURCES = ["official", "market", "newswire", "oracle"] as const;
 
@@ -175,6 +180,8 @@ export default function PredictionsPage() {
   const [checkInModalOpen, setCheckInModalOpen] = useState(false);
   const [selectedTier, setSelectedTier] = useState(0);
   const [pendingVote, setPendingVote] = useState<{ eventId: number; prediction: boolean } | null>(null);
+  const [voteTier, setVoteTier] = useState<"basic" | "pro" | "whale">("basic");
+  const [whaleVoteAmount, setWhaleVoteAmount] = useState("0.05");
   const [createOpen, setCreateOpen] = useState(false);
   const [creatingEvent, setCreatingEvent] = useState(false);
   const [expectedCreatedEventId, setExpectedCreatedEventId] = useState<number | null>(null);
@@ -276,6 +283,17 @@ export default function PredictionsPage() {
   const { isLoading: isCheckInConfirming, isSuccess: isCheckInSuccess } = useWaitForTransactionReceipt({ hash: checkInHash });
   const { writeContract: writeCreateEvent, data: createHash, isPending: isCreatePending } = useWriteContract();
   const { isSuccess: isCreateSuccess } = useWaitForTransactionReceipt({ hash: createHash });
+  const selectedVoteFeeWei = useMemo(() => {
+    try {
+      if (voteTier === "basic") return parseEther(VOTE_TIERS.basic);
+      if (voteTier === "pro") return parseEther(VOTE_TIERS.pro);
+      const amount = Number(whaleVoteAmount || "0");
+      if (!Number.isFinite(amount) || amount < Number(VOTE_TIERS.whaleMin)) return null;
+      return parseEther(String(amount));
+    } catch {
+      return null;
+    }
+  }, [voteTier, whaleVoteAmount]);
 
   const loadPredictions = useCallback(async (lang?: string) => {
     const seq = ++requestSeqRef.current;
@@ -460,12 +478,16 @@ export default function PredictionsPage() {
       toast.error(tr("predictions.creatorCannotVoteOwn", "You cannot vote on your own event"));
       return;
     }
+    if (!selectedVoteFeeWei) {
+      toast.error(tr("predictions.invalidVoteFee", "Invalid vote fee amount"));
+      return;
+    }
     writeVote({
       address: predictionAddress,
       abi: PredictionABI,
       functionName: "submitPrediction",
       args: [BigInt(eventId), prediction],
-      value: isUserEvent && hasCreatorEconomy ? userEventVoteFeeWei : undefined,
+      value: selectedVoteFeeWei,
     });
     setLastSubmittedVote({ eventId, prediction });
   };
@@ -693,15 +715,7 @@ export default function PredictionsPage() {
                 ? tr("predictions.userCreateCooldownVerified", "verified: 3 events per 24h")
                 : tr("predictions.userCreateCooldown", "1 event per 24h")}
             </p>
-            {hasCreatorEconomy && (
-              <p className="text-[11px] text-gray-500 mt-1">
-                {tr("predictions.userVoteFeeInfo", "User-event vote fee")} {userEventVoteFeeDisplay} BNB
-                {" · "}
-                {tr("predictions.creatorGets", "creator gets")} {creatorSharePct}%
-                {" · "}
-                {tr("predictions.creatorPayoutVotesMin", "payout unlock")} {minCreatorPayoutVotes} {tr("predictions.votes", "votes")}
-              </p>
-            )}
+            {hasCreatorEconomy && null}
             <p className="text-[11px] text-gray-500 mt-1">
               {isVerifiedCreator
                 ? tr("predictions.creatorTierVerified", "Creator tier: VERIFIED")
@@ -814,6 +828,43 @@ export default function PredictionsPage() {
           <span className="inline-flex items-center gap-1"><AppIcon name="target" className="w-4 h-4" /> {tr("predictions.myVotes", "My Votes")} ({votedPredictions.length})</span>
         </button>
       </div>
+
+      <GlassCard className="space-y-2 p-3" glow="cyan" hover={false}>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-gray-400">{tr("predictions.voteFeeTier", "Vote fee tier")}:</span>
+          {(["basic", "pro", "whale"] as const).map((tier) => (
+            <button
+              key={tier}
+              onClick={() => setVoteTier(tier)}
+              className={`px-3 py-1.5 rounded-lg text-xs border transition ${
+                voteTier === tier
+                  ? "border-neon-cyan bg-neon-cyan/15 text-neon-cyan"
+                  : "border-dark-500 bg-dark-700 text-gray-300"
+              }`}
+            >
+              {tier.toUpperCase()}
+            </button>
+          ))}
+          <span className="text-xs font-mono text-neon-gold">
+            {tr("predictions.currentVoteFee", "Current vote fee")}:{" "}
+            {voteTier === "basic" ? VOTE_TIERS.basic : voteTier === "pro" ? VOTE_TIERS.pro : whaleVoteAmount} BNB
+          </span>
+        </div>
+        {voteTier === "whale" && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-gray-400">{tr("predictions.whaleAmount", "Whale amount")}:</span>
+            <input
+              value={whaleVoteAmount}
+              onChange={(e) => setWhaleVoteAmount(e.target.value)}
+              className="bg-dark-700 border border-dark-500 rounded-lg px-2 py-1.5 text-xs text-white w-32"
+              placeholder="0.05"
+            />
+            <span className="text-[11px] text-gray-500">
+              {tr("predictions.whaleAmountHint", "Minimum 0.05 BNB. Any higher amount is allowed.")}
+            </span>
+          </div>
+        )}
+      </GlassCard>
 
       {/* Category Tabs */}
       <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">

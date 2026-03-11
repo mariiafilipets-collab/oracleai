@@ -56,11 +56,13 @@ contract Prediction is AccessControl, ReentrancyGuard {
     address public stakingRewards;
     uint256 public eventCount;
 
-    uint256 public constant CORRECT_BONUS = 50;
-    uint256 public constant BEAT_AI_BONUS = 100;
+    uint256 public constant VOTE_BASE_POINTS = 50;
     uint256 public constant DAY = 86400;
     uint256 public constant USER_EVENT_FEE = 0.0015 ether;
     uint256 public userEventVoteFee = 0.0002 ether;
+    uint256 public constant VOTE_BASIC_FEE = 0.00015 ether;
+    uint256 public constant VOTE_PRO_FEE = 0.005 ether;
+    uint256 public constant VOTE_WHALE_MIN_FEE = 0.05 ether;
     uint256 public constant USER_EVENT_COOLDOWN = DAY;
     uint256 public constant VERIFIED_CREATOR_COOLDOWN = DAY / 3;
     uint256 public constant VERIFIED_MIN_POINTS = 5000;
@@ -94,6 +96,7 @@ contract Prediction is AccessControl, ReentrancyGuard {
     mapping(uint256 => uint256) public creatorPendingByEvent;
     mapping(address => uint256) public creatorClaimableWei;
     mapping(uint256 => bool) public creatorPayoutFinalized;
+    mapping(uint256 => mapping(address => uint256)) public voteMultiplierBps;
     uint256 public pendingProtocolFeesWei;
     uint256 public nextProtocolDistributionAt;
 
@@ -225,26 +228,21 @@ contract Prediction is AccessControl, ReentrancyGuard {
         require(!userVotes[eventId][msg.sender].voted, "Already voted");
         if (evt.isUserEvent) {
             require(msg.sender != evt.creator, "Creator cannot vote own event");
-            require(msg.value == userEventVoteFee, "Invalid vote fee");
-        } else {
-            require(msg.value == 0, "No vote fee for AI events");
         }
+        uint256 multiplierBps = _getVoteMultiplierBps(msg.value);
         (, , , uint256 lastCheckIn, , , ) = pointsContract.users(msg.sender);
         require(lastCheckIn / DAY == block.timestamp / DAY, "Check-in required today");
 
         userVotes[eventId][msg.sender] = UserVote(true, _prediction);
+        voteMultiplierBps[eventId][msg.sender] = multiplierBps;
         eventVoters[eventId].push(msg.sender);
 
         if (_prediction) evt.totalVotesYes++;
         else evt.totalVotesNo++;
 
-        if (evt.isUserEvent && msg.value > 0) {
-            uint256 creatorCut = (msg.value * creatorShareBps) / BPS_DENOMINATOR;
-            uint256 protocolCut = msg.value - creatorCut;
-            creatorPendingByEvent[eventId] += creatorCut;
-            pendingProtocolFeesWei += protocolCut;
-            emit ProtocolFeesDistributionScheduled(pendingProtocolFeesWei, nextProtocolDistributionAt);
-            emit VoteFeeDistributed(eventId, msg.sender, msg.value, creatorCut, protocolCut);
+        if (msg.value > 0) {
+            _distributeVoteFees(msg.sender, msg.value);
+            emit VoteFeeDistributed(eventId, msg.sender, msg.value, 0, msg.value);
         }
 
         emit VoteSubmitted(eventId, msg.sender, _prediction);
@@ -285,8 +283,11 @@ contract Prediction is AccessControl, ReentrancyGuard {
             bool userCorrect = vote.prediction == _pendingOutcome[eventId];
             if (userCorrect) {
                 resolvedWinners[eventId]++;
-                uint256 bonus = CORRECT_BONUS;
-                if (!_pendingAiWasRight[eventId]) bonus += BEAT_AI_BONUS;
+                uint256 multiplierBps = voteMultiplierBps[eventId][voters[i]];
+                if (multiplierBps == 0) multiplierBps = 10000; // backward-safe default (Basic)
+                uint256 basePoints = (VOTE_BASE_POINTS * multiplierBps) / 10000;
+                // +100% for correct prediction (x2 on all tiers, incl. Whale).
+                uint256 bonus = basePoints * 2;
                 pointsContract.addPredictionBonus(voters[i], bonus, true);
             } else {
                 pointsContract.addPredictionBonus(voters[i], 0, false);
@@ -313,7 +314,7 @@ contract Prediction is AccessControl, ReentrancyGuard {
         return ok;
     }
 
-    function _distributeProtocolShare(uint256 amount) internal {
+    function _distributeVoteFees(address user, uint256 amount) internal {
         if (amount == 0) return;
 
         uint256 prizeAmount = (amount * PRIZE_SHARE) / BPS_DENOMINATOR;
@@ -328,10 +329,20 @@ contract Prediction is AccessControl, ReentrancyGuard {
         if (!_safeSend(treasury, treasuryAmount)) {
             revert("Treasury transfer failed");
         }
-        // For 12h batched distribution we no longer have per-voter context.
-        // Referral share from user-event vote fees is redirected to treasury.
-        if (!_safeSend(treasury, referralAmount)) {
-            revert("Referral fallback failed");
+        bool referralHandled = false;
+        if (address(referralContract) != address(0) && referralAmount > 0) {
+            try referralContract.hasReferrer(user) returns (bool hasRef) {
+                if (hasRef) {
+                    try referralContract.distributeReferralFees{value: referralAmount}(user, referralAmount) {
+                        referralHandled = true;
+                    } catch {}
+                }
+            } catch {}
+        }
+        if (!referralHandled) {
+            if (!_safeSend(treasury, referralAmount)) {
+                revert("Referral fallback failed");
+            }
         }
 
         if (!_safeSend(burnReserve, burnAmount)) {
@@ -348,7 +359,7 @@ contract Prediction is AccessControl, ReentrancyGuard {
         uint256 amount = pendingProtocolFeesWei;
         require(amount > 0, "No protocol fees");
         pendingProtocolFeesWei = 0;
-        _distributeProtocolShare(amount);
+        _distributeVoteFees(address(0), amount);
         nextProtocolDistributionAt = block.timestamp + PROTOCOL_DISTRIBUTION_INTERVAL;
     }
 
@@ -402,6 +413,29 @@ contract Prediction is AccessControl, ReentrancyGuard {
         creatorShareBps = _creatorShareBps;
         minCreatorPayoutVotes = _minCreatorPayoutVotes;
         emit FeeConfigUpdated(_userEventVoteFee, _creatorShareBps, _minCreatorPayoutVotes);
+    }
+
+    function _sqrt(uint256 x) internal pure returns (uint256 y) {
+        if (x == 0) return 0;
+        uint256 z = (x + 1) / 2;
+        y = x;
+        while (z < y) {
+            y = z;
+            z = (x / z + z) / 2;
+        }
+    }
+
+    function _getVoteMultiplierBps(uint256 amount) internal pure returns (uint256) {
+        if (amount == VOTE_BASIC_FEE) return 10000; // 1x
+        if (amount == VOTE_PRO_FEE) return 30000;   // 3x
+        require(amount >= VOTE_WHALE_MIN_FEE, "Invalid vote fee tier");
+        // multiplier = 10 * sqrt(amount / 0.05)
+        // return in bps (1x = 10000 bps)
+        uint256 ratio1e18 = (amount * 1e18) / VOTE_WHALE_MIN_FEE;
+        uint256 sqrtRatio1e9 = _sqrt(ratio1e18); // sqrt(1e18)=1e9
+        uint256 multBps = (100000 * sqrtRatio1e9) / 1e9; // 10x at min whale
+        if (multBps < 100000) multBps = 100000;
+        return multBps;
     }
 
     function setFeeReceivers(
