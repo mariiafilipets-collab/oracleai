@@ -163,10 +163,30 @@ function genericCategorySignature(title, category) {
   return `${c}|${dateKey}|${tokens.slice(0, 6).join(" ")}`;
 }
 
+function marketTopicKey(title, category) {
+  const c = String(category || "").toUpperCase();
+  if (c !== "ECONOMY" && c !== "CRYPTO") return "";
+  const s = String(title || "");
+  const topicAliases = [
+    { key: "SP500", re: /\b(s&p|sp 500|s 500)\b/i },
+    { key: "NASDAQ", re: /\b(nasdaq)\b/i },
+    { key: "DOW", re: /\b(dow|dow jones)\b/i },
+    { key: "BTC", re: /\b(bitcoin|btc)\b/i },
+    { key: "ETH", re: /\b(ethereum|eth)\b/i },
+    { key: "GOLD", re: /\b(gold)\b/i },
+    { key: "WTI", re: /\b(wti|crude oil|oil)\b/i },
+    { key: "US_CPI", re: /\b(cpi|inflation)\b/i },
+  ];
+  return topicAliases.find((x) => x.re.test(s))?.key || "";
+}
+
 function isNearDuplicateEvent(a, b) {
   const ca = String(a?.category || "").toUpperCase();
   const cb = String(b?.category || "").toUpperCase();
   if (ca && cb && ca === cb) {
+    const ta = marketTopicKey(a?.title, ca);
+    const tb = marketTopicKey(b?.title, cb);
+    if (ta && tb && ta === tb) return true;
     const sa = ca === "SPORTS" ? sportsFixtureSignature(a?.title) : genericCategorySignature(a?.title, ca);
     const sb = cb === "SPORTS" ? sportsFixtureSignature(b?.title) : genericCategorySignature(b?.title, cb);
     if (sa && sb && sa === sb) return true;
