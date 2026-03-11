@@ -18,7 +18,7 @@ const CATEGORY_NAMES = ["SPORTS", "POLITICS", "ECONOMY", "CRYPTO", "CLIMATE"];
 
 function inferCategoryFromText(text) {
   const t = String(text || "").toLowerCase();
-  if (/\b(vs|match|fixture|derby|league|cup|goal|score|scorer|assist|football|soccer|basketball|tennis|hockey|ufc|f1|motogp|grand prix|gp|verstappen|hamilton|nba|nfl|mlb|nhl|arsenal|manchester|liverpool|chelsea|tottenham|real madrid|barcelona|atletico|bayern|psg|juventus|inter|milan)\b/.test(t)) return "SPORTS";
+  if (/\b(vs|versus|match|fixture|derby|league|cup|goal|score|scorer|assist|football|soccer|basketball|tennis|hockey|ufc|f1|motogp|grand prix|gp|verstappen|hamilton|nba|nfl|mlb|nhl|beat|defeat|defeats|defeated|lose to|lost to|arsenal|manchester|man utd|manchester united|liverpool|chelsea|tottenham|real madrid|barcelona|atletico|bayern|psg|juventus|inter|milan|burnley|bournemouth|aston villa|crystal palace|leeds|nottingham forest|west ham|newcastle)\b/.test(t)) return "SPORTS";
   if (/\b(election|president|parliament|sanction|summit|ceasefire|government|minister|vote)\b/.test(t)) return "POLITICS";
   if (/\b(cpi|inflation|gdp|fed|ecb|interest rate|jobs report|earnings|dow|nasdaq|s&p|gold|oil)\b/.test(t)) return "ECONOMY";
   if (/\b(bitcoin|btc|ethereum|eth|solana|xrp|crypto|token|etf|on-chain|wallet|binance|coinbase)\b/.test(t)) return "CRYPTO";

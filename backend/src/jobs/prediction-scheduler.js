@@ -576,7 +576,7 @@ async function publishNewBatch(options = {}) {
 
 function inferCategoryFromText(text) {
   const t = String(text || "").toLowerCase();
-  if (/\b(vs|match|fixture|derby|league|cup|goal|score|scorer|assist|player|team|coach|lineup|penalty|football|soccer|basketball|tennis|hockey|baseball|cricket|mma|ufc|f1|formula 1|motogp|grand prix|gp|verstappen|hamilton|nba|nfl|mlb|nhl|uefa|fifa|premier league|la liga|laliga|serie a|bundesliga|champions league|europa league|arsenal|manchester|liverpool|chelsea|tottenham|real madrid|barcelona|atletico|bayern|psg|juventus|inter|milan|dortmund)\b/.test(t)) {
+  if (/\b(vs|versus|match|fixture|derby|league|cup|goal|score|scorer|assist|player|team|coach|lineup|penalty|football|soccer|basketball|tennis|hockey|baseball|cricket|mma|ufc|f1|formula 1|motogp|grand prix|gp|verstappen|hamilton|nba|nfl|mlb|nhl|uefa|fifa|premier league|la liga|laliga|serie a|bundesliga|champions league|europa league|beat|defeat|defeats|defeated|lose to|lost to|arsenal|manchester|man utd|manchester united|liverpool|chelsea|tottenham|real madrid|barcelona|atletico|bayern|psg|juventus|inter|milan|dortmund|burnley|bournemouth|aston villa|crystal palace|leeds|nottingham forest|west ham|newcastle)\b/.test(t)) {
     return "SPORTS";
   }
   if (/\b(election|president|parliament|sanction|summit|ceasefire|government|minister|vote)\b/.test(t)) {
