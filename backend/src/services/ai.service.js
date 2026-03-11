@@ -330,6 +330,36 @@ function sportsFixtureSignature(title) {
   return `${sides[0]}|${sides[1]}|${dateKey || "na"}`;
 }
 
+function genericCategorySignature(title, category) {
+  const c = String(category || "").toUpperCase();
+  const norm = normalizeTitleForSimilarity(title);
+  if (!norm) return "";
+  const tokens = norm
+    .split(/\s+/)
+    .filter(Boolean)
+    .filter((t) => t.length > 2)
+    .slice(0, 10);
+  const dateKey = extractDateKey(title) || "na";
+  const nums = Array.from(new Set((String(title || "").match(/\d+(?:\.\d+)?/g) || []).slice(0, 3)));
+  const numKey = nums.join(",") || "na";
+  if (c === "ECONOMY" || c === "CRYPTO") {
+    // For market-like questions, numeric threshold + date + top terms is the strongest similarity signal.
+    return `${c}|${dateKey}|${numKey}|${tokens.slice(0, 5).join(" ")}`;
+  }
+  return `${c}|${dateKey}|${tokens.slice(0, 6).join(" ")}`;
+}
+
+function isNearDuplicateEvent(a, b) {
+  const ca = String(a?.category || "").toUpperCase();
+  const cb = String(b?.category || "").toUpperCase();
+  if (ca && cb && ca === cb) {
+    const sa = ca === "SPORTS" ? sportsFixtureSignature(a?.title) : genericCategorySignature(a?.title, ca);
+    const sb = cb === "SPORTS" ? sportsFixtureSignature(b?.title) : genericCategorySignature(b?.title, cb);
+    if (sa && sb && sa === sb) return true;
+  }
+  return isNearDuplicateTitle(a?.title, b?.title);
+}
+
 function buildDetailedDescription(event) {
   const title = String(event?.title || "").trim();
   const category = String(event?.category || "CRYPTO").toUpperCase();
@@ -518,7 +548,9 @@ async function generateCategoryPredictions(category, context, options = {}) {
   const avoidTitles = Array.isArray(options?.avoidTitles) ? options.avoidTitles : [];
   const avoidBlock = avoidTitles.length
     ? `\nDO NOT repeat, paraphrase, or closely mirror these already active markets.
-For SPORTS: never propose the same fixture (same teams and date) with different wording.\n${avoidTitles
+For SPORTS: never propose the same fixture (same teams and date) with different wording.
+For ECONOMY/CRYPTO: never propose the same metric + threshold + date window with different wording.
+For POLITICS/CLIMATE: never propose the same decision/event window with rephrased text.\n${avoidTitles
         .slice(0, 80)
         .map((t, i) => `${i + 1}. ${String(t).slice(0, 120)}`)
         .join("\n")}`
@@ -925,7 +957,7 @@ Bad: "Will Bitcoin rise soon?"${avoidBlock}`
 
     const deduped = [];
     for (const evt of final) {
-      if (deduped.some((x) => isNearDuplicateTitle(x.title, evt.title))) continue;
+      if (deduped.some((x) => isNearDuplicateEvent(x, evt))) continue;
       const richDescription = evt.description.length >= 80 ? evt.description : buildDetailedDescription(evt);
       deduped.push({
         ...evt,

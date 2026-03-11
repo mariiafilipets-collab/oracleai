@@ -133,6 +133,35 @@ function sportsFixtureSignature(title) {
   return `${sides[0]}|${sides[1]}|${dateKey || "na"}`;
 }
 
+function genericCategorySignature(title, category) {
+  const c = String(category || "").toUpperCase();
+  const norm = normalizeTitle(title);
+  if (!norm) return "";
+  const tokens = norm
+    .split(/\s+/)
+    .filter(Boolean)
+    .filter((t) => t.length > 2)
+    .slice(0, 10);
+  const dateKey = extractDateKey(title) || "na";
+  const nums = Array.from(new Set((String(title || "").match(/\d+(?:\.\d+)?/g) || []).slice(0, 3)));
+  const numKey = nums.join(",") || "na";
+  if (c === "ECONOMY" || c === "CRYPTO") {
+    return `${c}|${dateKey}|${numKey}|${tokens.slice(0, 5).join(" ")}`;
+  }
+  return `${c}|${dateKey}|${tokens.slice(0, 6).join(" ")}`;
+}
+
+function isNearDuplicateEvent(a, b) {
+  const ca = String(a?.category || "").toUpperCase();
+  const cb = String(b?.category || "").toUpperCase();
+  if (ca && cb && ca === cb) {
+    const sa = ca === "SPORTS" ? sportsFixtureSignature(a?.title) : genericCategorySignature(a?.title, ca);
+    const sb = cb === "SPORTS" ? sportsFixtureSignature(b?.title) : genericCategorySignature(b?.title, cb);
+    if (sa && sb && sa === sb) return true;
+  }
+  return isNearDuplicateTitle(a?.title, b?.title);
+}
+
 function buildFallbackDescription(evt) {
   const title = String(evt?.title || "").trim();
   const category = String(evt?.category || "CRYPTO").toUpperCase();
@@ -158,11 +187,7 @@ function ensureDetailedDescriptions(events) {
 function dedupeNearDuplicateEvents(events) {
   const out = [];
   for (const evt of events || []) {
-    const exists = out.some(
-      (x) =>
-        String(x.category || "").toUpperCase() === String(evt.category || "").toUpperCase() &&
-        isNearDuplicateTitle(x.title, evt.title)
-    );
+    const exists = out.some((x) => isNearDuplicateEvent(x, evt));
     if (exists) continue;
     out.push(evt);
   }
@@ -755,18 +780,21 @@ router.post("/generate", async (req, res) => {
   try {
     const predictions = await generateDailyPredictions();
     const activeTitles = await PredictionEvent.find({ resolved: false, deadline: { $gt: new Date() } })
-      .select("title")
+      .select("title category")
       .limit(1000)
       .lean();
-    const existing = activeTitles.map((x) => String(x.title || ""));
+    const existing = activeTitles.map((x) => ({
+      title: String(x.title || ""),
+      category: String(x.category || "CRYPTO").toUpperCase(),
+    }));
     const seen = [];
     const filteredPredictions = predictions.filter((pred) => {
       const t = String(pred?.title || "");
       const d = String(pred?.description || "").trim();
       if (!t || d.length < 80) return false;
-      if (seen.some((x) => isNearDuplicateTitle(x, t))) return false;
-      if (existing.some((x) => isNearDuplicateTitle(x, t))) return false;
-      seen.push(t);
+      if (seen.some((x) => isNearDuplicateEvent(x, pred))) return false;
+      if (existing.some((x) => isNearDuplicateEvent(x, pred))) return false;
+      seen.push({ title: t, category: String(pred?.category || "CRYPTO").toUpperCase() });
       return true;
     });
     const localized = await pretranslateEvents(filteredPredictions);

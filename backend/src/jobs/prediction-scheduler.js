@@ -144,6 +144,35 @@ function sportsFixtureSignature(title) {
   const sides = [a, b].sort();
   return `${sides[0]}|${sides[1]}|${dateKey || "na"}`;
 }
+
+function genericCategorySignature(title, category) {
+  const c = String(category || "").toUpperCase();
+  const norm = normalizeTitleForSimilarity(title);
+  if (!norm) return "";
+  const tokens = norm
+    .split(/\s+/)
+    .filter(Boolean)
+    .filter((t) => t.length > 2)
+    .slice(0, 10);
+  const dateKey = extractDateKey(title) || "na";
+  const nums = Array.from(new Set((String(title || "").match(/\d+(?:\.\d+)?/g) || []).slice(0, 3)));
+  const numKey = nums.join(",") || "na";
+  if (c === "ECONOMY" || c === "CRYPTO") {
+    return `${c}|${dateKey}|${numKey}|${tokens.slice(0, 5).join(" ")}`;
+  }
+  return `${c}|${dateKey}|${tokens.slice(0, 6).join(" ")}`;
+}
+
+function isNearDuplicateEvent(a, b) {
+  const ca = String(a?.category || "").toUpperCase();
+  const cb = String(b?.category || "").toUpperCase();
+  if (ca && cb && ca === cb) {
+    const sa = ca === "SPORTS" ? sportsFixtureSignature(a?.title) : genericCategorySignature(a?.title, ca);
+    const sb = cb === "SPORTS" ? sportsFixtureSignature(b?.title) : genericCategorySignature(b?.title, cb);
+    if (sa && sb && sa === sb) return true;
+  }
+  return isNearDuplicateTitle(a?.title, b?.title);
+}
 const withTimeout = async (promise, timeoutMs, label) => {
   return await Promise.race([
     promise,
@@ -386,24 +415,29 @@ async function publishNewBatch(options = {}) {
     const targetToCreate = Math.max(1, Number(options?.targetToCreate || 5));
     const maxRounds = Math.max(1, Number(options?.maxRounds || 1));
     const activeTitles = await PredictionEvent.find({ resolved: false, deadline: { $gt: new Date() } })
-      .select("title")
+      .select("title category")
       .limit(1000)
       .lean();
-    const existing = activeTitles.map((x) => String(x.title || ""));
+    const existing = activeTitles.map((x) => ({
+      title: String(x.title || ""),
+      category: String(x.category || "CRYPTO").toUpperCase(),
+    }));
     const createdTitles = [];
     let nonce = await signer.getNonce();
     let ok = 0;
 
     for (let round = 1; round <= maxRounds && ok < targetToCreate; round++) {
-      const predictions = await generateDailyPredictions({ avoidTitles: [...existing, ...createdTitles] });
+      const predictions = await generateDailyPredictions({
+        avoidTitles: [...existing, ...createdTitles].map((x) => String(x?.title || "")).filter(Boolean),
+      });
       const seenInBatch = [];
       const unique = predictions.filter((p) => {
         const t = String(p?.title || "");
         if (!t) return false;
-        if (seenInBatch.some((x) => isNearDuplicateTitle(x, t))) return false;
-        if (existing.some((x) => isNearDuplicateTitle(x, t))) return false;
-        if (createdTitles.some((x) => isNearDuplicateTitle(x, t))) return false;
-        seenInBatch.push(t);
+        if (seenInBatch.some((x) => isNearDuplicateEvent(x, p))) return false;
+        if (existing.some((x) => isNearDuplicateEvent(x, p))) return false;
+        if (createdTitles.some((x) => isNearDuplicateEvent(x, p))) return false;
+        seenInBatch.push({ title: t, category: p?.category || "CRYPTO" });
         return true;
       });
       if (!unique.length) {
@@ -489,7 +523,7 @@ async function publishNewBatch(options = {}) {
             { upsert: true }
           );
           ok++;
-          createdTitles.push(String(p.title || ""));
+          createdTitles.push({ title: String(p.title || ""), category: normalizedCategory });
         } catch (e) {
           console.error(`[Scheduler] create: ${e.message?.slice(0, 80)}`);
         }
