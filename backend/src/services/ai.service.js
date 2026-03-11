@@ -819,7 +819,10 @@ export async function generateDailyPredictions() {
   const all = batches.flat();
   const dist = CATEGORIES.map(c => `${c}(${all.filter(e => e.category === c).length})`).join(" ");
   console.log(`[AI] Done: ${all.length} predictions — ${dist}`);
-  return all.length > 0 ? all : generateMock();
+  if (all.length === 0) {
+    console.warn("[AI] No production-grade predictions passed QA; returning empty set (mock fallback disabled).");
+  }
+  return all;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
