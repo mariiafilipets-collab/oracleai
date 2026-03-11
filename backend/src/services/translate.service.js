@@ -11,6 +11,8 @@ const LANG_NAMES = {
 };
 export const SUPPORTED_LANGS = Object.keys(LANG_NAMES);
 
+const MATCHUP_RE = /will\s+(.+?)\s+(?:beat|defeat|defeats|defeated|win(?:\s+against)?|lose to|vs\.?|versus)\s+(.+?)(?:\s+on\s+|\s+by\s+|\?|$)/i;
+
 // Cache: key = `${eventId}:${lang}` → { title, description, aiReasoning }
 const cache = new Map();
 const CACHE_MAX = 2000;
@@ -68,6 +70,74 @@ function parseTranslations(rawText) {
   }
 }
 
+function uniqueStrings(arr) {
+  return Array.from(new Set((arr || []).map((x) => String(x || "").trim()).filter(Boolean)));
+}
+
+function extractProtectedEntities(text) {
+  const src = String(text || "");
+  const out = [];
+  const m = src.match(MATCHUP_RE);
+  if (m) {
+    out.push(String(m[1] || "").trim());
+    out.push(String(m[2] || "").trim());
+  }
+  const tickers = src.match(/\$[A-Za-z0-9]{2,10}\b/g) || [];
+  out.push(...tickers);
+  const symbols = src.match(/\b(BTC|ETH|BNB|SOL|XRP|DOGE|SP500|NASDAQ|DOW|WTI|CPI|DXB)\b/g) || [];
+  out.push(...symbols);
+  return uniqueStrings(out).sort((a, b) => b.length - a.length);
+}
+
+function buildMaskedItems(items) {
+  const masked = [];
+  const byId = new Map();
+  for (const it of items || []) {
+    const id = String(it?.id ?? "");
+    const entities = extractProtectedEntities(`${it?.title || ""} ${it?.description || ""} ${it?.aiReasoning || ""}`);
+    const placeholders = entities.map((entity, idx) => ({ entity, token: `[[E${idx}]]` }));
+    const maskText = (value) => {
+      let out = String(value || "");
+      for (const p of placeholders) {
+        out = out.split(p.entity).join(p.token);
+      }
+      return out;
+    };
+    masked.push({
+      id,
+      title: maskText(it?.title),
+      description: maskText(it?.description),
+      aiReasoning: maskText(it?.aiReasoning),
+    });
+    byId.set(id, { placeholders });
+  }
+  return { masked, byId };
+}
+
+function unmaskRow(row, meta) {
+  const placeholders = Array.isArray(meta?.placeholders) ? meta.placeholders : [];
+  const restore = (value) => {
+    let out = String(value || "");
+    for (const p of placeholders) {
+      out = out.split(p.token).join(p.entity);
+    }
+    return out;
+  };
+  return {
+    ...row,
+    title: restore(row?.title),
+    description: restore(row?.description),
+    aiReasoning: restore(row?.aiReasoning),
+  };
+}
+
+function hasEntityMismatch(srcTitle, localizedTitle) {
+  const entities = extractProtectedEntities(srcTitle);
+  if (!entities.length) return false;
+  const dst = String(localizedTitle || "");
+  return entities.some((entity) => !dst.includes(entity));
+}
+
 function normalizeLocalized(evt, tr) {
   return {
     title: tr?.title || evt.title,
@@ -78,6 +148,7 @@ function normalizeLocalized(evt, tr) {
 
 function hasCompleteLocalized(evt, localized, lang) {
   if (!localized) return false;
+  if (hasEntityMismatch(evt?.title, localized?.title)) return false;
   const hasTitle = Boolean(localized.title) && (lang === "en" || localized.title !== evt?.title);
   const hasDescription = !evt?.description || (Boolean(localized.description) && (lang === "en" || localized.description !== evt?.description));
   const hasReasoning = !evt?.aiReasoning || (Boolean(localized.aiReasoning) && (lang === "en" || localized.aiReasoning !== evt?.aiReasoning));
@@ -117,6 +188,7 @@ async function requestBatchTranslation(items, lang, model) {
     return null;
   }
   const timeoutMs = timeoutMsForModel(model || config.openrouterModel);
+  const { masked, byId } = buildMaskedItems(items);
   for (let attempt = 1; attempt <= 1; attempt++) {
     const started = Date.now();
     try {
@@ -126,11 +198,11 @@ async function requestBatchTranslation(items, lang, model) {
           messages: [
             {
               role: "system",
-              content: `Translate the following prediction market events to ${LANG_NAMES[lang]}. Keep names, numbers, tickers, team names, and dates unchanged. Translate naturally, not word-by-word. Return ONLY a JSON array.`,
+              content: `Translate the following prediction market events to ${LANG_NAMES[lang]}. Keep names, numbers, tickers, team names, and dates unchanged. Translate naturally, not word-by-word. NEVER alter placeholders like [[E0]], [[E1]]. Return ONLY a JSON array.`,
             },
             {
               role: "user",
-              content: `Translate to ${LANG_NAMES[lang]}:\n${JSON.stringify(items)}\n\nReturn: [{"id":"...","title":"translated","description":"translated","aiReasoning":"translated"}]`,
+              content: `Translate to ${LANG_NAMES[lang]}:\n${JSON.stringify(masked)}\n\nReturn: [{"id":"...","title":"translated","description":"translated","aiReasoning":"translated"}]`,
             },
           ],
           temperature: 0.2,
@@ -143,8 +215,12 @@ async function requestBatchTranslation(items, lang, model) {
       const raw = response.choices?.[0]?.message?.content || "";
       const parsed = parseTranslations(raw);
       if (Array.isArray(parsed)) {
+        const unmasked = parsed.map((row) => {
+          const id = String(row?.id ?? "");
+          return unmaskRow(row, byId.get(id));
+        });
         trackAICall({ operation: "translate", model: model || config.openrouterModel, status: "success", latencyMs: Date.now() - started });
-        return parsed;
+        return unmasked;
       }
       trackAICall({ operation: "translate", model: model || config.openrouterModel, status: "error", latencyMs: Date.now() - started, error: "parse-failed" });
     } catch (err) {
