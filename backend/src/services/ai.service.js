@@ -797,7 +797,10 @@ Bad: "Will Bitcoin rise soon?"`
 // ═══════════════════════════════════════════════════════════════════════════
 
 export async function generateDailyPredictions() {
-  if (config.aiProvider === "mock" || !config.openrouterKey) return generateMock();
+  if (config.aiProvider === "mock" || !config.openrouterKey) {
+    console.warn("[AI] Generation skipped: production mock generation is disabled.");
+    return [];
+  }
 
   const { today, hour, day } = getTimeInfo();
   console.log(`[AI] Generating for ${day} ${today} ${hour}:00 UTC`);
