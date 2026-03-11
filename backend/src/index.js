@@ -125,6 +125,10 @@ const isRateLimitError = (err) => {
   const msg = String(err?.message || err || "").toLowerCase();
   return msg.includes("rate limit") || msg.includes("too many requests") || msg.includes("-32005");
 };
+const isPrunedHistoryError = (err) => {
+  const msg = String(err?.message || err || "").toLowerCase();
+  return msg.includes("history has been pruned") || msg.includes("code\": -32701") || msg.includes("pruned for this block");
+};
 const EVENT_CURSOR_KEY = "event-poller";
 
 async function syncUsersFromOnChainSnapshot() {
@@ -349,6 +353,13 @@ async function setupEventListeners() {
             await saveCursor(lastProcessedBlock);
             break;
           } catch (err) {
+            if (isPrunedHistoryError(err)) {
+              // Provider pruned historical blocks; skip this range to unblock poller progress.
+              lastProcessedBlock = toBlock;
+              await saveCursor(lastProcessedBlock);
+              console.warn(`[Events] Catch-up pruned range skipped ${cursor}..${toBlock}`);
+              break;
+            }
             if (!isRateLimitError(err) || attempt >= maxRetries) {
               console.error(`[Events] Catch-up range failed ${cursor}..${toBlock}:`, err?.message || err);
               break;
@@ -367,6 +378,8 @@ async function setupEventListeners() {
   };
 
   const pollEvents = async () => {
+    let fromBlock = null;
+    let toBlock = null;
     try {
       if (catchUpInProgress) return;
       const latestBlock = await provider.getBlockNumber();
@@ -378,12 +391,20 @@ async function setupEventListeners() {
       }
       if (latestBlock === lastProcessedBlock) return;
 
-      const fromBlock = lastProcessedBlock + 1;
-      const toBlock = Math.min(latestBlock, lastProcessedBlock + Math.max(1, config.eventMaxBlockRange));
+      fromBlock = lastProcessedBlock + 1;
+      toBlock = Math.min(latestBlock, lastProcessedBlock + Math.max(1, config.eventMaxBlockRange));
       await processRange(fromBlock, toBlock);
       lastProcessedBlock = toBlock;
       await saveCursor(lastProcessedBlock);
     } catch (err) {
+      if (isPrunedHistoryError(err) && Number.isFinite(toBlock)) {
+        // Shared/public nodes can prune old log history.
+        // Advance cursor so polling does not loop forever on the same pruned interval.
+        lastProcessedBlock = toBlock;
+        await saveCursor(lastProcessedBlock);
+        console.warn(`[Events] Poll skipped pruned range ${fromBlock}..${toBlock}`);
+        return;
+      }
       console.error("[Events] Poll error:", err?.message || err);
     }
   };
