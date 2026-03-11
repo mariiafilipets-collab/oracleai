@@ -210,18 +210,18 @@ const POPULARITY_PATTERNS = {
 
 const CATEGORY_VERIFY_BUFFER_MINUTES = {
   SPORTS: 20,
-  POLITICS: 45,
-  ECONOMY: 30,
-  CRYPTO: 15,
-  CLIMATE: 45,
+  POLITICS: 60,
+  ECONOMY: 20,
+  CRYPTO: 20,
+  CLIMATE: 60,
 };
 
 const CATEGORY_VOTE_LEAD_MINUTES = {
-  SPORTS: 30,
-  POLITICS: 15,
-  ECONOMY: 15,
+  SPORTS: 1,
+  POLITICS: 30,
+  ECONOMY: 10,
   CRYPTO: 10,
-  CLIMATE: 20,
+  CLIMATE: 30,
 };
 
 function parseIsoUtc(value) {
@@ -606,11 +606,17 @@ ABSOLUTE RULES:
 - If hoursToResolve > 24, include explicit UTC date context in title (e.g., "on March 9", "by Mar 10 18:00 UTC")
 - Do NOT use "today/tonight/now" unless hoursToResolve <= 6
 - Always provide verifyAtUtc in strict ISO UTC format, e.g. "2026-03-22T21:30:00Z"
-- For SPORTS: use exact kickoff in UTC and set verifyAtUtc to expected final-result availability (usually kickoff + 2h to 3h)
+- For SPORTS: use exact kickoff in UTC and set verifyAtUtc to expected final-result availability (prefer kickoff + 3h to 4h to handle delays/overtime)
 - Never use non-UTC timezone abbreviations (ET/PT/CET etc.) in title; convert to UTC.
 - hoursToResolve must reflect real result availability (e.g., match end, market close, official statement window)
 - For markets: will resolve when market closes today
 - For crypto: usually 6-48h, unless event is a scheduled date item
+- Timing guardrails by category:
+  - SPORTS: vote closes 1 minute before kickoff; verify usually kickoff + 3-4h.
+  - ECONOMY: vote closes ~10 minutes before release/close; verify +20 minutes.
+  - CRYPTO: vote closes ~10 minutes before target candle/event; verify +20 minutes.
+  - POLITICS: vote closes ~30 minutes before official cutoff; verify +60 to +120 minutes.
+  - CLIMATE: vote closes ~30 minutes before window end; verify +60 to +120 minutes.
 - Return ONLY a JSON array of 5 objects, nothing else
 
 REJECT these types of predictions:

@@ -22,24 +22,24 @@ const SYNC_TIMEOUT_MS = 12000;
 const DEFAULT_RESULT_VERIFY_BUFFER_MS = 10 * 60 * 1000;
 const CATEGORY_VERIFY_BUFFER_MINUTES = {
   SPORTS: 20,
-  POLITICS: 45,
-  ECONOMY: 30,
-  CRYPTO: 15,
-  CLIMATE: 45,
+  POLITICS: 60,
+  ECONOMY: 20,
+  CRYPTO: 20,
+  CLIMATE: 60,
 };
 const CATEGORY_VOTE_CLOSE_LEAD_MINUTES = {
-  SPORTS: 30,
-  POLITICS: 15,
-  ECONOMY: 15,
+  SPORTS: 1,
+  POLITICS: 30,
+  ECONOMY: 10,
   CRYPTO: 10,
-  CLIMATE: 20,
+  CLIMATE: 30,
 };
 const CATEGORY_MIN_RESULT_DELAY_MINUTES = {
-  SPORTS: 120,
-  POLITICS: 30,
-  ECONOMY: 15,
-  CRYPTO: 15,
-  CLIMATE: 30,
+  SPORTS: 180,
+  POLITICS: 90,
+  ECONOMY: 20,
+  CRYPTO: 20,
+  CLIMATE: 90,
 };
 
 let io = null;
@@ -986,7 +986,7 @@ async function resolveExpired() {
       if (r.retryable) {
         const doc = await PredictionEvent.findOne({ eventId: r.eventId }).select("resolveAttempts").lean();
         const attempts = Number(doc?.resolveAttempts || 0) + 1;
-        const retryDelayMs = Math.min(6 * 60 * 60 * 1000, attempts * 10 * 60 * 1000); // max 6h
+        const retryDelayMs = 60 * 60 * 1000; // fixed 1h retry for unresolved/no-result cases
         await PredictionEvent.updateOne(
           { eventId: r.eventId },
           {
