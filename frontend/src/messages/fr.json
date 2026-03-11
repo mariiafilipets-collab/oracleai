@@ -473,6 +473,12 @@
     "userVoteFeeInfo": "Frais de vote sur evenement utilisateur",
     "creatorGets": "le createur recoit",
     "creatorPayoutVotesMin": "deblocage du paiement",
+    "eventStartsAt": "Debut de l'evenement",
+    "eventStartTbd": "A definir",
+    "voteClosesAt": "Le vote se ferme a",
+    "verifyAt": "Verification a",
+    "voteCloseIn": "Le vote se ferme dans",
+    "verifyIn": "Verification dans",
     "alreadyVoted": "Vous avez deja vote sur cet evenement",
     "alreadyVotedCard": "Vous avez deja vote sur cet evenement",
     "checkInAlreadyToday": "Vous avez deja effectue le check-in aujourd'hui"

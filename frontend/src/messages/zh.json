@@ -473,6 +473,12 @@
     "userVoteFeeInfo": "用户事件投票费",
     "creatorGets": "创作者获得",
     "creatorPayoutVotesMin": "解锁门槛",
+    "eventStartsAt": "事件开始时间",
+    "eventStartTbd": "待定",
+    "voteClosesAt": "投票截止时间",
+    "verifyAt": "结果验证时间",
+    "voteCloseIn": "距离投票截止",
+    "verifyIn": "距离结果验证",
     "alreadyVoted": "你已在该事件中投过票",
     "alreadyVotedCard": "你已为该事件投过票",
     "checkInAlreadyToday": "你今天已经完成签到"

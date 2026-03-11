@@ -473,6 +473,12 @@
     "userVoteFeeInfo": "Comision de voto en evento de usuario",
     "creatorGets": "el creador recibe",
     "creatorPayoutVotesMin": "desbloqueo de pago",
+    "eventStartsAt": "Inicio del evento",
+    "eventStartTbd": "Por definir",
+    "voteClosesAt": "La votacion cierra a las",
+    "verifyAt": "Verificacion a las",
+    "voteCloseIn": "La votacion cierra en",
+    "verifyIn": "Verificacion en",
     "alreadyVoted": "Ya votaste en este evento",
     "alreadyVotedCard": "Ya votaste en este evento",
     "checkInAlreadyToday": "Ya hiciste el check-in hoy"

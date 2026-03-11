@@ -945,30 +945,41 @@ export default function PredictionsPage() {
                     )}
 
                     {/* Timing details in user UTC */}
-                    <div className="mb-3 p-2.5 rounded-lg bg-dark-700/60 border border-dark-500/50">
-                      <div className="flex items-center justify-between text-[11px] text-gray-400">
-                        <span>{tr("predictions.eventStartsAt", "Event starts at")}</span>
-                        <span className="font-mono text-gray-300">
-                          {pred.eventStartAtUtc
-                            ? formatUserTime(pred.eventStartAtUtc)
-                            : tr("predictions.eventStartTbd", "TBD")}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between text-[11px] text-gray-400">
-                        <span>{tr("predictions.voteClosesAt", "Voting closes at")}</span>
-                        <span className="font-mono text-gray-300">{formatUserTime(pred.deadline)}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-[11px] text-gray-400 mt-1">
-                        <span>{tr("predictions.verifyAt", "Verification at")}</span>
-                        <span className="font-mono text-gray-300">{formatUserTime(pred.verifyAfter || pred.deadline)}</span>
+                    <div className="mb-3 rounded-xl border border-neon-cyan/20 bg-gradient-to-br from-dark-700/80 to-dark-800/80 p-2.5">
+                      <div className="grid grid-cols-1 gap-1.5">
+                        <div className="flex items-center justify-between rounded-lg border border-dark-500/60 bg-dark-800/60 px-2 py-1.5 text-[11px]">
+                          <span className="inline-flex items-center gap-1 text-gray-400">
+                            <AppIcon name="history" className="h-3.5 w-3.5" />
+                            {tr("predictions.eventStartsAt", "Event starts at")}
+                          </span>
+                          <span className="font-mono text-gray-300">
+                            {pred.eventStartAtUtc
+                              ? formatUserTime(pred.eventStartAtUtc)
+                              : tr("predictions.eventStartTbd", "TBD")}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between rounded-lg border border-dark-500/60 bg-dark-800/60 px-2 py-1.5 text-[11px]">
+                          <span className="inline-flex items-center gap-1 text-gray-400">
+                            <AppIcon name="hourglass" className="h-3.5 w-3.5" />
+                            {tr("predictions.voteClosesAt", "Voting closes at")}
+                          </span>
+                          <span className="font-mono text-gray-300">{formatUserTime(pred.deadline)}</span>
+                        </div>
+                        <div className="flex items-center justify-between rounded-lg border border-dark-500/60 bg-dark-800/60 px-2 py-1.5 text-[11px]">
+                          <span className="inline-flex items-center gap-1 text-gray-400">
+                            <AppIcon name="check" className="h-3.5 w-3.5" />
+                            {tr("predictions.verifyAt", "Verification at")}
+                          </span>
+                          <span className="font-mono text-gray-300">{formatUserTime(pred.verifyAfter || pred.deadline)}</span>
+                        </div>
                       </div>
                       {!pred.resolved && (
-                        <div className="mt-2 grid grid-cols-1 gap-1">
-                          <div className="flex items-center justify-between text-[11px]">
+                        <div className="mt-2 grid grid-cols-1 gap-1 sm:grid-cols-2">
+                          <div className="flex items-center justify-between rounded-lg border border-neon-gold/20 bg-neon-gold/5 px-2 py-1.5 text-[11px]">
                             <span className="text-gray-500">{tr("predictions.voteCloseIn", "Voting closes in")}</span>
                             <CountdownTimer deadline={pred.deadline} compact />
                           </div>
-                          <div className="flex items-center justify-between text-[11px]">
+                          <div className="flex items-center justify-between rounded-lg border border-neon-purple/20 bg-neon-purple/5 px-2 py-1.5 text-[11px]">
                             <span className="text-gray-500">{tr("predictions.verifyIn", "Verification in")}</span>
                             <CountdownTimer deadline={pred.verifyAfter || pred.deadline} compact />
                           </div>
