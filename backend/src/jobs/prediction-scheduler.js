@@ -13,6 +13,7 @@ const REFILL_CHECK_INTERVAL = 5 * 60 * 1000; // 5 minutes
 const WEEKLY_CHECK_INTERVAL = 60 * 60 * 1000; // 1 hour
 const NIGHTLY_RETRY_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours
 const PROTOCOL_FEE_DISTRIBUTION_CHECK_INTERVAL = 10 * 60 * 1000; // 10 minutes
+const QA_WATCHDOG_INTERVAL = 10 * 60 * 1000; // 10 minutes
 const MAX_REFILL_BATCH_ROUNDS = 4;
 const WEEK_SECONDS = 7 * 24 * 60 * 60;
 const MAX_WEEKLY_WINNERS = 1000;
@@ -50,6 +51,13 @@ let lastWeeklyReset = 0;
 let stats = { generated: 0, resolved: 0, prizesDistributed: 0, cycles: 0 };
 let schedulerInitialized = false;
 const schedulerTimers = [];
+let qaLastRunAt = 0;
+let qaLastReport = {
+  ok: true,
+  scanned: 0,
+  issues: {},
+  samples: [],
+};
 
 const CATEGORY_NAMES = ["SPORTS", "POLITICS", "ECONOMY", "CRYPTO", "CLIMATE"];
 const ALLOWED_CATEGORIES = new Set(CATEGORY_NAMES);
@@ -444,6 +452,7 @@ export function initScheduler(socketIO) {
     schedulerTimers.push(setInterval(weeklyCheck, WEEKLY_CHECK_INTERVAL));
     schedulerTimers.push(setInterval(nightlyRetryPendingResolutions, NIGHTLY_RETRY_INTERVAL));
     schedulerTimers.push(setInterval(distributeProtocolFeesIfDue, PROTOCOL_FEE_DISTRIBUTION_CHECK_INTERVAL));
+    schedulerTimers.push(setInterval(runQualityWatchdog, QA_WATCHDOG_INTERVAL));
 
     console.log(`[Scheduler] Running. Resolve: ${RESOLVE_INTERVAL / 1000}s | Refill: ${REFILL_CHECK_INTERVAL / 60000}min | Gen: ${GENERATE_INTERVAL / 60000}min | Weekly: ${WEEKLY_CHECK_INTERVAL / 60000}min | Fees: ${PROTOCOL_FEE_DISTRIBUTION_CHECK_INTERVAL / 60000}min`);
 
@@ -454,6 +463,7 @@ export function initScheduler(socketIO) {
         await syncUnresolvedWithChain();
         await resyncArchivedFromChain();
         await refill();
+        await runQualityWatchdog();
       } catch (err) {
         console.error(`[Scheduler] Startup sync failed: ${err?.message || err}`);
       }
@@ -1195,6 +1205,106 @@ async function distributeProtocolFeesIfDue() {
   }
 }
 
+async function runQualityWatchdog() {
+  try {
+    const now = Date.now();
+    const active = await PredictionEvent.find({ resolved: false, deadline: { $gt: new Date() } })
+      .select("eventId title description category deadline verifyAfter eventStartAtUtc isUserEvent")
+      .lean();
+    const issues = {
+      categoryMismatch: 0,
+      sportsMissingStart: 0,
+      sportsLeadBad: 0,
+      sportsVerifyTooEarly: 0,
+      verifyLeDeadline: 0,
+      dayRuleBad: 0,
+    };
+    const samples = [];
+    const corrections = [];
+    for (const evt of active) {
+      const cat = String(evt?.category || "").toUpperCase();
+      const title = String(evt?.title || "");
+      const desc = String(evt?.description || "");
+      const deadlineTs = new Date(evt?.deadline).getTime();
+      const verifyTs = new Date(evt?.verifyAfter || evt?.deadline).getTime();
+      const startTs = evt?.eventStartAtUtc ? new Date(evt.eventStartAtUtc).getTime() : 0;
+      const strong = inferCategoryStrong(`${title} ${desc}`);
+      if (strong && strong !== cat && !evt?.isUserEvent) {
+        issues.categoryMismatch++;
+        corrections.push({
+          updateOne: {
+            filter: { eventId: evt.eventId },
+            update: { $set: { category: strong } },
+          },
+        });
+        if (samples.length < 12) samples.push({ eventId: evt.eventId, type: "categoryMismatch", from: cat, to: strong, title });
+      }
+      if (verifyTs <= deadlineTs) {
+        issues.verifyLeDeadline++;
+        if (samples.length < 12) samples.push({ eventId: evt.eventId, type: "verify<=deadline", title });
+      }
+      if (cat === "SPORTS") {
+        if (!startTs) {
+          issues.sportsMissingStart++;
+          if (samples.length < 12) samples.push({ eventId: evt.eventId, type: "sportsMissingStart", title });
+        } else {
+          const leadMin = Math.round((startTs - deadlineTs) / 60000);
+          const lagMin = Math.round((verifyTs - startTs) / 60000);
+          if (leadMin !== 1) {
+            issues.sportsLeadBad++;
+            if (samples.length < 12) samples.push({ eventId: evt.eventId, type: "sportsLeadBad", leadMin, title });
+          }
+          if (lagMin < 180) {
+            issues.sportsVerifyTooEarly++;
+            if (samples.length < 12) samples.push({ eventId: evt.eventId, type: "sportsVerifyTooEarly", lagMin, title });
+          }
+        }
+      }
+      if ((cat === "ECONOMY" || cat === "CLIMATE") && !hasExplicitUtcTime(title)) {
+        const eodTs = parseTitleDateEndOfDayUtc(title);
+        if (eodTs > now + 60_000) {
+          const latestDeadline = eodTs - 12 * 60 * 60 * 1000;
+          if (deadlineTs > latestDeadline || verifyTs < eodTs) {
+            issues.dayRuleBad++;
+            if (samples.length < 12) {
+              samples.push({
+                eventId: evt.eventId,
+                type: "dayRuleBad",
+                title,
+              });
+            }
+          }
+        }
+      }
+    }
+    if (corrections.length) {
+      await PredictionEvent.bulkWrite(corrections, { ordered: false });
+    }
+    const totalIssues = Object.values(issues).reduce((s, v) => s + Number(v || 0), 0);
+    qaLastRunAt = Date.now();
+    qaLastReport = {
+      ok: totalIssues === 0,
+      scanned: active.length,
+      issues,
+      samples,
+    };
+    if (totalIssues === 0) {
+      console.log(`[QA] PASS scanned=${active.length}`);
+    } else {
+      console.warn(`[QA] FAIL scanned=${active.length} issues=${JSON.stringify(issues)}`);
+    }
+  } catch (e) {
+    qaLastRunAt = Date.now();
+    qaLastReport = {
+      ok: false,
+      scanned: 0,
+      issues: { runtimeError: 1 },
+      samples: [{ type: "runtimeError", message: String(e?.message || e).slice(0, 160) }],
+    };
+    console.warn(`[QA] Watchdog error: ${e.message}`);
+  }
+}
+
 // ─── WEEKLY LEADERBOARD RESET + PRIZE DISTRIBUTION ──────────────────────────
 
 async function weeklyCheck() {
@@ -1362,6 +1472,11 @@ export function getSchedulerStatus() {
     resolveIntervalSec: RESOLVE_INTERVAL / 1000,
     nextWeeklyReset: new Date(nextWeeklyReset).toISOString(),
     weeklyResetIn: Math.max(0, Math.round((nextWeeklyReset - Date.now()) / 60000)) + " min",
+    qaWatchdog: {
+      intervalMin: QA_WATCHDOG_INTERVAL / 60000,
+      lastRunAt: qaLastRunAt ? new Date(qaLastRunAt).toISOString() : null,
+      report: qaLastReport,
+    },
   };
 }
 
