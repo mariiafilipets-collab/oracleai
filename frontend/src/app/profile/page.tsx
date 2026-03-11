@@ -40,6 +40,13 @@ export default function ProfilePage() {
   const [referralStats, setReferralStats] = useState<any>(null);
   const [creatorStats, setCreatorStats] = useState<any>(null);
   const [platformVoteFeesBnb, setPlatformVoteFeesBnb] = useState(0);
+  const [platformVoteBreakdown, setPlatformVoteBreakdown] = useState<Record<string, number>>({
+    prizes: 0,
+    treasury: 0,
+    referrals: 0,
+    burn: 0,
+    stakers: 0,
+  });
   const { writeContract, data: withdrawHash, isPending: withdrawing } = useWriteContract();
   const { isSuccess: withdrawSuccess } = useWaitForTransactionReceipt({ hash: withdrawHash });
   const { writeContract: writeCreatorClaim, data: creatorClaimHash, isPending: creatorClaiming } = useWriteContract();
@@ -115,6 +122,14 @@ export default function ProfilePage() {
       if (!res?.success) return;
       const raw = BigInt(String(res?.data?.totalVoteFeesCollected || "0"));
       setPlatformVoteFeesBnb(parseFloat(formatEther(raw)));
+      const split = res?.data?.voteFeesBreakdownWei || {};
+      setPlatformVoteBreakdown({
+        prizes: parseFloat(formatEther(BigInt(String(split.prizes || "0")))),
+        treasury: parseFloat(formatEther(BigInt(String(split.treasury || "0")))),
+        referrals: parseFloat(formatEther(BigInt(String(split.referrals || "0")))),
+        burn: parseFloat(formatEther(BigInt(String(split.burn || "0")))),
+        stakers: parseFloat(formatEther(BigInt(String(split.stakers || "0")))),
+      });
     }).catch(() => {});
   }, [address]);
 
@@ -326,6 +341,16 @@ export default function ProfilePage() {
           </div>
         </GlassCard>
       </div>
+      <GlassCard hover={false} className="p-4">
+        <div className="text-xs text-gray-500 mb-2">{tr("profile.voteFeesBreakdown", "Vote fees breakdown (platform)")}</div>
+        <div className="grid sm:grid-cols-5 gap-2 text-xs">
+          <div className="text-gray-300">Prizes: <span className="font-mono text-neon-cyan">{platformVoteBreakdown.prizes.toFixed(6)} BNB</span></div>
+          <div className="text-gray-300">Treasury: <span className="font-mono text-neon-cyan">{platformVoteBreakdown.treasury.toFixed(6)} BNB</span></div>
+          <div className="text-gray-300">Referrals: <span className="font-mono text-neon-cyan">{platformVoteBreakdown.referrals.toFixed(6)} BNB</span></div>
+          <div className="text-gray-300">Burn: <span className="font-mono text-neon-cyan">{platformVoteBreakdown.burn.toFixed(6)} BNB</span></div>
+          <div className="text-gray-300">Stakers: <span className="font-mono text-neon-cyan">{platformVoteBreakdown.stakers.toFixed(6)} BNB</span></div>
+        </div>
+      </GlassCard>
 
       {/* Referral Section */}
       <GlassCard hover={false} className="p-4 sm:p-6">

@@ -37,6 +37,13 @@ const TIER_KEYS = ["bronze", "silver", "gold", "diamond"];
 export default function TokenomicsPage() {
   const { t } = useI18n();
   const [voteFeesBnb, setVoteFeesBnb] = useState(0);
+  const [voteBreakdown, setVoteBreakdown] = useState<Record<string, number>>({
+    prizes: 0,
+    treasury: 0,
+    referrals: 0,
+    burn: 0,
+    stakers: 0,
+  });
   const tr = (key: string, fallback: string) => {
     const value = t(key);
     return value === key ? fallback : value;
@@ -48,6 +55,14 @@ export default function TokenomicsPage() {
         if (!res?.success) return;
         const raw = BigInt(String(res?.data?.totalVoteFeesCollected || "0"));
         setVoteFeesBnb(Number(formatEther(raw)));
+        const split = res?.data?.voteFeesBreakdownWei || {};
+        setVoteBreakdown({
+          prizes: Number(formatEther(BigInt(String(split.prizes || "0")))),
+          treasury: Number(formatEther(BigInt(String(split.treasury || "0")))),
+          referrals: Number(formatEther(BigInt(String(split.referrals || "0")))),
+          burn: Number(formatEther(BigInt(String(split.burn || "0")))),
+          stakers: Number(formatEther(BigInt(String(split.stakers || "0")))),
+        });
       })
       .catch(() => {});
   }, []);
@@ -143,6 +158,16 @@ export default function TokenomicsPage() {
             <div className="text-[11px] text-gray-500 mt-1">
               {tr("tokenomicsPage.votingFees.distributedHint", "Distribution is applied immediately on each vote transaction.")}
             </div>
+          </div>
+        </div>
+        <div className="mt-4 p-4 rounded-xl bg-dark-700/50 border border-dark-500/50">
+          <div className="text-xs text-gray-500 mb-2">{tr("tokenomicsPage.votingFees.breakdown", "Distributed breakdown")}</div>
+          <div className="grid sm:grid-cols-5 gap-2 text-xs">
+            <div className="text-gray-300">Prizes: <span className="font-mono text-neon-cyan">{voteBreakdown.prizes.toFixed(6)} BNB</span></div>
+            <div className="text-gray-300">Treasury: <span className="font-mono text-neon-cyan">{voteBreakdown.treasury.toFixed(6)} BNB</span></div>
+            <div className="text-gray-300">Referrals: <span className="font-mono text-neon-cyan">{voteBreakdown.referrals.toFixed(6)} BNB</span></div>
+            <div className="text-gray-300">Burn: <span className="font-mono text-neon-cyan">{voteBreakdown.burn.toFixed(6)} BNB</span></div>
+            <div className="text-gray-300">Stakers: <span className="font-mono text-neon-cyan">{voteBreakdown.stakers.toFixed(6)} BNB</span></div>
           </div>
         </div>
       </GlassCard>

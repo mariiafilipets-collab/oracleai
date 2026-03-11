@@ -12,6 +12,14 @@ const TIER_ACTIVITY_DEFAULTS = {
   PRO: { amount: "0.01", points: 300 },
   WHALE: { amount: "0.05", points: 1000 },
 };
+const BPS_DENOMINATOR = 10000n;
+const VOTE_FEE_SPLIT_BPS = {
+  prizes: 5000n,
+  treasury: 1500n,
+  referrals: 2000n,
+  burn: 1000n,
+  stakers: 500n,
+};
 const CHAIN_READ_TIMEOUT_MS = 8000;
 
 async function withTimeout(promise, timeoutMs = CHAIN_READ_TIMEOUT_MS) {
@@ -84,6 +92,20 @@ router.get("/", async (req, res) => {
       } catch {}
     }
 
+    const totalVoteFeesWei = BigInt(String(totalVoteFeesCollected || "0"));
+    const voteFeesBreakdownWei = {
+      prizes: (totalVoteFeesWei * VOTE_FEE_SPLIT_BPS.prizes) / BPS_DENOMINATOR,
+      treasury: (totalVoteFeesWei * VOTE_FEE_SPLIT_BPS.treasury) / BPS_DENOMINATOR,
+      referrals: (totalVoteFeesWei * VOTE_FEE_SPLIT_BPS.referrals) / BPS_DENOMINATOR,
+      burn: (totalVoteFeesWei * VOTE_FEE_SPLIT_BPS.burn) / BPS_DENOMINATOR,
+      stakers:
+        totalVoteFeesWei
+        - ((totalVoteFeesWei * VOTE_FEE_SPLIT_BPS.prizes) / BPS_DENOMINATOR)
+        - ((totalVoteFeesWei * VOTE_FEE_SPLIT_BPS.treasury) / BPS_DENOMINATOR)
+        - ((totalVoteFeesWei * VOTE_FEE_SPLIT_BPS.referrals) / BPS_DENOMINATOR)
+        - ((totalVoteFeesWei * VOTE_FEE_SPLIT_BPS.burn) / BPS_DENOMINATOR),
+    };
+
     res.json({
       success: true,
       data: {
@@ -93,6 +115,21 @@ router.get("/", async (req, res) => {
         prizePoolBalance,
         totalFeesCollected,
         totalVoteFeesCollected,
+        totalVoteFeesDistributed: totalVoteFeesCollected,
+        voteFeeSplitBps: {
+          prizes: Number(VOTE_FEE_SPLIT_BPS.prizes),
+          treasury: Number(VOTE_FEE_SPLIT_BPS.treasury),
+          referrals: Number(VOTE_FEE_SPLIT_BPS.referrals),
+          burn: Number(VOTE_FEE_SPLIT_BPS.burn),
+          stakers: Number(VOTE_FEE_SPLIT_BPS.stakers),
+        },
+        voteFeesBreakdownWei: {
+          prizes: voteFeesBreakdownWei.prizes.toString(),
+          treasury: voteFeesBreakdownWei.treasury.toString(),
+          referrals: voteFeesBreakdownWei.referrals.toString(),
+          burn: voteFeesBreakdownWei.burn.toString(),
+          stakers: voteFeesBreakdownWei.stakers.toString(),
+        },
       },
     });
   } catch (err) {
