@@ -89,6 +89,37 @@ export default function TokenomicsPage() {
         </div>
       </GlassCard>
 
+      {/* Voting Fees and Points */}
+      <GlassCard hover={false}>
+        <h2 className="text-xl font-heading font-bold mb-2">
+          {tr("tokenomicsPage.votingFees.title", "Voting Fees and Points")}
+        </h2>
+        <p className="text-sm text-gray-500 mb-6">
+          {tr("tokenomicsPage.votingFees.desc", "Voting uses tiered BNB fees and dynamic point multipliers.")}
+        </p>
+        <div className="grid md:grid-cols-2 gap-3">
+          <div className="p-4 rounded-xl bg-dark-700/50 border border-dark-500/50">
+            <h3 className="text-sm font-bold text-white mb-2">{tr("tokenomicsPage.votingFees.tiersTitle", "Vote tiers")}</h3>
+            <ul className="text-xs text-gray-400 space-y-1">
+              <li>- Basic: 0.00015 BNB (x1)</li>
+              <li>- Pro: 0.005 BNB (x3)</li>
+              <li>- Whale: 0.05+ BNB (no limit)</li>
+            </ul>
+          </div>
+          <div className="p-4 rounded-xl bg-dark-700/50 border border-dark-500/50">
+            <h3 className="text-sm font-bold text-white mb-2">{tr("tokenomicsPage.votingFees.formulaTitle", "Formula")}</h3>
+            <ul className="text-xs text-gray-400 space-y-1">
+              <li>- Whale multiplier = 10 * sqrt(amount / 0.05)</li>
+              <li>- Base vote points scale by tier multiplier</li>
+              <li>- Correct prediction bonus: +100% (x2)</li>
+            </ul>
+          </div>
+        </div>
+        <p className="text-xs text-gray-400 mt-4">
+          {tr("tokenomicsPage.votingFees.distribution", "All vote fees follow check-in distribution: 50% prizes, 15% treasury, 20% referrals, 10% burn reserve, 5% staking rewards.")}
+        </p>
+      </GlassCard>
+
       {/* Creator Economy */}
       <GlassCard hover={false}>
         <h2 className="text-xl font-heading font-bold mb-2">

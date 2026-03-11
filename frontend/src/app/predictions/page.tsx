@@ -211,24 +211,6 @@ export default function PredictionsPage() {
     functionName: "USER_EVENT_FEE",
     query: { enabled: !!predictionAddress },
   });
-  const { data: userEventVoteFeeRaw } = useReadContract({
-    address: predictionAddress,
-    abi: PredictionABI,
-    functionName: "userEventVoteFee",
-    query: { enabled: !!predictionAddress },
-  });
-  const { data: creatorShareBpsRaw } = useReadContract({
-    address: predictionAddress,
-    abi: PredictionABI,
-    functionName: "creatorShareBps",
-    query: { enabled: !!predictionAddress },
-  });
-  const { data: minCreatorPayoutVotesRaw } = useReadContract({
-    address: predictionAddress,
-    abi: PredictionABI,
-    functionName: "minCreatorPayoutVotes",
-    query: { enabled: !!predictionAddress },
-  });
   const { data: eventCountRaw } = useReadContract({
     address: predictionAddress,
     abi: PredictionABI,
@@ -264,11 +246,6 @@ export default function PredictionsPage() {
   });
   const userEventFeeWei = (userEventFeeRaw as bigint | undefined) ?? parseEther("0.0015");
   const userEventFeeDisplay = Number(formatEther(userEventFeeWei)).toFixed(4);
-  const hasCreatorEconomy = typeof userEventVoteFeeRaw !== "undefined";
-  const userEventVoteFeeWei = (userEventVoteFeeRaw as bigint | undefined) ?? BigInt(0);
-  const userEventVoteFeeDisplay = Number(formatEther(userEventVoteFeeWei)).toFixed(4);
-  const creatorSharePct = Number(creatorShareBpsRaw ?? 5000) / 100;
-  const minCreatorPayoutVotes = Number(minCreatorPayoutVotesRaw ?? BigInt(20));
   const nextUserEventAt = Number(nextUserEventAtRaw ?? BigInt(0));
   const cooldownSeconds = Math.max(0, nextUserEventAt - Math.floor(Date.now() / 1000));
   const nextCreateAtText =
@@ -431,11 +408,12 @@ export default function PredictionsPage() {
         abi: PredictionABI,
         functionName: "submitPrediction",
         args: [BigInt(pendingVote.eventId), pendingVote.prediction],
+        value: selectedVoteFeeWei ?? undefined,
       });
       setLastSubmittedVote({ eventId: pendingVote.eventId, prediction: pendingVote.prediction });
       setPendingVote(null);
     }
-  }, [isCheckInSuccess, checkInHash, pendingVote, predictionAddress, tr, writeVote]);
+  }, [isCheckInSuccess, checkInHash, pendingVote, predictionAddress, selectedVoteFeeWei, tr, writeVote]);
 
   useEffect(() => {
     if (!isCreateSuccess || !createHash || createHandledRef.current === createHash) return;
@@ -679,6 +657,7 @@ export default function PredictionsPage() {
             {t("predictions.correctReward")}.
             <span className="text-neon-gold font-bold"> {t("predictions.beatAi")}</span>
           </p>
+          <p className="text-xs text-gray-500 mt-1">{tr("predictions.voteFeeFormulaSummary", "Vote points: Basic x1 (0.00015), Pro x3 (0.005), Whale 10*sqrt(amount/0.05). Correct prediction gives +100% bonus (x2).")}</p>
           <p className="text-xs text-gray-500 mt-1">{t("predictions.autoResolve")}</p>
         </div>
       </div>
@@ -715,7 +694,6 @@ export default function PredictionsPage() {
                 ? tr("predictions.userCreateCooldownVerified", "verified: 3 events per 24h")
                 : tr("predictions.userCreateCooldown", "1 event per 24h")}
             </p>
-            {hasCreatorEconomy && null}
             <p className="text-[11px] text-gray-500 mt-1">
               {isVerifiedCreator
                 ? tr("predictions.creatorTierVerified", "Creator tier: VERIFIED")
@@ -974,7 +952,6 @@ export default function PredictionsPage() {
                       {pred.isUserEvent && (
                         <span className="text-[10px] px-2 py-1 rounded-full border border-neon-gold/40 text-neon-gold bg-neon-gold/10">
                           {tr("predictions.userEventBadge", "User Event")}
-                          {hasCreatorEconomy ? ` · ${userEventVoteFeeDisplay} BNB` : ""}
                         </span>
                       )}
                       {!pred.resolved && !isExpired && <CountdownTimer deadline={pred.deadline} />}

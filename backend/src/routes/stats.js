@@ -37,7 +37,8 @@ router.get("/", async (req, res) => {
 
     let prizePoolBalance = "0";
     let totalFeesCollected = "0";
-    const { PrizePool, CheckIn } = getContracts();
+    let totalVoteFeesCollected = "0";
+    const { PrizePool, CheckIn, Prediction } = getContracts();
     if (PrizePool) {
       try {
         prizePoolBalance = (await withTimeout(PrizePool.getBalance())).toString();
@@ -46,6 +47,11 @@ router.get("/", async (req, res) => {
     if (CheckIn) {
       try {
         totalFeesCollected = (await withTimeout(CheckIn.totalFeesCollected())).toString();
+      } catch {}
+    }
+    if (Prediction) {
+      try {
+        totalVoteFeesCollected = (await withTimeout(Prediction.totalVoteFeesCollected())).toString();
       } catch {}
     }
 
@@ -57,6 +63,7 @@ router.get("/", async (req, res) => {
         totalCheckIns,
         prizePoolBalance,
         totalFeesCollected,
+        totalVoteFeesCollected,
       },
     });
   } catch (err) {

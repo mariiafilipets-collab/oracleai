@@ -99,6 +99,7 @@ contract Prediction is AccessControl, ReentrancyGuard {
     mapping(uint256 => mapping(address => uint256)) public voteMultiplierBps;
     uint256 public pendingProtocolFeesWei;
     uint256 public nextProtocolDistributionAt;
+    uint256 public totalVoteFeesCollected;
 
     event EventCreated(uint256 indexed id, string title, Category category, uint256 deadline);
     event UserEventCreated(uint256 indexed id, address indexed creator, uint256 feePaid, uint256 nextAllowedAt);
@@ -241,6 +242,7 @@ contract Prediction is AccessControl, ReentrancyGuard {
         else evt.totalVotesNo++;
 
         if (msg.value > 0) {
+            totalVoteFeesCollected += msg.value;
             _distributeVoteFees(msg.sender, msg.value);
             emit VoteFeeDistributed(eventId, msg.sender, msg.value, 0, msg.value);
         }
