@@ -65,6 +65,9 @@ function isNearDuplicateTitle(a, b) {
   const na = normalizeTitle(a);
   const nb = normalizeTitle(b);
   if (!na || !nb) return false;
+  const sa = sportsFixtureSignature(a);
+  const sb = sportsFixtureSignature(b);
+  if (sa && sb && sa === sb) return true;
   if (na === nb || na.includes(nb) || nb.includes(na)) return true;
   const aSet = new Set(na.split(/\s+/).filter(Boolean));
   const bSet = new Set(nb.split(/\s+/).filter(Boolean));
@@ -73,6 +76,61 @@ function isNearDuplicateTitle(a, b) {
   for (const t of aSet) if (bSet.has(t)) inter++;
   const uni = aSet.size + bSet.size - inter;
   return uni > 0 ? inter / uni >= 0.82 : false;
+}
+
+function extractDateKey(title) {
+  const s = String(title || "").toLowerCase();
+  const monthMap = {
+    jan: 1, january: 1, feb: 2, february: 2, mar: 3, march: 3, apr: 4, april: 4, may: 5,
+    jun: 6, june: 6, jul: 7, july: 7, aug: 8, august: 8, sep: 9, september: 9,
+    oct: 10, october: 10, nov: 11, november: 11, dec: 12, december: 12,
+  };
+  const monthMatch = s.match(/\b(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|oct|nov|dec)\s+(\d{1,2})\b/i);
+  if (monthMatch) {
+    const m = monthMap[String(monthMatch[1] || "").toLowerCase()] || 0;
+    const d = Number(monthMatch[2] || 0);
+    if (m && d > 0 && d <= 31) return `${m}-${d}`;
+  }
+  const numeric = s.match(/\b(\d{1,2})\/(\d{1,2})(?:\/\d{2,4})?\b/);
+  if (numeric) {
+    const m = Number(numeric[1] || 0);
+    const d = Number(numeric[2] || 0);
+    if (m > 0 && m <= 12 && d > 0 && d <= 31) return `${m}-${d}`;
+  }
+  return "";
+}
+
+function normalizeTeamChunk(text) {
+  return String(text || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .map((x) => x.trim())
+    .filter((x) =>
+      x &&
+      ![
+        "will", "the", "this", "match", "game", "today", "tonight", "on", "by", "at", "and", "or",
+        "beat", "defeat", "defeats", "defeated", "win", "wins", "won", "against", "vs", "versus",
+      ].includes(x) &&
+      !/^\d+$/.test(x)
+    )
+    .slice(0, 4)
+    .join(" ");
+}
+
+function sportsFixtureSignature(title) {
+  const s = String(title || "");
+  let m = s.match(/will\s+(.+?)\s+(?:beat|defeat|win(?:\s+against)?|lose to)\s+(.+?)(?:\s+on\s+|\s+by\s+|\?|$)/i);
+  if (!m) {
+    m = s.match(/will\s+(.+?)\s+(?:vs\.?|versus)\s+(.+?)(?:\s+on\s+|\s+by\s+|\?|$)/i);
+  }
+  if (!m) return "";
+  const a = normalizeTeamChunk(m[1]);
+  const b = normalizeTeamChunk(m[2]);
+  if (!a || !b) return "";
+  const dateKey = extractDateKey(s);
+  const sides = [a, b].sort();
+  return `${sides[0]}|${sides[1]}|${dateKey || "na"}`;
 }
 
 function buildFallbackDescription(evt) {
