@@ -26,10 +26,21 @@ function inferCategoryFromText(text) {
   return "CRYPTO";
 }
 
+function inferCategoryStrong(text) {
+  const t = String(text || "").toLowerCase();
+  if (/\b(beat|defeat|defeats|defeated|lose to|lost to|vs|versus|match|fixture|league|cup|goal|score|arsenal|manchester|man utd|liverpool|chelsea|tottenham|real madrid|barcelona|atletico|bayern|psg|juventus|inter|milan|burnley|bournemouth|aston villa|west ham|newcastle|everton|nba|nfl|mlb|nhl|ufc|mma|f1|formula 1)\b/.test(t)) return "SPORTS";
+  if (/\b(tornado|hail|hurricane|earthquake|wildfire|flood|heatwave|temperature|weather|climate|rainfall|cyclone|storm)\b/.test(t)) return "CLIMATE";
+  if (/\b(election|parliament|congress|senate|president|ceasefire|sanction|summit|government|minister|white house|vote)\b/.test(t)) return "POLITICS";
+  if (/\b(cpi|inflation|gdp|fed|ecb|interest rate|jobs report|payrolls|dow|nasdaq|s&p|gold|oil|brent|wti|bond|yield)\b/.test(t)) return "ECONOMY";
+  if (/\b(bitcoin|btc|ethereum|eth|solana|xrp|crypto|token|etf|on-chain|wallet|binance|coinbase)\b/.test(t)) return "CRYPTO";
+  return "";
+}
+
 function normalizeAutoCategory(category, title, description = "") {
   const model = String(category || "").toUpperCase();
-  if (CATEGORY_NAMES.includes(model)) return model;
-  return inferCategoryFromText(`${title} ${description}`);
+  const fallback = CATEGORY_NAMES.includes(model) ? model : inferCategoryFromText(`${title} ${description}`);
+  const strong = inferCategoryStrong(`${title} ${description}`);
+  return strong || fallback;
 }
 
 function isAdminAuthorized(req) {
@@ -226,8 +237,13 @@ function dedupeNearDuplicateEvents(events) {
 }
 
 function recategorizeByTitle(events) {
-  // Keep stored categories stable; category assignment is fixed at generation time.
-  return events || [];
+  return (events || []).map((evt) => {
+    if (evt?.isUserEvent) return evt;
+    const strong = inferCategoryStrong(`${evt?.title || ""} ${evt?.description || ""}`);
+    if (!strong) return evt;
+    if (String(evt?.category || "").toUpperCase() === strong) return evt;
+    return { ...evt, category: strong };
+  });
 }
 
 async function readPredictionValueNoArgs(prediction, fragment, methodName, fallback) {

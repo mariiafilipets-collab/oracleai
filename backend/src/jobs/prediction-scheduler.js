@@ -652,13 +652,33 @@ function inferCategoryFromText(text) {
   return "CRYPTO";
 }
 
+function inferCategoryStrong(text) {
+  const t = String(text || "").toLowerCase();
+  if (/\b(beat|defeat|defeats|defeated|lose to|lost to|vs|versus|match|fixture|league|cup|goal|score|arsenal|manchester|man utd|liverpool|chelsea|tottenham|real madrid|barcelona|atletico|bayern|psg|juventus|inter|milan|burnley|bournemouth|aston villa|west ham|newcastle|everton|nba|nfl|mlb|nhl|ufc|mma|f1|formula 1)\b/.test(t)) {
+    return "SPORTS";
+  }
+  if (/\b(tornado|hail|hurricane|earthquake|wildfire|flood|heatwave|temperature|weather|climate|rainfall|cyclone|storm)\b/.test(t)) {
+    return "CLIMATE";
+  }
+  if (/\b(election|parliament|congress|senate|president|ceasefire|sanction|summit|government|minister|white house|vote)\b/.test(t)) {
+    return "POLITICS";
+  }
+  if (/\b(cpi|inflation|gdp|fed|ecb|interest rate|jobs report|payrolls|dow|nasdaq|s&p|gold|oil|brent|wti|bond|yield)\b/.test(t)) {
+    return "ECONOMY";
+  }
+  if (/\b(bitcoin|btc|ethereum|eth|solana|xrp|crypto|token|etf|on-chain|wallet|binance|coinbase)\b/.test(t)) {
+    return "CRYPTO";
+  }
+  return "";
+}
+
 function normalizeStoredCategory(eventCategory, title, description, isUserEvent) {
   const modelCategory = ALLOWED_CATEGORIES.has(String(eventCategory || "").toUpperCase())
     ? String(eventCategory).toUpperCase()
     : "CRYPTO";
   if (isUserEvent) return modelCategory;
-  // Keep the model's explicit category for auto-events to prevent heuristic drift
-  // (e.g. climate/economy terms being over-mapped to sports/crypto).
+  const strong = inferCategoryStrong(`${title || ""} ${description || ""}`);
+  if (strong && strong !== modelCategory) return strong;
   return modelCategory;
 }
 
