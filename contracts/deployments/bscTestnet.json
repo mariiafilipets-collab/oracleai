@@ -13,5 +13,9 @@
   "deployer": "0x8973987BF03AeA074daB64a98fe13D2538C1302b",
   "chainId": 97,
   "network": "bscTestnet",
-  "deployedAt": "2026-03-11T15:50:10.592Z"
+  "deployedAt": "2026-03-11T15:50:10.592Z",
+  "PredictionNFT": "0x35375A2D6C5ca01Afb7a88b7aB44651ceacc4591",
+  "PredictionNFTImpl": "0x133ba16bbf636De11d919589a6d3A87D386dE93c",
+  "OracleGovernance": "0x7f75c4B99E7AD7F5027f928b0244f476FcF8DB94",
+  "InsurancePool": "0x03412E10B200BD7a1BB2F8Ab78a23603777E2d38"
 }
