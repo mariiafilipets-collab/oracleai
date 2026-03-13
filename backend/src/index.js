@@ -21,6 +21,7 @@ import usersRouter from "./routes/users.js";
 import statsRouter from "./routes/stats.js";
 import aiRouter from "./routes/ai.js";
 import questsRouter from "./routes/quests.js";
+import insightsRouter from "./routes/insights.js";
 import swaggerUi from "swagger-ui-express";
 import swaggerSpec from "./swagger.js";
 
@@ -81,6 +82,7 @@ app.use("/api/user", usersRouter);
 app.use("/api/stats", statsRouter);
 app.use("/api/ai", aiRouter);
 app.use("/api/quests", questsRouter);
+app.use("/api/insights", insightsRouter);
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, { customSiteTitle: "OracleAI API Docs" }));
 
 // --- Deep health check ---
