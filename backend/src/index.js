@@ -1,6 +1,8 @@
 import "./bootstrap-logging.js";
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import mongoose from "mongoose";
@@ -26,12 +28,49 @@ import EventSyncState from "./models/EventSyncState.js";
 
 const app = express();
 const server = createServer(app);
-const io = new Server(server, {
-  cors: { origin: "*", methods: ["GET", "POST"] },
-});
 
-app.use(cors());
-app.use(express.json());
+// --- CORS configuration ---
+const allowedOrigins = config.corsOrigins
+  ? config.corsOrigins.split(",").map((o) => o.trim()).filter(Boolean)
+  : [];
+const corsOptions = allowedOrigins.length > 0
+  ? { origin: allowedOrigins, methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"] }
+  : { origin: true }; // dev: mirror request origin
+
+const io = new Server(server, { cors: corsOptions });
+
+// --- Security middleware ---
+app.use(helmet({ contentSecurityPolicy: false })); // CSP managed by frontend
+app.use(cors(corsOptions));
+app.use(express.json({ limit: "1mb" }));
+
+// --- Rate limiting ---
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 120,            // 120 requests per minute per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: "Too many requests, please try again later." },
+});
+app.use("/api/", apiLimiter);
+
+// Stricter limit for admin and write endpoints
+const adminLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: "Too many admin requests." },
+});
+app.use("/api/predictions/admin", adminLimiter);
+app.use("/api/predictions/generate", adminLimiter);
+app.use("/api/predictions/user/validate", rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: "Too many validation requests." },
+}));
 
 app.use("/api/predictions", predictionsRouter);
 app.use("/api/leaderboard", leaderboardRouter);
@@ -39,8 +78,37 @@ app.use("/api/user", usersRouter);
 app.use("/api/stats", statsRouter);
 app.use("/api/ai", aiRouter);
 
-app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", timestamp: Date.now() });
+// --- Deep health check ---
+app.get("/api/health", async (req, res) => {
+  const checks = { status: "ok", timestamp: Date.now() };
+
+  // MongoDB
+  try {
+    const mongoState = mongoose.connection.readyState;
+    checks.mongodb = mongoState === 1 ? "connected" : `state:${mongoState}`;
+    if (mongoState !== 1) checks.status = "degraded";
+  } catch {
+    checks.mongodb = "error";
+    checks.status = "degraded";
+  }
+
+  // RPC / blockchain
+  try {
+    const contracts = getContracts();
+    const provider = contracts.CheckIn?.runner?.provider;
+    if (provider) {
+      const blockNumber = await provider.getBlockNumber();
+      checks.rpc = { connected: true, blockNumber };
+    } else {
+      checks.rpc = { connected: false };
+      checks.status = "degraded";
+    }
+  } catch {
+    checks.rpc = { connected: false };
+    checks.status = "degraded";
+  }
+
+  res.json(checks);
 });
 
 io.on("connection", (socket) => {

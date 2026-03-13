@@ -20,6 +20,9 @@ frontend/.env.local
 backend/.env
 contracts/.env
 
+# production env (NEVER commit — contains private keys and secrets)
+oracleai.env
+
 # local tooling state
 .vercel/
 frontend/.vercel/

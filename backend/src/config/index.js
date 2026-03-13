@@ -14,6 +14,10 @@ export default {
   rpcFallbackUrl: process.env.RPC_FALLBACK_URL || "",
   deploymentNetwork,
   centralWallet: (process.env.CENTRAL_WALLET || "").toLowerCase(),
+  // Separate admin API key — falls back to DEPLOYER_PRIVATE_KEY for backwards compat
+  adminApiKey: process.env.ADMIN_API_KEY || "",
+  // CORS whitelist — comma-separated origins; empty = allow all (dev only)
+  corsOrigins: process.env.CORS_ORIGINS || "",
   enableScheduler: boolFromEnv(process.env.ENABLE_SCHEDULER, !isBscTestnet),
   enableEventPolling: boolFromEnv(process.env.ENABLE_EVENT_POLLING, true),
   eventPollIntervalMs: parseInt(process.env.EVENT_POLL_INTERVAL_MS || (isBscTestnet ? "15000" : "3000")),

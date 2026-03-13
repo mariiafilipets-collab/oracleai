@@ -7,8 +7,40 @@ import { Toaster } from "react-hot-toast";
 import LiveBackground from "@/components/LiveBackground";
 
 export const metadata: Metadata = {
-  title: "OracleAI Predict",
-  description: "Decentralized AI Prediction Platform",
+  title: {
+    default: "OracleAI Predict — Decentralized AI Prediction Platform",
+    template: "%s | OracleAI Predict",
+  },
+  description:
+    "Predict real-world events, earn points, and win rewards on the AI-powered decentralized prediction market on BNB Chain.",
+  keywords: [
+    "prediction market",
+    "AI predictions",
+    "BNB Chain",
+    "crypto",
+    "decentralized",
+    "oracle",
+    "DeFi",
+    "gamification",
+  ],
+  metadataBase: new URL("https://oracleai-predict.app"),
+  openGraph: {
+    type: "website",
+    siteName: "OracleAI Predict",
+    title: "OracleAI Predict — Decentralized AI Prediction Platform",
+    description:
+      "Predict real-world events, earn points, and win rewards on the AI-powered decentralized prediction market on BNB Chain.",
+    url: "https://oracleai-predict.app",
+    images: [{ url: "/brand/oracleai-logo-v2.png", width: 512, height: 512, alt: "OracleAI Predict" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "OracleAI Predict",
+    description:
+      "AI-powered prediction market on BNB Chain. Predict, earn, win.",
+    images: ["/brand/oracleai-logo-v2.png"],
+  },
+  robots: { index: true, follow: true },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

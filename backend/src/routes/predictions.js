@@ -48,7 +48,10 @@ function normalizeAutoCategory(category, title, description = "") {
 
 function isAdminAuthorized(req) {
   const key = String(req.header("x-admin-key") || "").trim();
-  return Boolean(key) && Boolean(config.deployerKey) && key === String(config.deployerKey).trim();
+  if (!key) return false;
+  // Prefer dedicated admin API key; fall back to deployer key for backwards compat
+  const adminKey = config.adminApiKey || config.deployerKey;
+  return Boolean(adminKey) && key === String(adminKey).trim();
 }
 
 async function ensureSchedulerStarted() {
