@@ -9,6 +9,15 @@ import config from "../config/index.js";
 const router = Router();
 const SYSTEM_REFERRAL_CODE = "ORACLEAI";
 const CHAIN_READ_TIMEOUT_MS = 8000;
+const ADDRESS_RE = /^0x[a-f0-9]{40}$/i;
+
+// Validate :address param on all routes that use it
+router.param("address", (req, res, next, value) => {
+  if (!ADDRESS_RE.test(value)) {
+    return res.status(400).json({ success: false, error: "Invalid address format" });
+  }
+  next();
+});
 
 async function withTimeout(promise, timeoutMs = CHAIN_READ_TIMEOUT_MS) {
   return await Promise.race([

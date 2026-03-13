@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 
 interface IPointsCheckIn {
     function addPoints(address user, uint256 amount, uint256 streak) external;
@@ -17,7 +18,7 @@ interface IStaking {
     function getPointsBoost(address user) external view returns (uint256);
 }
 
-contract CheckIn is Ownable, ReentrancyGuard {
+contract CheckIn is Ownable, ReentrancyGuard, Pausable {
     enum Tier { BASIC, PRO, WHALE }
 
     struct CheckInRecord {
@@ -113,7 +114,15 @@ contract CheckIn is Ownable, ReentrancyGuard {
         stakingRewards = _stakingRewards;
     }
 
-    function checkIn() external payable nonReentrant {
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
+    function checkIn() external payable nonReentrant whenNotPaused {
         require(msg.value >= BASIC_THRESHOLD, "Below minimum");
 
         CheckInRecord storage record = records[msg.sender];
