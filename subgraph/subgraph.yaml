@@ -1,0 +1,189 @@
+specVersion: 0.0.5
+schema:
+  file: ./schema.graphql
+dataSources:
+  - kind: ethereum
+    name: CheckIn
+    network: bsc-testnet
+    source:
+      address: "0x0000000000000000000000000000000000000000" # Replace with deployed address
+      abi: CheckIn
+      startBlock: 0 # Replace with deploy block
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - User
+        - CheckInEvent
+        - ProtocolMetrics
+      abis:
+        - name: CheckIn
+          file: ../contracts/artifacts/contracts/CheckIn.sol/CheckIn.json
+      eventHandlers:
+        - event: CheckedIn(indexed address,uint256,uint8,uint256,uint256)
+          handler: handleCheckedIn
+      file: ./src/mappings/checkin.ts
+
+  - kind: ethereum
+    name: Prediction
+    network: bsc-testnet
+    source:
+      address: "0x0000000000000000000000000000000000000000"
+      abi: Prediction
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - PredictionEvent
+        - VoteEvent
+        - EventResolution
+        - ProtocolMetrics
+      abis:
+        - name: Prediction
+          file: ../contracts/artifacts/contracts/Prediction.sol/Prediction.json
+      eventHandlers:
+        - event: EventCreated(indexed uint256,string,uint8,uint256)
+          handler: handleEventCreated
+        - event: VoteSubmitted(indexed uint256,indexed address,bool)
+          handler: handleVoteSubmitted
+        - event: EventResolved(indexed uint256,bool,uint256)
+          handler: handleEventResolved
+        - event: VoteFeeDistributed(indexed uint256,indexed address,uint256,uint256,uint256)
+          handler: handleVoteFeeDistributed
+      file: ./src/mappings/prediction.ts
+
+  - kind: ethereum
+    name: Staking
+    network: bsc-testnet
+    source:
+      address: "0x0000000000000000000000000000000000000000"
+      abi: Staking
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - User
+        - StakeEvent
+        - ProtocolMetrics
+      abis:
+        - name: Staking
+          file: ../contracts/artifacts/contracts/Staking.sol/Staking.json
+      eventHandlers:
+        - event: Staked(indexed address,uint256)
+          handler: handleStaked
+        - event: UnstakeRequested(indexed address,uint256)
+          handler: handleUnstakeRequested
+        - event: Unstaked(indexed address,uint256)
+          handler: handleUnstaked
+      file: ./src/mappings/staking.ts
+
+  - kind: ethereum
+    name: PrizePoolV2
+    network: bsc-testnet
+    source:
+      address: "0x0000000000000000000000000000000000000000"
+      abi: PrizePoolV2
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - PrizeEpoch
+        - PrizeClaim
+        - ProtocolMetrics
+      abis:
+        - name: PrizePoolV2
+          file: ../contracts/artifacts/contracts/PrizePoolV2.sol/PrizePoolV2.json
+      eventHandlers:
+        - event: EpochStarted(indexed uint256,bytes32,uint256)
+          handler: handleEpochStarted
+        - event: PrizeClaimed(indexed uint256,indexed address,uint256,uint256)
+          handler: handlePrizeClaimed
+      file: ./src/mappings/prizepool.ts
+
+  - kind: ethereum
+    name: PredictionNFT
+    network: bsc-testnet
+    source:
+      address: "0x0000000000000000000000000000000000000000"
+      abi: PredictionNFT
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - PredictionNFTToken
+        - User
+      abis:
+        - name: PredictionNFT
+          file: ../contracts/artifacts/contracts/PredictionNFT.sol/PredictionNFT.json
+      eventHandlers:
+        - event: StreakNFTMinted(indexed address,indexed uint256,uint8,uint256,uint256)
+          handler: handleStreakNFTMinted
+        - event: Transfer(indexed address,indexed address,indexed uint256)
+          handler: handleNFTTransfer
+      file: ./src/mappings/nft.ts
+
+  - kind: ethereum
+    name: OracleGovernance
+    network: bsc-testnet
+    source:
+      address: "0x0000000000000000000000000000000000000000"
+      abi: OracleGovernance
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - GovernanceProposal
+        - GovernanceVote
+        - ProtocolMetrics
+      abis:
+        - name: OracleGovernance
+          file: ../contracts/artifacts/contracts/OracleGovernance.sol/OracleGovernance.json
+      eventHandlers:
+        - event: ProposalCreated(indexed uint256,indexed address,string,uint256,uint256)
+          handler: handleProposalCreated
+        - event: VoteCast(indexed uint256,indexed address,bool,uint256)
+          handler: handleVoteCast
+        - event: ProposalExecuted(indexed uint256)
+          handler: handleProposalExecuted
+        - event: ProposalCancelled(indexed uint256)
+          handler: handleProposalCancelled
+      file: ./src/mappings/governance.ts
+
+  - kind: ethereum
+    name: InsurancePool
+    network: bsc-testnet
+    source:
+      address: "0x0000000000000000000000000000000000000000"
+      abi: InsurancePool
+      startBlock: 0
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - InsuranceClaim
+        - ProtocolMetrics
+      abis:
+        - name: InsurancePool
+          file: ../contracts/artifacts/contracts/InsurancePool.sol/InsurancePool.json
+      eventHandlers:
+        - event: ClaimFiled(indexed uint256,indexed address,uint256,uint256)
+          handler: handleClaimFiled
+        - event: ClaimApproved(indexed uint256,uint256)
+          handler: handleClaimApproved
+        - event: ClaimDenied(indexed uint256)
+          handler: handleClaimDenied
+        - event: ClaimPaid(indexed uint256,indexed address,uint256)
+          handler: handleClaimPaid
+      file: ./src/mappings/insurance.ts

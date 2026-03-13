@@ -22,6 +22,7 @@ const spec = {
     { name: "Quests", description: "Daily/weekly quest progression and rewards" },
     { name: "Stats", description: "Platform-wide statistics" },
     { name: "Admin", description: "Protected admin operations (x-admin-key header)" },
+    { name: "Insights", description: "AI insights marketplace — premium analytics" },
     { name: "Health", description: "Service health" },
   ],
   components: {
@@ -576,6 +577,57 @@ const spec = {
         tags: ["Stats"],
         summary: "TGE airdrop forecast",
         responses: { 200: { description: "Token distribution scenarios" } },
+      },
+    },
+
+    // ─── Insights ──────────────────────────────────────────────
+    "/api/insights/top": {
+      get: {
+        tags: ["Insights"],
+        summary: "Top confidence AI predictions",
+        parameters: [
+          { $ref: "#/components/parameters/LimitQuery" },
+          { name: "minConfidence", in: "query", schema: { type: "number", default: 0.7 }, description: "Minimum confidence threshold" },
+        ],
+        responses: { 200: { description: "High-confidence AI insights with edge scores" } },
+      },
+    },
+    "/api/insights/category/{category}": {
+      get: {
+        tags: ["Insights"],
+        summary: "Category deep dive with accuracy stats",
+        parameters: [
+          { name: "category", in: "path", required: true, schema: { type: "string", enum: ["SPORTS", "POLITICS", "ECONOMY", "CRYPTO", "CLIMATE"] } },
+          { $ref: "#/components/parameters/LimitQuery" },
+          { name: "includeResolved", in: "query", schema: { type: "boolean" } },
+        ],
+        responses: { 200: { description: "Category events and AI accuracy breakdown" } },
+      },
+    },
+    "/api/insights/accuracy": {
+      get: {
+        tags: ["Insights"],
+        summary: "AI model accuracy breakdown by category",
+        responses: { 200: { description: "Overall and per-category accuracy stats" } },
+      },
+    },
+    "/api/insights/trending": {
+      get: {
+        tags: ["Insights"],
+        summary: "Trending events by community engagement",
+        parameters: [{ $ref: "#/components/parameters/LimitQuery" }],
+        responses: { 200: { description: "Events ranked by vote count and sentiment" } },
+      },
+    },
+    "/api/insights/contrarian": {
+      get: {
+        tags: ["Insights"],
+        summary: "Events where AI and community disagree",
+        parameters: [
+          { $ref: "#/components/parameters/LimitQuery" },
+          { name: "minVotes", in: "query", schema: { type: "integer", default: 5 } },
+        ],
+        responses: { 200: { description: "Contrarian opportunities ranked by disagreement" } },
       },
     },
   },
