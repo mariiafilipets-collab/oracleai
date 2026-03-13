@@ -1,0 +1,167 @@
+"""
+OracleAI Predict — Subgraph Schema for The Graph
+Indexes all on-chain events from CheckIn, Prediction, Points, Staking,
+PrizePool, Referral, PredictionNFT, Governance, and InsurancePool.
+"""
+
+type User @entity {
+  id: Bytes! # wallet address
+  totalPoints: BigInt!
+  weeklyPoints: BigInt!
+  streak: BigInt!
+  totalCheckIns: BigInt!
+  correctPredictions: BigInt!
+  totalPredictions: BigInt!
+  stakedAmount: BigInt!
+  stakingTier: Int!
+  referrer: Bytes
+  directReferralCount: BigInt!
+  totalReferralEarnings: BigInt!
+  nfts: [PredictionNFTToken!]! @derivedFrom(field: "owner")
+  checkIns: [CheckInEvent!]! @derivedFrom(field: "user")
+  votes: [VoteEvent!]! @derivedFrom(field: "user")
+  claims: [InsuranceClaim!]! @derivedFrom(field: "claimant")
+  proposals: [GovernanceProposal!]! @derivedFrom(field: "proposer")
+  createdAt: BigInt!
+  updatedAt: BigInt!
+}
+
+type CheckInEvent @entity(immutable: true) {
+  id: Bytes! # txHash-logIndex
+  user: User!
+  amount: BigInt!
+  tier: Int! # 0=BASIC, 1=PRO, 2=WHALE
+  points: BigInt!
+  streak: BigInt!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+}
+
+type PredictionEvent @entity {
+  id: ID! # eventId
+  title: String!
+  category: Int! # 0=SPORTS..4=CLIMATE
+  aiProbability: BigInt!
+  deadline: BigInt!
+  resolved: Boolean!
+  outcome: Boolean
+  totalVotesYes: BigInt!
+  totalVotesNo: BigInt!
+  creator: Bytes
+  isUserEvent: Boolean!
+  listingFee: BigInt!
+  votes: [VoteEvent!]! @derivedFrom(field: "event")
+  createdAt: BigInt!
+  resolvedAt: BigInt
+}
+
+type VoteEvent @entity(immutable: true) {
+  id: Bytes! # txHash-logIndex
+  event: PredictionEvent!
+  user: User!
+  prediction: Boolean!
+  multiplierBps: BigInt!
+  feePaid: BigInt!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+}
+
+type EventResolution @entity(immutable: true) {
+  id: Bytes! # txHash-logIndex
+  event: PredictionEvent!
+  outcome: Boolean!
+  winnersCount: BigInt!
+  timestamp: BigInt!
+}
+
+type StakeEvent @entity(immutable: true) {
+  id: Bytes! # txHash-logIndex
+  user: User!
+  action: String! # "stake", "requestUnstake", "unstake"
+  amount: BigInt!
+  timestamp: BigInt!
+}
+
+type ReferralPayment @entity(immutable: true) {
+  id: Bytes! # txHash-logIndex
+  referrer: Bytes!
+  referee: Bytes!
+  amount: BigInt!
+  level: Int!
+  timestamp: BigInt!
+}
+
+type PrizeEpoch @entity {
+  id: ID! # epoch number
+  merkleRoot: Bytes!
+  totalAllocation: BigInt!
+  claimed: BigInt!
+  startedAt: BigInt!
+  claims: [PrizeClaim!]! @derivedFrom(field: "epoch")
+}
+
+type PrizeClaim @entity(immutable: true) {
+  id: Bytes! # txHash-logIndex
+  epoch: PrizeEpoch!
+  claimant: Bytes!
+  amount: BigInt!
+  index: BigInt!
+  timestamp: BigInt!
+}
+
+type PredictionNFTToken @entity {
+  id: ID! # tokenId
+  owner: User!
+  tier: Int! # 0=BRONZE..3=DIAMOND
+  streak: BigInt!
+  eventId: BigInt!
+  mintedAt: BigInt!
+}
+
+type GovernanceProposal @entity {
+  id: ID! # proposalId
+  proposer: User!
+  title: String!
+  description: String!
+  forVotes: BigInt!
+  againstVotes: BigInt!
+  startTime: BigInt!
+  endTime: BigInt!
+  executed: Boolean!
+  cancelled: Boolean!
+  votes: [GovernanceVote!]! @derivedFrom(field: "proposal")
+}
+
+type GovernanceVote @entity(immutable: true) {
+  id: Bytes! # txHash-logIndex
+  proposal: GovernanceProposal!
+  voter: Bytes!
+  support: Boolean!
+  weight: BigInt!
+  timestamp: BigInt!
+}
+
+type InsuranceClaim @entity {
+  id: ID! # claimId
+  claimant: User!
+  eventId: BigInt!
+  requestedAmount: BigInt!
+  approvedAmount: BigInt!
+  reason: String!
+  status: Int! # 0=Pending, 1=Approved, 2=Denied, 3=Paid
+  filedAt: BigInt!
+  resolvedAt: BigInt
+}
+
+type ProtocolMetrics @entity {
+  id: ID! # "singleton"
+  totalCheckIns: BigInt!
+  totalFeesCollected: BigInt!
+  totalVoteFeesCollected: BigInt!
+  totalPointsIssued: BigInt!
+  totalStaked: BigInt!
+  totalPrizesDistributed: BigInt!
+  totalInsurancePaid: BigInt!
+  totalProposals: BigInt!
+  updatedAt: BigInt!
+}

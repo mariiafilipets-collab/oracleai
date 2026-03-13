@@ -75,6 +75,10 @@ router.get("/:address", async (req, res) => {
     }).lean();
     const progressMap = new Map(progressDocs.map((p) => [`${p.questId}:${p.periodKey}`, p]));
 
+    // Pre-fetch referral count if needed
+    const hasReferralQuest = quests.some((q) => q.action === "referral");
+    const referralCount = hasReferralQuest ? await User.countDocuments({ referrer: address }) : 0;
+
     const result = quests
       .filter((q) => !q.expiresAt || q.expiresAt > now)
       .map((q) => {
@@ -93,8 +97,7 @@ router.get("/:address", async (req, res) => {
             currentProgress = Math.round((user.correctPredictions / user.totalPredictions) * 100);
           }
           if (q.action === "referral") {
-            const refCount = await User.countDocuments({ referrer: address });
-            currentProgress = refCount;
+            currentProgress = referralCount;
           }
         }
 

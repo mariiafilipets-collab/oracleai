@@ -20,7 +20,8 @@
     "mongoose": "^8.9.0",
     "node-cron": "^3.0.3",
     "openai": "^4.77.0",
-    "socket.io": "^4.8.0"
+    "socket.io": "^4.8.0",
+    "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
     "@jest/globals": "^30.3.0",
