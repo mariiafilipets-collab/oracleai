@@ -25,8 +25,8 @@ const DEFAULT_RESULT_VERIFY_BUFFER_MS = 10 * 60 * 1000;
 const CATEGORY_VERIFY_BUFFER_MINUTES = {
   SPORTS: 20,
   POLITICS: 60,
-  ECONOMY: 20,
-  CRYPTO: 20,
+  ECONOMY: 60,
+  CRYPTO: 60,
   CLIMATE: 60,
 };
 const CATEGORY_VOTE_CLOSE_LEAD_MINUTES = {
@@ -39,8 +39,8 @@ const CATEGORY_VOTE_CLOSE_LEAD_MINUTES = {
 const CATEGORY_MIN_RESULT_DELAY_MINUTES = {
   SPORTS: 180,
   POLITICS: 90,
-  ECONOMY: 20,
-  CRYPTO: 20,
+  ECONOMY: 60,
+  CRYPTO: 60,
   CLIMATE: 90,
 };
 const CATEGORY_MAX_VERIFY_DEADLINE_GAP_HOURS = {
@@ -1411,6 +1411,22 @@ async function runQualityWatchdog() {
       if (cat === "SPORTS") {
         if (!startTs) {
           issues.sportsMissingStart++;
+          // Archive — can't enforce anti-cheat without kickoff time
+          corrections.push({
+            updateOne: {
+              filter: { eventId: evt.eventId },
+              update: {
+                $set: {
+                  resolved: true,
+                  resolvePending: false,
+                  outcome: false,
+                  aiReasoning: "Archived: SPORTS event missing eventStartAtUtc (anti-cheat cannot be enforced).",
+                  nextResolveRetryAt: null,
+                  lastResolveError: "",
+                },
+              },
+            },
+          });
           if (samples.length < 12) samples.push({ eventId: evt.eventId, type: "sportsMissingStart", title });
         } else {
           const leadMin = Math.round((startTs - deadlineTs) / 60000);
