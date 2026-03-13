@@ -22,6 +22,7 @@ export default {
   eventBackfillBlockRange: parseInt(process.env.EVENT_BACKFILL_BLOCK_RANGE || (isBscTestnet ? "100" : "500")),
   eventBackfillDelayMs: parseInt(process.env.EVENT_BACKFILL_DELAY_MS || (isBscTestnet ? "250" : "50")),
   eventBackfillMaxRetries: parseInt(process.env.EVENT_BACKFILL_MAX_RETRIES || "6"),
+  eventCatchupMaxGap: Math.max(0, parseInt(process.env.EVENT_CATCHUP_MAX_GAP || (isBscTestnet ? "5000" : "0"))),
   mongoUri: process.env.MONGODB_URI || "",
   aiProvider: process.env.AI_PROVIDER || "mock",
   openrouterKey: process.env.OPENROUTER_API_KEY || "",

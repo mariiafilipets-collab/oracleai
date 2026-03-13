@@ -344,7 +344,19 @@ async function setupEventListeners() {
 
   const runInitialCatchUp = async () => {
     if (latestAtStartup <= lastProcessedBlock) return;
+    const gap = latestAtStartup - lastProcessedBlock;
+    const maxGap = Math.max(0, Number(config.eventCatchupMaxGap || 0));
+    if (maxGap > 0 && gap > maxGap) {
+      console.warn(`[Events] Catch-up gap too large (${gap} blocks), resuming from latest ${latestAtStartup}`);
+      lastProcessedBlock = latestAtStartup;
+      await saveCursor(lastProcessedBlock);
+      return;
+    }
     catchUpInProgress = true;
+    let prunedSkipCount = 0;
+    let lastPrunedLogAt = 0;
+    const PRUNED_LOG_INTERVAL_MS = 30_000;
+    const PRUNED_LOG_EVERY_N = 50;
     try {
       const step = Math.max(1, Number(config.eventBackfillBlockRange || config.eventMaxBlockRange || 1));
       const backfillDelayMs = Math.max(0, Number(config.eventBackfillDelayMs || 0));
@@ -364,10 +376,14 @@ async function setupEventListeners() {
               break catchUp;
             }
             if (isPrunedHistoryError(err)) {
-              // Provider pruned historical blocks; skip this range to unblock poller progress.
               lastProcessedBlock = toBlock;
               await saveCursor(lastProcessedBlock);
-              console.warn(`[Events] Catch-up pruned range skipped ${cursor}..${toBlock}`);
+              prunedSkipCount += 1;
+              const now = Date.now();
+              if (prunedSkipCount % PRUNED_LOG_EVERY_N === 0 || now - lastPrunedLogAt >= PRUNED_LOG_INTERVAL_MS) {
+                console.warn(`[Events] Catch-up: skipped ${prunedSkipCount} pruned ranges (now at block ${toBlock})`);
+                lastPrunedLogAt = now;
+              }
               break;
             }
             if (!isRateLimitError(err) || attempt >= maxRetries) {
@@ -381,6 +397,9 @@ async function setupEventListeners() {
           }
         }
         if (backfillDelayMs > 0) await sleep(backfillDelayMs);
+      }
+      if (prunedSkipCount > 0) {
+        console.log(`[Events] Catch-up finished: ${prunedSkipCount} pruned ranges skipped, cursor at ${lastProcessedBlock}`);
       }
     } finally {
       catchUpInProgress = false;
