@@ -20,6 +20,9 @@ import leaderboardRouter from "./routes/leaderboard.js";
 import usersRouter from "./routes/users.js";
 import statsRouter from "./routes/stats.js";
 import aiRouter from "./routes/ai.js";
+import questsRouter from "./routes/quests.js";
+import swaggerUi from "swagger-ui-express";
+import swaggerSpec from "./swagger.js";
 
 import User from "./models/User.js";
 import CheckInRecord from "./models/CheckInRecord.js";
@@ -77,6 +80,8 @@ app.use("/api/leaderboard", leaderboardRouter);
 app.use("/api/user", usersRouter);
 app.use("/api/stats", statsRouter);
 app.use("/api/ai", aiRouter);
+app.use("/api/quests", questsRouter);
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, { customSiteTitle: "OracleAI API Docs" }));
 
 // --- Deep health check ---
 app.get("/api/health", async (req, res) => {
@@ -329,6 +334,17 @@ async function setupEventListeners() {
         streak,
         timestamp: Date.now(),
       });
+
+      // Whale alert — broadcast notable check-ins
+      if (tierName === "WHALE") {
+        io.emit("notification:whale", {
+          type: "whale_checkin",
+          message: `Whale check-in: ${user.slice(0, 6)}...${user.slice(-4)} deposited ${bnbAmount} BNB`,
+          address: user,
+          amount: bnbAmount,
+          timestamp: Date.now(),
+        });
+      }
     }
 
     if (referral) {
@@ -378,6 +394,17 @@ async function setupEventListeners() {
             },
             { upsert: true }
           );
+          // Emit live vote event for real-time UI updates
+          const voter = (args.user ?? args[1])?.toLowerCase?.();
+          const userPrediction = args.prediction ?? args[2];
+          io.emit("prediction:vote", {
+            eventId,
+            voter,
+            prediction: Boolean(userPrediction),
+            totalVotesYes: Number(on.totalVotesYes || 0n),
+            totalVotesNo: Number(on.totalVotesNo || 0n),
+            timestamp: Date.now(),
+          });
         } catch (e) {
           console.warn(`[Events] Vote sync failed for event ${eventId}:`, e?.message || e);
         }

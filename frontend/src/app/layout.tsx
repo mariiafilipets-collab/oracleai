@@ -46,6 +46,11 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="theme-color" content="#00f0ff" />
+        <link rel="apple-touch-icon" href="/brand/oracleai-logo-v2.png" />
+      </head>
       <body className="bg-dark-900 min-h-screen antialiased">
         <LiveBackground />
         <Providers>

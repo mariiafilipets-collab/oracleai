@@ -6,6 +6,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { selectedChain, wagmiConfig } from "@/lib/web3-config";
 import "@rainbow-me/rainbowkit/styles.css";
 import { useEffect } from "react";
+import AnalyticsTracker from "@/components/AnalyticsTracker";
+import LiveNotifications from "@/components/LiveNotifications";
 
 const queryClient = new QueryClient();
 
@@ -46,6 +48,8 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     <WagmiProvider config={wagmiConfig}>
       <QueryClientProvider client={queryClient}>
         <EnsureBnbLocalNetwork />
+        <AnalyticsTracker />
+        <LiveNotifications />
         <RainbowKitProvider
           theme={darkTheme({
             accentColor: "#00f0ff",

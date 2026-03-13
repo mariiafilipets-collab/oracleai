@@ -98,4 +98,21 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ referrerCode, attribution }),
     }),
+
+  // Quests
+  getQuests: (address: string) => fetchAPI(`/api/quests/${address}`),
+  updateQuestProgress: (address: string, questId: string, increment = 1) =>
+    fetchAPI(`/api/quests/${address}/progress`, {
+      method: "POST",
+      body: JSON.stringify({ questId, increment }),
+    }),
+  claimQuestReward: (address: string, questId: string) =>
+    fetchAPI(`/api/quests/${address}/claim`, {
+      method: "POST",
+      body: JSON.stringify({ questId }),
+    }),
+
+  // Accuracy ranking
+  getAccuracyRanking: (limit = 50, min = 5) =>
+    fetchAPI(`/api/leaderboard/accuracy?limit=${limit}&min=${min}`),
 };

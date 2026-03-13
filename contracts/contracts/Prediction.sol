@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 
 interface IPoints {
     function addPredictionBonus(address user, uint256 bonus, bool correct) external;
@@ -22,7 +23,7 @@ interface IReferralPrediction {
     function distributeReferralFees(address user, uint256 totalReferralFee) external payable;
 }
 
-contract Prediction is AccessControl, ReentrancyGuard {
+contract Prediction is AccessControl, ReentrancyGuard, Pausable {
     bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
 
     enum Category { SPORTS, POLITICS, ECONOMY, CRYPTO, CLIMATE }
@@ -139,12 +140,20 @@ contract Prediction is AccessControl, ReentrancyGuard {
         nextProtocolDistributionAt = block.timestamp + PROTOCOL_DISTRIBUTION_INTERVAL;
     }
 
+    function pause() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _pause();
+    }
+
+    function unpause() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _unpause();
+    }
+
     function createEvent(
         string calldata title,
         Category category,
         uint256 deadline,
         uint256 aiProbability
-    ) external onlyRole(OPERATOR_ROLE) returns (uint256) {
+    ) external onlyRole(OPERATOR_ROLE) whenNotPaused returns (uint256) {
         require(deadline > block.timestamp, "Past deadline");
         require(aiProbability <= 100, "Invalid probability");
 
@@ -174,7 +183,7 @@ contract Prediction is AccessControl, ReentrancyGuard {
         Category category,
         uint256 deadline,
         string calldata sourcePolicy
-    ) external payable nonReentrant returns (uint256) {
+    ) external payable nonReentrant whenNotPaused returns (uint256) {
         require(bytes(title).length > 10 && bytes(title).length <= MAX_TITLE_LENGTH, "Invalid title length");
         require(bytes(sourcePolicy).length > 0 && bytes(sourcePolicy).length <= MAX_SOURCE_POLICY_LENGTH, "Invalid source");
         require(msg.value == USER_EVENT_FEE, "Invalid fee");
@@ -220,7 +229,7 @@ contract Prediction is AccessControl, ReentrancyGuard {
         return USER_EVENT_COOLDOWN;
     }
 
-    function submitPrediction(uint256 eventId, bool _prediction) external payable nonReentrant {
+    function submitPrediction(uint256 eventId, bool _prediction) external payable nonReentrant whenNotPaused {
         PredictionEvent storage evt = events[eventId];
         require(evt.id != 0, "Event not found");
         require(!evt.resolved, "Already resolved");

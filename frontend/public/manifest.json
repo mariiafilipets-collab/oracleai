@@ -1,0 +1,20 @@
+{
+  "name": "OracleAI Predict",
+  "short_name": "OracleAI",
+  "description": "AI-powered decentralized prediction market on BNB Chain",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#050810",
+  "theme_color": "#00f0ff",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/brand/oracleai-logo-v2.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["finance", "games"],
+  "lang": "en"
+}
