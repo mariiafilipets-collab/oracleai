@@ -735,7 +735,7 @@ async function finalizePredictionsWithArbiter(category, events, nowInfo) {
   const messages = [
     {
       role: "system",
-      content: `You are a strict final arbiter for prediction market listings.
+      content: `You are a strict final arbiter for prediction market listings with live web search.
 Return ONLY JSON array:
 [{"idx":number,"accepted":true|false,"reason":"short","verifyAtUtc":"ISO UTC|null","eventStartAtUtc":"ISO UTC|null","sources":["https://..."],"description":"120-220 chars"}]
 Hard rules:
@@ -744,7 +744,10 @@ Hard rules:
 - verifyAtUtc must be after current time and after event start (if provided).
 - Reject if timing is ambiguous or likely already known.
 - Never invent fake URLs.
-- Description must be concrete and useful (what exactly is checked, in what time window, by which source type).`,
+- REJECT events with hallucinated prices/thresholds. If a title says "Gold above $5,200" but Gold is actually ~$2,900, REJECT it. Verify all numeric thresholds against current real data.
+- REJECT niche/local events that would not attract global attention (local elections <1M voters, routine weather, obscure sports).
+- Description must be concrete and useful (what exactly is checked, in what time window, by which source type).
+- Only accept events that would genuinely engage prediction market users (crypto traders, sports bettors, news followers).`,
     },
     {
       role: "user",
@@ -834,38 +837,47 @@ ${repromptReason ? `- Previous pass issue focus: ${repromptReason}` : ""}`
     : "";
 
   const r = await generate(
-    `You create prediction market events. You are strict about timing and verifiability.
+    `You create prediction market events. You are strict about timing, verifiability, and factual accuracy.
 
 ABSOLUTE RULES:
 - Today is ${day}, ${today}, ${hour}:00 UTC
 - Create predictions for events from now up to the next 30 days.
 - Prefer the next 1-7 days for most events.
 - At least 3 of 5 predictions should resolve in 1-7 days.
-- You may include explicit dates if they are within the next 30 days.
+
+FACTUAL ACCURACY (CRITICAL):
+- Use ONLY prices, scores, and facts from the VERIFIED NEWS provided below.
+- NEVER invent or guess prices/thresholds. If the news says "Bitcoin is at $83,000", use a threshold near $83,000 — NOT $70,000 or $100,000.
+- For ECONOMY/CRYPTO: the threshold in the title MUST be within 5-15% of the CURRENT price from the news. Example: if Gold is $2,920, use "$2,900" or "$3,000" — NEVER "$5,200".
+- If no current price is available in the news for an asset, do NOT create a prediction about it.
+
+POPULARITY (CRITICAL):
+- ONLY create events that would attract mass interest on a prediction market.
+- Think: "Would 1000+ crypto/betting users want to vote on this?"
+- GOOD: Champions League matches, Bitcoin price, Fed rate decisions, major elections, celebrity events
+- BAD: niche weather events, local elections with <1M voters, obscure sports leagues, routine data releases
+- For CLIMATE: only major disasters making global headlines (Cat 3+ hurricanes, M7+ earthquakes, record heatwaves). NO routine weather.
+- popularityScore must honestly reflect global interest (80+ = mainstream, 60-80 = notable, <60 = niche — reject niche)
+
+TIMING:
 - The outcome MUST be verifiable by trusted sources at or shortly after deadline.
-- Prefer HIGH-POPULARITY topics only (major teams, major assets, major political/economic headlines).
-- Avoid niche/local/low-volume topics unless they are globally trending today.
 - Frame as a clear YES/NO question with specific names and numbers
 - hoursToResolve = hours from NOW until result is known (6-720 max)
 - Most hoursToResolve should be 24-168 (1-7 days)
 - If hoursToResolve > 24, include explicit UTC date context in title (e.g., "on March 9", "by Mar 10 18:00 UTC")
 - Do NOT use "today/tonight/now" unless hoursToResolve <= 6
 - Always provide verifyAtUtc in strict ISO UTC format, e.g. "2026-03-22T21:30:00Z"
-- For SPORTS: use exact kickoff in UTC and set verifyAtUtc to expected final-result availability (prefer kickoff + 3h to 4h to handle delays/overtime)
-- For SPORTS diversity: do NOT output only football. Include at least 2 events from non-football sports (NBA/NHL/tennis/MMA/F1/etc.) when such mainstream fixtures exist in the next 7 days.
+- For SPORTS: use exact kickoff in UTC and set verifyAtUtc to expected final-result availability (prefer kickoff + 3h to 4h for delays/overtime)
+- For SPORTS diversity: include at least 2 events from non-football sports (NBA/NHL/tennis/MMA/F1/etc.) when such mainstream fixtures exist in the next 7 days.
 - Never use non-UTC timezone abbreviations (ET/PT/CET etc.) in title; convert to UTC.
-- hoursToResolve must reflect real result availability (e.g., match end, market close, official statement window)
-- For markets: will resolve when market closes today
-- For crypto: usually 6-48h, unless event is a scheduled date item
+- hoursToResolve must reflect real result availability (match end, market close, official statement window)
 - Timing guardrails by category:
   - SPORTS: vote closes 1 minute before kickoff; verify usually kickoff + 3-4h.
   - ECONOMY: vote closes ~60 minutes before release/close; verify +20 minutes.
   - CRYPTO: vote closes ~60 minutes before target candle/event; verify +20 minutes.
   - POLITICS: vote closes ~30 minutes before official cutoff; verify +60 to +120 minutes.
   - CLIMATE: vote closes ~30 minutes before window end; verify +60 to +120 minutes.
-- Return ONLY a JSON array of 5 objects, nothing else
 - Category lock is strict: every object.category MUST be exactly "${category}"
-- Never output non-UTC timezone labels in title/description
 - For SPORTS: eventStartAtUtc is mandatory and must be exact kickoff UTC
 - For non-SPORTS: eventStartAtUtc must be null or omitted unless truly needed
 - If exact timing is uncertain, do NOT include that event
@@ -875,12 +887,14 @@ REJECT these types of predictions:
 - Events with deadlines beyond 30 days
 - Vague timing ("sometime soon") or unverifiable outcomes
 - Events that already happened
-- Events that are not sufficiently popular/visible`,
+- Events that are not sufficiently popular/visible
+- Niche/local events that would not interest a global audience
+- Price predictions with hallucinated thresholds not grounded in current data`,
 
     `Today: ${day}, ${today}, ${hour}:00 UTC. Category: ${category}
 
-VERIFIED NEWS FOR TODAY:
-${context || "No specific news. Use current verifiable facts: live prices, current standings, today's weather."}
+VERIFIED NEWS AND CURRENT DATA (use these facts, do NOT invent prices):
+${context || "No specific news available. Skip price-based predictions if no current prices are provided."}
 
 Create exactly 5 predictions about events in the next 30 days.
 Each: {"title":"yes/no question max 90 chars","description":"120-220 chars, detailed and user-friendly","category":"${category}","aiProbability":15-85,"hoursToResolve":6-720,"eventStartAtUtc":"ISO UTC or null","verifyAtUtc":"ISO UTC","sources":["https://..."],"confidence":0..1,"popularityScore":0..100}
@@ -889,24 +903,30 @@ Required horizon mix per 5 events:
 - at least 3 events resolving within 24-168h (1-7 days)
 - at least 1 event resolving within 168-720h (8-30 days)
 
+PRICE/THRESHOLD RULES (CRITICAL):
+- Any number in your title (price, index level, percentage) MUST come from the VERIFIED NEWS above.
+- If the news says "S&P 500 is at 5,521", your threshold should be near 5,521 (e.g., 5,500 or 5,550), NOT 6,000.
+- Round thresholds to clean numbers: $83,000 not $83,247; $2,900 not $2,917.
+- If you cannot find a current price in the news, do NOT create that price prediction.
+
 For SPORTS wording precision:
 - If it is a two-leg/tournament tie, title MUST be about this specific match result only.
-- Explicitly avoid aggregate ambiguity.
 - Good: "Will Barcelona win this match vs Atletico tonight?"
 - Bad: "Will Barcelona advance vs Atletico tonight?"
-- Bad reasoning basis: aggregate score when title asks match winner.
-- Descriptions MUST NOT be generic. Include: exact metric/outcome, verification window, and public source type.
 
-If helpful, include concrete date/time context in title for future events within 30 days.
-Good: "Will Real Madrid win on March 10?"
-Good: "Will Bitcoin close above $90k this week?"
-Bad: "Will Bitcoin rise soon?"
-Before returning, self-check each candidate against:
+ENGAGEMENT RULES:
+- Write titles that make users want to vote immediately.
+- Use exciting, specific language. "Will Arsenal beat Everton?" > "Will a team win?"
+- Descriptions must include: exact metric/outcome, verification window, and source type.
+- Each event should feel like something people discuss on Twitter/Reddit.
+
+Before returning, self-check each candidate:
 1) in next 30 days,
 2) verifiable by >=2 credible URLs,
 3) no category drift,
 4) no "today/tonight" with horizon > 6h,
-5) verifyAtUtc after now and after eventStartAtUtc (if present).${avoidBlock}`
+5) verifyAtUtc after now and after eventStartAtUtc (if present),
+6) ALL prices/thresholds match the verified news data above.${avoidBlock}`
   );
 
   if (!r) return [];
@@ -1062,6 +1082,7 @@ Before returning, self-check each candidate against:
       ambiguousToday: 0,
       missingDateOrVerify: 0,
       sportsNoTime: 0,
+      priceHallucination: 0,
     };
 
     const filtered = preprocessed.filter(e => {
@@ -1089,9 +1110,14 @@ Before returning, self-check each candidate against:
         return false;
       }
       const modelPopularity = Math.max(0, Math.min(100, Number(e.popularityScore ?? 0)));
-      if (!isPopularEvent(category, title, description) && modelPopularity < 70) {
+      if (modelPopularity < 60) {
         rejectionStats.lowPopularity += 1;
-        console.log(`[AI] Filtered out low-popularity event: "${title}"`);
+        console.log(`[AI] Filtered out low-popularity event (score ${modelPopularity}): "${title}"`);
+        return false;
+      }
+      if (!isPopularEvent(category, title, description) && modelPopularity < 75) {
+        rejectionStats.lowPopularity += 1;
+        console.log(`[AI] Filtered out low-popularity event (no keyword match, score ${modelPopularity}): "${title}"`);
         return false;
       }
       if (inferredCategory !== category) {
