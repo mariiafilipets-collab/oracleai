@@ -27,6 +27,7 @@ export default {
   openrouterModel: process.env.OPENROUTER_MODEL || "google/gemma-3n-e4b-it",
   openrouterRetrieverModel: process.env.OPENROUTER_RETRIEVER_MODEL || "",
   openrouterNormalizerModel: process.env.OPENROUTER_NORMALIZER_MODEL || "",
+  openrouterFormatterModel: process.env.OPENROUTER_FORMATTER_MODEL || "",
   openrouterArbiterModel: process.env.OPENROUTER_ARBITER_MODEL || "",
   openrouterSearchModel: process.env.OPENROUTER_SEARCH_MODEL || "x-ai/grok-4.1-fast",
   openrouterResolveModel: process.env.OPENROUTER_RESOLVE_MODEL || "x-ai/grok-4.1-fast",

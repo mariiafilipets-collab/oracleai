@@ -29,6 +29,48 @@ let client = null;
 let aiPauseUntil = 0;
 const AI_PAUSE_MS_ON_CREDIT_ERROR = 10 * 60 * 1000;
 
+/** OpenRouter Structured Outputs schema: array of up to 5 prediction events (root object with "predictions" key). */
+const PREDICTIONS_RESPONSE_FORMAT = {
+  type: "json_schema",
+  json_schema: {
+    name: "event_predictions",
+    strict: true,
+    schema: {
+      type: "object",
+      properties: {
+        predictions: {
+          type: "array",
+          description: "Exactly 5 prediction market events",
+          minItems: 1,
+          maxItems: 5,
+          items: {
+            type: "object",
+            properties: {
+              title: { type: "string", description: "Yes/no question, max 90 chars" },
+              description: { type: "string", description: "120-220 chars, detailed" },
+              category: { type: "string", description: "Category e.g. SPORTS, ECONOMY" },
+              aiProbability: { type: "number", description: "15-85" },
+              hoursToResolve: { type: "number", description: "6-720" },
+              eventStartAtUtc: { type: ["string", "null"], description: "ISO UTC or null" },
+              verifyAtUtc: { type: "string", description: "ISO UTC verification time" },
+              sources: { type: "array", items: { type: "string" }, description: "URLs" },
+              confidence: { type: "number", description: "0-1" },
+              popularityScore: { type: "number", description: "0-100" },
+            },
+            required: [
+              "title", "description", "category", "aiProbability", "hoursToResolve",
+              "eventStartAtUtc", "verifyAtUtc", "sources", "confidence", "popularityScore",
+            ],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ["predictions"],
+      additionalProperties: false,
+    },
+  },
+};
+
 function isInsufficientCreditsError(err) {
   const msg = String(err?.message || err || "");
   return msg.includes("402") || /insufficient credits/i.test(msg);
@@ -94,7 +136,7 @@ function getClient() {
   return client;
 }
 
-async function ask(model, messages, temp = 0.5, tokens = 2048, operation = "generate") {
+async function ask(model, messages, temp = 0.5, tokens = 2048, operation = "generate", options = {}) {
   if (Date.now() < aiPauseUntil) {
     trackAICall({ operation, model, status: "skipped", latencyMs: 0, error: "paused-after-credit-error" });
     return null;
@@ -105,8 +147,10 @@ async function ask(model, messages, temp = 0.5, tokens = 2048, operation = "gene
     return null;
   }
   const started = Date.now();
+  const body = { model, messages, temperature: temp, max_tokens: tokens };
+  if (options?.response_format) body.response_format = options.response_format;
   try {
-    const r = await c.chat.completions.create({ model, messages, temperature: temp, max_tokens: tokens });
+    const r = await c.chat.completions.create(body);
     const content = r?.choices?.[0]?.message?.content;
     if (typeof content !== "string" || !content.trim()) {
       throw new Error("Empty model response");
@@ -123,14 +167,14 @@ async function ask(model, messages, temp = 0.5, tokens = 2048, operation = "gene
   }
 }
 
-async function askWithFallbackModels(models, messages, temp, tokens, operation) {
+async function askWithFallbackModels(models, messages, temp, tokens, operation, options = {}) {
   const tried = new Set();
   let lastErr = null;
   for (const model of (models || []).map((m) => String(m || "").trim()).filter(Boolean)) {
     if (tried.has(model)) continue;
     tried.add(model);
     try {
-      const out = await ask(model, messages, temp, tokens, operation);
+      const out = await ask(model, messages, temp, tokens, operation, options);
       if (out) return out;
     } catch (err) {
       lastErr = err;
@@ -253,16 +297,34 @@ async function search(query) {
 }
 
 async function generate(sysPrompt, userPrompt) {
+  // Prefer dedicated formatter when set (strict formatting by rules); else normalizer/general.
   const normalizerModels = modelList(
+    config.openrouterFormatterModel,
     config.openrouterNormalizerModel,
     config.openrouterModel,
     config.openrouterFallback
   );
   try {
-    return await askWithFallbackModels(normalizerModels, [
-      { role: "system", content: sysPrompt },
-      { role: "user", content: userPrompt },
-    ], 0.35, 2500, "generate");
+    const out = await askWithFallbackModels(
+      normalizerModels,
+      [
+        { role: "system", content: sysPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      0.35,
+      2500,
+      "generate",
+      { response_format: PREDICTIONS_RESPONSE_FORMAT }
+    );
+    if (!out) return null;
+    // Structured output returns { predictions: [...] }; unwrap so caller still gets array string.
+    try {
+      const parsed = JSON.parse(out);
+      if (parsed && Array.isArray(parsed.predictions)) {
+        return JSON.stringify(parsed.predictions);
+      }
+    } catch (_) {}
+    return out;
   } catch (e) {
     if (isInsufficientCreditsError(e)) return null;
     console.error(`[AI] Generate failed: ${e.message}`);
