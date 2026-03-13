@@ -126,7 +126,12 @@ const isRateLimitError = (err) => {
   const msg = String(err?.message || err || "").toLowerCase();
   return msg.includes("rate limit") || msg.includes("too many requests") || msg.includes("-32005");
 };
+const isNetworkError = (err) => {
+  const msg = String(err?.message || err || "").toLowerCase();
+  return msg.includes("failed to detect network") || msg.includes("econnrefused") || msg.includes("enotfound") || msg.includes("network") && msg.includes("cannot");
+};
 const isPrunedHistoryError = (err) => {
+  if (isNetworkError(err)) return false;
   const msg = String(err?.message || err || "").toLowerCase();
   return msg.includes("history has been pruned") || msg.includes("code\": -32701") || msg.includes("pruned for this block");
 };
@@ -344,7 +349,7 @@ async function setupEventListeners() {
       const step = Math.max(1, Number(config.eventBackfillBlockRange || config.eventMaxBlockRange || 1));
       const backfillDelayMs = Math.max(0, Number(config.eventBackfillDelayMs || 0));
       const maxRetries = Math.max(0, Number(config.eventBackfillMaxRetries || 0));
-      for (let cursor = lastProcessedBlock + 1; cursor <= latestAtStartup; cursor += step) {
+      catchUp: for (let cursor = lastProcessedBlock + 1; cursor <= latestAtStartup; cursor += step) {
         const toBlock = Math.min(latestAtStartup, cursor + step - 1);
         let attempt = 0;
         while (true) {
@@ -354,6 +359,10 @@ async function setupEventListeners() {
             await saveCursor(lastProcessedBlock);
             break;
           } catch (err) {
+            if (isNetworkError(err)) {
+              console.error("[Events] RPC unreachable; stopping catch-up.", err?.message || err);
+              break catchUp;
+            }
             if (isPrunedHistoryError(err)) {
               // Provider pruned historical blocks; skip this range to unblock poller progress.
               lastProcessedBlock = toBlock;

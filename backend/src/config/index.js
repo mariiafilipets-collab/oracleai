@@ -11,6 +11,7 @@ const boolFromEnv = (value, fallback) => {
 export default {
   port: parseInt(process.env.PORT || "3001"),
   rpcUrl: process.env.RPC_URL || "http://127.0.0.1:8545",
+  rpcFallbackUrl: process.env.RPC_FALLBACK_URL || "",
   deploymentNetwork,
   centralWallet: (process.env.CENTRAL_WALLET || "").toLowerCase(),
   enableScheduler: boolFromEnv(process.env.ENABLE_SCHEDULER, !isBscTestnet),
