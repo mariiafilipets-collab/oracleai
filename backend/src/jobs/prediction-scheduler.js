@@ -382,6 +382,13 @@ export function buildEventTiming({ category, hoursToResolve, verifyAtUtc, eventS
     const preferredByLead = resultCheckAt.getTime() - voteCloseLeadMs;
     candidateDeadlineMs = Math.max(latestAllowedByGap, preferredByLead);
   }
+  // Never push deadline past event start for start-anchored categories (SPORTS).
+  if (parsedEventStart && useEventStartAnchor(category, isUserEvent)) {
+    const hardCap = parsedEventStart.getTime() - voteCloseLeadMs;
+    if (candidateDeadlineMs > hardCap) {
+      candidateDeadlineMs = hardCap;
+    }
+  }
   const isValidWindow = Number.isFinite(candidateDeadlineMs) && candidateDeadlineMs > now + 60_000;
   const voteDeadlineMs = isValidWindow ? candidateDeadlineMs : now + 60_000;
   return {
@@ -770,7 +777,12 @@ function inferCategoryFromText(text) {
 
 function inferCategoryStrong(text) {
   const t = String(text || "").toLowerCase();
-  if (/\b(beat|defeat|defeats|defeated|lose to|lost to|vs|versus|match|fixture|league|cup|goal|score|arsenal|manchester|man utd|liverpool|chelsea|tottenham|real madrid|barcelona|atletico|bayern|psg|juventus|inter|milan|burnley|bournemouth|aston villa|west ham|newcastle|everton|nba|nfl|mlb|nhl|ufc|mma|f1|formula 1)\b/.test(t)) {
+  // Require unambiguous sports keywords; "beat"/"match"/"score" alone are too generic
+  if (/\b(defeat|defeats|defeated|lose to|lost to|vs|versus|fixture|derby|league|cup|goal|goalkeeper|arsenal|manchester|man utd|liverpool|chelsea|tottenham|real madrid|barcelona|atletico|bayern|psg|juventus|inter|milan|burnley|bournemouth|aston villa|west ham|newcastle|everton|nba|nfl|mlb|nhl|ufc|mma|f1|formula 1)\b/.test(t)) {
+    return "SPORTS";
+  }
+  // "beat" is SPORTS only when followed by a team-like word (not "expectations", "estimates", etc.)
+  if (/\b(beat)\b/.test(t) && /\b(arsenal|manchester|man utd|liverpool|chelsea|tottenham|real madrid|barcelona|atletico|bayern|psg|juventus|inter|milan|burnley|bournemouth|aston villa|west ham|newcastle|everton|spurs)\b/.test(t)) {
     return "SPORTS";
   }
   if (/\b(tornado|hail|hurricane|earthquake|wildfire|flood|heatwave|temperature|weather|climate|rainfall|cyclone|storm)\b/.test(t)) {
@@ -793,7 +805,9 @@ function normalizeStoredCategory(eventCategory, title, description, isUserEvent)
     ? String(eventCategory).toUpperCase()
     : "CRYPTO";
   if (isUserEvent) return modelCategory;
-  const strong = inferCategoryStrong(`${title || ""} ${description || ""}`);
+  // Only match against title to avoid false positives from description keywords
+  // (e.g. "beat" in "market beat expectations" triggering SPORTS)
+  const strong = inferCategoryStrong(title || "");
   if (strong && strong !== modelCategory) return strong;
   return modelCategory;
 }
@@ -1335,13 +1349,29 @@ async function runQualityWatchdog() {
       const deadlineTs = new Date(evt?.deadline).getTime();
       const verifyTs = new Date(evt?.verifyAfter || evt?.deadline).getTime();
       const startTs = evt?.eventStartAtUtc ? new Date(evt.eventStartAtUtc).getTime() : 0;
-      const strong = inferCategoryStrong(`${title} ${desc}`);
+      const strong = inferCategoryStrong(title);
       if (strong && strong !== cat && !evt?.isUserEvent) {
         issues.categoryMismatch++;
+        const correction = { category: strong };
+        // When correcting to SPORTS, recalculate deadline to respect event start anchoring
+        if (strong === "SPORTS" && startTs) {
+          const reTiming = buildEventTiming({
+            category: strong,
+            hoursToResolve: Math.max(6, Math.round((verifyTs - now) / 3600000)),
+            verifyAtUtc: new Date(verifyTs).toISOString(),
+            eventStartAtUtc: new Date(startTs).toISOString(),
+            isUserEvent: false,
+            title,
+          });
+          if (reTiming.isValidWindow) {
+            correction.deadline = reTiming.deadline;
+            correction.verifyAfter = reTiming.verifyAfter;
+          }
+        }
         corrections.push({
           updateOne: {
             filter: { eventId: evt.eventId },
-            update: { $set: { category: strong } },
+            update: { $set: correction },
           },
         });
         if (samples.length < 12) samples.push({ eventId: evt.eventId, type: "categoryMismatch", from: cat, to: strong, title });
@@ -1388,6 +1418,36 @@ async function runQualityWatchdog() {
           if (leadMin !== 1) {
             issues.sportsLeadBad++;
             if (samples.length < 12) samples.push({ eventId: evt.eventId, type: "sportsLeadBad", leadMin, title });
+            // Fix: recalculate deadline or archive if match already started
+            if (startTs <= now) {
+              // Match already started, archive the event
+              corrections.push({
+                updateOne: {
+                  filter: { eventId: evt.eventId },
+                  update: {
+                    $set: {
+                      resolved: true,
+                      resolvePending: false,
+                      outcome: false,
+                      aiReasoning: "Archived: voting was still open after match started (bad lead time).",
+                      nextResolveRetryAt: null,
+                      lastResolveError: "",
+                    },
+                  },
+                },
+              });
+            } else {
+              // Match not started yet, fix deadline to start - 1 min
+              const fixedDeadline = new Date(startTs - getVoteCloseLeadMs(cat, false));
+              if (fixedDeadline.getTime() > now + 60_000) {
+                corrections.push({
+                  updateOne: {
+                    filter: { eventId: evt.eventId },
+                    update: { $set: { deadline: fixedDeadline } },
+                  },
+                });
+              }
+            }
           }
           if (lagMin < 180) {
             issues.sportsVerifyTooEarly++;

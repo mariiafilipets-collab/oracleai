@@ -28,7 +28,9 @@ function inferCategoryFromText(text) {
 
 function inferCategoryStrong(text) {
   const t = String(text || "").toLowerCase();
-  if (/\b(beat|defeat|defeats|defeated|lose to|lost to|vs|versus|match|fixture|league|cup|goal|score|arsenal|manchester|man utd|liverpool|chelsea|tottenham|real madrid|barcelona|atletico|bayern|psg|juventus|inter|milan|burnley|bournemouth|aston villa|west ham|newcastle|everton|nba|nfl|mlb|nhl|ufc|mma|f1|formula 1)\b/.test(t)) return "SPORTS";
+  // Require unambiguous sports keywords; "beat"/"match"/"score" alone are too generic
+  if (/\b(defeat|defeats|defeated|lose to|lost to|vs|versus|fixture|derby|league|cup|goal|goalkeeper|arsenal|manchester|man utd|liverpool|chelsea|tottenham|real madrid|barcelona|atletico|bayern|psg|juventus|inter|milan|burnley|bournemouth|aston villa|west ham|newcastle|everton|nba|nfl|mlb|nhl|ufc|mma|f1|formula 1)\b/.test(t)) return "SPORTS";
+  if (/\b(beat)\b/.test(t) && /\b(arsenal|manchester|man utd|liverpool|chelsea|tottenham|real madrid|barcelona|atletico|bayern|psg|juventus|inter|milan|burnley|bournemouth|aston villa|west ham|newcastle|everton|spurs)\b/.test(t)) return "SPORTS";
   if (/\b(tornado|hail|hurricane|earthquake|wildfire|flood|heatwave|temperature|weather|climate|rainfall|cyclone|storm)\b/.test(t)) return "CLIMATE";
   if (/\b(election|parliament|congress|senate|president|ceasefire|sanction|summit|government|minister|white house|vote)\b/.test(t)) return "POLITICS";
   if (/\b(cpi|inflation|gdp|fed|ecb|interest rate|jobs report|payrolls|dow|nasdaq|s&p|gold|oil|brent|wti|bond|yield)\b/.test(t)) return "ECONOMY";
@@ -38,8 +40,9 @@ function inferCategoryStrong(text) {
 
 function normalizeAutoCategory(category, title, description = "") {
   const model = String(category || "").toUpperCase();
-  const fallback = CATEGORY_NAMES.includes(model) ? model : inferCategoryFromText(`${title} ${description}`);
-  const strong = inferCategoryStrong(`${title} ${description}`);
+  const fallback = CATEGORY_NAMES.includes(model) ? model : inferCategoryFromText(title);
+  // Only match against title to avoid false positives from description keywords
+  const strong = inferCategoryStrong(title);
   return strong || fallback;
 }
 
@@ -239,7 +242,8 @@ function dedupeNearDuplicateEvents(events) {
 function recategorizeByTitle(events) {
   return (events || []).map((evt) => {
     if (evt?.isUserEvent) return evt;
-    const strong = inferCategoryStrong(`${evt?.title || ""} ${evt?.description || ""}`);
+    // Only match against title to avoid false positives from description keywords
+    const strong = inferCategoryStrong(evt?.title || "");
     if (!strong) return evt;
     if (String(evt?.category || "").toUpperCase() === strong) return evt;
     return { ...evt, category: strong };
