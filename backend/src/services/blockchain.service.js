@@ -28,8 +28,31 @@ function loadAddresses() {
   return null;
 }
 
+const BSC_TESTNET = { chainId: 97, name: "bsc-testnet" };
+
+async function connectRpc() {
+  const urls = [config.rpcUrl].concat(config.rpcFallbackUrl ? [config.rpcFallbackUrl] : []);
+  const network = config.deploymentNetwork === "bscTestnet" ? BSC_TESTNET : undefined;
+  for (const url of urls) {
+    if (!url) continue;
+    try {
+      const p = new ethers.JsonRpcProvider(url, network);
+      await p.getBlockNumber();
+      console.log("[Blockchain] RPC connected:", url.replace(/\/\/[^@]+@/, "//***@"));
+      return p;
+    } catch (err) {
+      console.warn("[Blockchain] RPC unreachable:", url.replace(/\/\/[^@]+@/, "//***@"), err?.message || err);
+    }
+  }
+  const primary = config.rpcUrl || "http://127.0.0.1:8545";
+  throw new Error(
+    `RPC unreachable. Set RPC_URL (and optionally RPC_FALLBACK_URL) in env. Primary: ${primary}. ` +
+    "From cloud (e.g. Render) some public RPCs block datacenter IPs — try https://bsc-testnet.publicnode.com or another provider."
+  );
+}
+
 export async function initBlockchain() {
-  provider = new ethers.JsonRpcProvider(config.rpcUrl);
+  provider = await connectRpc();
   signer = config.deployerKey ? new ethers.Wallet(config.deployerKey, provider) : null;
 
   const addresses = loadAddresses();

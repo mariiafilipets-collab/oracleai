@@ -9,6 +9,7 @@ import GlassCard from "@/components/GlassCard";
 import { useContractAddresses } from "@/hooks/useContracts";
 import { StakingABI, OAITokenABI } from "@/lib/contracts";
 import { useI18n } from "@/lib/i18n";
+import { formatInOffset, getEffectiveOffsetMinutes, useTimezone } from "@/lib/timezone";
 import AppIcon from "@/components/icons/AppIcon";
 
 const TGE_IS_LIVE = process.env.NEXT_PUBLIC_TGE_IS_LIVE === "true";
@@ -22,6 +23,8 @@ const LOCK_PLANS = [
 export default function StakingPage() {
   const { address, isConnected } = useAccount();
   const { t } = useI18n();
+  const { mode: tzMode, fixedOffsetMinutes } = useTimezone();
+  const userOffsetMinutes = getEffectiveOffsetMinutes(tzMode, fixedOffsetMinutes);
   const tr = (key: string, fallback: string, params?: Record<string, string | number>) => {
     const value = t(key, params);
     return value === key ? fallback : value;
@@ -355,7 +358,7 @@ export default function StakingPage() {
                 <p className="text-xs text-gray-400">
                   {canUnstake
                     ? t("staking.cooldownComplete")
-                    : `${t("staking.cooldownEnds")}: ${new Date(cooldownEnd * 1000).toLocaleString()}`}
+                    : `${t("staking.cooldownEnds")}: ${formatInOffset(cooldownEnd * 1000, userOffsetMinutes)}`}
                 </p>
                 <motion.button
                   whileTap={{ scale: 0.98 }}

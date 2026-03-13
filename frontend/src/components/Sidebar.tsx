@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import LanguageSwitcher from "./LanguageSwitcher";
+import TimezoneSwitcher from "./TimezoneSwitcher";
 import { useI18n } from "@/lib/i18n";
 import Image from "next/image";
 import AppIcon, { type IconName } from "./icons/AppIcon";
@@ -59,6 +60,7 @@ export default function Sidebar() {
         </nav>
 
         <div className="p-4 space-y-3">
+          <TimezoneSwitcher />
           <LanguageSwitcher />
           <ConnectButton.Custom>
             {({ account, chain, openConnectModal, openAccountModal, mounted }) => {
@@ -80,10 +82,16 @@ export default function Sidebar() {
       </aside>
 
       {/* Mobile Bottom Bar */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-dark-800/95 backdrop-blur-lg border-t border-dark-500 z-50 px-2 py-2">
-        <div className="flex justify-around">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-dark-800/95 backdrop-blur-lg border-t border-dark-500 z-50 px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
+        <div className="flex gap-1.5 overflow-x-auto no-scrollbar snap-x snap-mandatory">
           {NAV_KEYS.map((item) => (
-            <Link key={item.href} href={item.href} className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg text-xs transition ${pathname === item.href ? "text-neon-cyan" : "text-gray-500 hover:text-gray-300"}`}>
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`snap-start shrink-0 min-w-[72px] min-h-11 flex flex-col items-center justify-center gap-1 px-2 py-1 rounded-lg text-[11px] leading-none transition ${
+                pathname === item.href ? "text-neon-cyan bg-neon-cyan/10" : "text-gray-500 hover:text-gray-300"
+              }`}
+            >
               <span className="text-lg"><AppIcon name={item.icon as IconName} className="w-[18px] h-[18px]" /></span>
               <span suppressHydrationWarning>{t(`nav.${item.key}`)}</span>
             </Link>
@@ -92,26 +100,30 @@ export default function Sidebar() {
       </nav>
 
       {/* Mobile Top Bar */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 bg-dark-800/95 backdrop-blur-lg border-b border-dark-500 z-50 px-4 py-3 flex items-center justify-between">
+      <header className="lg:hidden fixed top-0 left-0 right-0 bg-dark-800/95 backdrop-blur-lg border-b border-dark-500 z-50 px-3 py-2.5 flex items-center justify-between gap-2">
         <Image
           src="/brand/oracleai-logo-clean.svg"
           alt="OracleAI Predict"
           width={148}
           height={52}
-          className="h-8 w-auto"
+          className="h-7 sm:h-8 w-auto"
           priority
         />
+        <div className="shrink-0 flex items-center gap-2">
+          <TimezoneSwitcher compact />
+          <LanguageSwitcher compact />
+        </div>
         <ConnectButton.Custom>
           {({ account, chain, openConnectModal, openAccountModal, mounted }) => {
             if (!mounted || !account || !chain) {
               return (
-                <button onClick={openConnectModal} className="px-4 py-2 rounded-lg bg-gradient-to-r from-neon-cyan to-neon-purple text-dark-900 font-bold text-xs">
+              <button onClick={openConnectModal} className="min-h-10 px-2.5 sm:px-3 py-2 rounded-lg bg-gradient-to-r from-neon-cyan to-neon-purple text-dark-900 font-bold text-[11px] sm:text-xs">
                   <span suppressHydrationWarning>{t("common.connect")}</span>
                 </button>
               );
             }
             return (
-              <button onClick={openAccountModal} className="px-3 py-2 rounded-lg glass text-xs font-mono">
+              <button onClick={openAccountModal} className="min-h-10 px-2.5 sm:px-3 py-2 rounded-lg glass text-[11px] sm:text-xs font-mono max-w-[106px] sm:max-w-[120px] truncate">
                 {account.displayName}
               </button>
             );

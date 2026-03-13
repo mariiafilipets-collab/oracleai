@@ -1,5 +1,8 @@
+import "./bootstrap-logging.js";
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import mongoose from "mongoose";
@@ -20,15 +23,54 @@ import aiRouter from "./routes/ai.js";
 
 import User from "./models/User.js";
 import CheckInRecord from "./models/CheckInRecord.js";
+import PredictionEvent from "./models/PredictionEvent.js";
+import EventSyncState from "./models/EventSyncState.js";
 
 const app = express();
 const server = createServer(app);
-const io = new Server(server, {
-  cors: { origin: "*", methods: ["GET", "POST"] },
-});
 
-app.use(cors());
-app.use(express.json());
+// --- CORS configuration ---
+const allowedOrigins = config.corsOrigins
+  ? config.corsOrigins.split(",").map((o) => o.trim()).filter(Boolean)
+  : [];
+const corsOptions = allowedOrigins.length > 0
+  ? { origin: allowedOrigins, methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"] }
+  : { origin: true }; // dev: mirror request origin
+
+const io = new Server(server, { cors: corsOptions });
+
+// --- Security middleware ---
+app.use(helmet({ contentSecurityPolicy: false })); // CSP managed by frontend
+app.use(cors(corsOptions));
+app.use(express.json({ limit: "1mb" }));
+
+// --- Rate limiting ---
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 120,            // 120 requests per minute per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: "Too many requests, please try again later." },
+});
+app.use("/api/", apiLimiter);
+
+// Stricter limit for admin and write endpoints
+const adminLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: "Too many admin requests." },
+});
+app.use("/api/predictions/admin", adminLimiter);
+app.use("/api/predictions/generate", adminLimiter);
+app.use("/api/predictions/user/validate", rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: "Too many validation requests." },
+}));
 
 app.use("/api/predictions", predictionsRouter);
 app.use("/api/leaderboard", leaderboardRouter);
@@ -36,8 +78,37 @@ app.use("/api/user", usersRouter);
 app.use("/api/stats", statsRouter);
 app.use("/api/ai", aiRouter);
 
-app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", timestamp: Date.now() });
+// --- Deep health check ---
+app.get("/api/health", async (req, res) => {
+  const checks = { status: "ok", timestamp: Date.now() };
+
+  // MongoDB
+  try {
+    const mongoState = mongoose.connection.readyState;
+    checks.mongodb = mongoState === 1 ? "connected" : `state:${mongoState}`;
+    if (mongoState !== 1) checks.status = "degraded";
+  } catch {
+    checks.mongodb = "error";
+    checks.status = "degraded";
+  }
+
+  // RPC / blockchain
+  try {
+    const contracts = getContracts();
+    const provider = contracts.CheckIn?.runner?.provider;
+    if (provider) {
+      const blockNumber = await provider.getBlockNumber();
+      checks.rpc = { connected: true, blockNumber };
+    } else {
+      checks.rpc = { connected: false };
+      checks.status = "degraded";
+    }
+  } catch {
+    checks.rpc = { connected: false };
+    checks.status = "degraded";
+  }
+
+  res.json(checks);
 });
 
 io.on("connection", (socket) => {
@@ -123,6 +194,16 @@ const isRateLimitError = (err) => {
   const msg = String(err?.message || err || "").toLowerCase();
   return msg.includes("rate limit") || msg.includes("too many requests") || msg.includes("-32005");
 };
+const isNetworkError = (err) => {
+  const msg = String(err?.message || err || "").toLowerCase();
+  return msg.includes("failed to detect network") || msg.includes("econnrefused") || msg.includes("enotfound") || msg.includes("network") && msg.includes("cannot");
+};
+const isPrunedHistoryError = (err) => {
+  if (isNetworkError(err)) return false;
+  const msg = String(err?.message || err || "").toLowerCase();
+  return msg.includes("history has been pruned") || msg.includes("code\": -32701") || msg.includes("pruned for this block");
+};
+const EVENT_CURSOR_KEY = "event-poller";
 
 async function syncUsersFromOnChainSnapshot() {
   const { Points, CheckIn } = getContracts();
@@ -146,10 +227,15 @@ async function syncUsersFromOnChainSnapshot() {
       const totalCheckIns = Number(pts.totalCheckIns ?? pts[4] ?? 0);
 
       let tier = undefined;
+      let lastCheckInAt = undefined;
       if (CheckIn) {
         try {
           const rec = await CheckIn.getRecord(address);
           tier = ["BASIC", "PRO", "WHALE"][Number(rec.lastTier ?? 0)] || "BASIC";
+          const lastCheckInRaw = Number(rec.lastCheckIn ?? 0);
+          if (lastCheckInRaw > 0) {
+            lastCheckInAt = new Date(lastCheckInRaw * 1000);
+          }
         } catch {}
       }
 
@@ -160,6 +246,7 @@ async function syncUsersFromOnChainSnapshot() {
         totalCheckIns,
       };
       if (tier) update.tier = tier;
+      if (lastCheckInAt) update.lastCheckIn = lastCheckInAt;
 
       await User.findOneAndUpdate({ address }, { $set: update }, { upsert: true });
       updated += 1;
@@ -184,6 +271,7 @@ async function setupEventListeners() {
   const contracts = getContracts();
   const checkIn = contracts.CheckIn;
   const referral = contracts.Referral;
+  const prediction = contracts.Prediction;
   if (!checkIn) return;
 
   const provider = checkIn.runner?.provider;
@@ -257,60 +345,171 @@ async function setupEventListeners() {
         );
       }
     }
-  };
 
-  let lastProcessedBlock = await provider.getBlockNumber();
-  const backfillBlocks = Math.max(0, Number(config.eventBackfillBlocks || 0));
-  if (backfillBlocks > 0) {
-    const fromBlock = Math.max(0, lastProcessedBlock - backfillBlocks);
-    console.log(`[Events] Backfill enabled: scanning blocks ${fromBlock}..${lastProcessedBlock}`);
-    const step = Math.max(1, Number(config.eventBackfillBlockRange || config.eventMaxBlockRange || 1));
-    const backfillDelayMs = Math.max(0, Number(config.eventBackfillDelayMs || 0));
-    const maxRetries = Math.max(0, Number(config.eventBackfillMaxRetries || 0));
-    for (let cursor = fromBlock; cursor <= lastProcessedBlock; cursor += step) {
-      const toBlock = Math.min(lastProcessedBlock, cursor + step - 1);
-      let attempt = 0;
-      while (true) {
+    if (prediction) {
+      const voteLogs = await prediction.queryFilter(prediction.filters.VoteSubmitted(), fromBlock, toBlock);
+      for (const log of voteLogs) {
+        const args = log.args || [];
+        const eventId = Number(args.eventId ?? args[0] ?? 0);
+        if (!Number.isFinite(eventId) || eventId <= 0) continue;
         try {
-          await processRange(cursor, toBlock);
-          break;
-        } catch (err) {
-          if (!isRateLimitError(err) || attempt >= maxRetries) {
-            console.error(`[Events] Backfill range failed ${cursor}..${toBlock}:`, err?.message || err);
-            break;
-          }
-          const waitMs = Math.min(30_000, backfillDelayMs * Math.max(1, 2 ** attempt));
-          attempt += 1;
-          console.warn(`[Events] Backfill rate-limited ${cursor}..${toBlock}, retry ${attempt}/${maxRetries} in ${waitMs}ms`);
-          await sleep(waitMs);
+          // Keep vote counters in DB strictly aligned with chain state.
+          const on = await prediction["getEvent(uint256)"](BigInt(eventId));
+          if (!on || Number(on.id || 0n) === 0) continue;
+          await PredictionEvent.updateOne(
+            { eventId },
+            {
+              $set: {
+                totalVotesYes: Number(on.totalVotesYes || 0n),
+                totalVotesNo: Number(on.totalVotesNo || 0n),
+                deadline: new Date(Number(on.deadline || 0n) * 1000),
+                resolved: Boolean(on.resolved),
+                outcome: Boolean(on.resolved) ? Boolean(on.outcome) : null,
+                creator: String(on.creator || "").toLowerCase(),
+                isUserEvent: Boolean(on.isUserEvent),
+                listingFeeWei: String(on.listingFee || 0n),
+                sourcePolicy: String(on.sourcePolicy || ""),
+              },
+              $setOnInsert: {
+                title: String(on.title || `Event #${eventId}`),
+                category: ["SPORTS", "POLITICS", "ECONOMY", "CRYPTO", "CLIMATE"][Number(on.category || 3)] || "CRYPTO",
+                aiProbability: Number(on.aiProbability || 50n),
+              },
+            },
+            { upsert: true }
+          );
+        } catch (e) {
+          console.warn(`[Events] Vote sync failed for event ${eventId}:`, e?.message || e);
         }
       }
-      if (backfillDelayMs > 0) await sleep(backfillDelayMs);
     }
-    console.log("[Events] Backfill completed.");
+  };
+
+  const saveCursor = async (blockNumber) => {
+    await EventSyncState.updateOne(
+      { key: EVENT_CURSOR_KEY },
+      { $set: { lastProcessedBlock: Number(blockNumber), updatedAt: new Date() } },
+      { upsert: true }
+    );
+  };
+
+  const latestAtStartup = await provider.getBlockNumber();
+  const storedCursorDoc = await EventSyncState.findOne({ key: EVENT_CURSOR_KEY }).lean();
+  const backfillBlocks = Math.max(0, Number(config.eventBackfillBlocks || 0));
+  let lastProcessedBlock = latestAtStartup;
+  let catchUpInProgress = false;
+
+  if (storedCursorDoc && Number.isFinite(Number(storedCursorDoc.lastProcessedBlock))) {
+    lastProcessedBlock = Math.max(0, Math.min(latestAtStartup, Number(storedCursorDoc.lastProcessedBlock)));
+    console.log(`[Events] Resuming from stored cursor block ${lastProcessedBlock}.`);
+  } else {
+    lastProcessedBlock = Math.max(0, latestAtStartup - backfillBlocks);
+    await saveCursor(lastProcessedBlock);
+    if (lastProcessedBlock < latestAtStartup) {
+      console.log(`[Events] Initial backfill: scanning blocks ${lastProcessedBlock + 1}..${latestAtStartup}`);
+    }
   }
 
-  const pollEvents = async () => {
+  const runInitialCatchUp = async () => {
+    if (latestAtStartup <= lastProcessedBlock) return;
+    const gap = latestAtStartup - lastProcessedBlock;
+    const maxGap = Math.max(0, Number(config.eventCatchupMaxGap || 0));
+    if (maxGap > 0 && gap > maxGap) {
+      console.warn(`[Events] Catch-up gap too large (${gap} blocks), resuming from latest ${latestAtStartup}`);
+      lastProcessedBlock = latestAtStartup;
+      await saveCursor(lastProcessedBlock);
+      return;
+    }
+    catchUpInProgress = true;
+    let prunedSkipCount = 0;
+    let lastPrunedLogAt = 0;
+    const PRUNED_LOG_INTERVAL_MS = 30_000;
+    const PRUNED_LOG_EVERY_N = 50;
     try {
+      const step = Math.max(1, Number(config.eventBackfillBlockRange || config.eventMaxBlockRange || 1));
+      const backfillDelayMs = Math.max(0, Number(config.eventBackfillDelayMs || 0));
+      const maxRetries = Math.max(0, Number(config.eventBackfillMaxRetries || 0));
+      catchUp: for (let cursor = lastProcessedBlock + 1; cursor <= latestAtStartup; cursor += step) {
+        const toBlock = Math.min(latestAtStartup, cursor + step - 1);
+        let attempt = 0;
+        while (true) {
+          try {
+            await processRange(cursor, toBlock);
+            lastProcessedBlock = toBlock;
+            await saveCursor(lastProcessedBlock);
+            break;
+          } catch (err) {
+            if (isNetworkError(err)) {
+              console.error("[Events] RPC unreachable; stopping catch-up.", err?.message || err);
+              break catchUp;
+            }
+            if (isPrunedHistoryError(err)) {
+              lastProcessedBlock = toBlock;
+              await saveCursor(lastProcessedBlock);
+              prunedSkipCount += 1;
+              const now = Date.now();
+              if (prunedSkipCount % PRUNED_LOG_EVERY_N === 0 || now - lastPrunedLogAt >= PRUNED_LOG_INTERVAL_MS) {
+                console.warn(`[Events] Catch-up: skipped ${prunedSkipCount} pruned ranges (now at block ${toBlock})`);
+                lastPrunedLogAt = now;
+              }
+              break;
+            }
+            if (!isRateLimitError(err) || attempt >= maxRetries) {
+              console.error(`[Events] Catch-up range failed ${cursor}..${toBlock}:`, err?.message || err);
+              break;
+            }
+            const waitMs = Math.min(30_000, backfillDelayMs * Math.max(1, 2 ** attempt));
+            attempt += 1;
+            console.warn(`[Events] Catch-up rate-limited ${cursor}..${toBlock}, retry ${attempt}/${maxRetries} in ${waitMs}ms`);
+            await sleep(waitMs);
+          }
+        }
+        if (backfillDelayMs > 0) await sleep(backfillDelayMs);
+      }
+      if (prunedSkipCount > 0) {
+        console.log(`[Events] Catch-up finished: ${prunedSkipCount} pruned ranges skipped, cursor at ${lastProcessedBlock}`);
+      }
+    } finally {
+      catchUpInProgress = false;
+    }
+  };
+
+  const pollEvents = async () => {
+    let fromBlock = null;
+    let toBlock = null;
+    try {
+      if (catchUpInProgress) return;
       const latestBlock = await provider.getBlockNumber();
       if (latestBlock < lastProcessedBlock) {
         // Chain likely reset (Hardhat restart); restart cursor safely.
         lastProcessedBlock = latestBlock;
+        await saveCursor(lastProcessedBlock);
         return;
       }
       if (latestBlock === lastProcessedBlock) return;
 
-      const fromBlock = lastProcessedBlock + 1;
-      const toBlock = Math.min(latestBlock, lastProcessedBlock + Math.max(1, config.eventMaxBlockRange));
+      fromBlock = lastProcessedBlock + 1;
+      toBlock = Math.min(latestBlock, lastProcessedBlock + Math.max(1, config.eventMaxBlockRange));
       await processRange(fromBlock, toBlock);
       lastProcessedBlock = toBlock;
+      await saveCursor(lastProcessedBlock);
     } catch (err) {
+      if (isPrunedHistoryError(err) && Number.isFinite(toBlock)) {
+        // Shared/public nodes can prune old log history.
+        // Advance cursor so polling does not loop forever on the same pruned interval.
+        lastProcessedBlock = toBlock;
+        await saveCursor(lastProcessedBlock);
+        console.warn(`[Events] Poll skipped pruned range ${fromBlock}..${toBlock}`);
+        return;
+      }
       console.error("[Events] Poll error:", err?.message || err);
     }
   };
 
   setInterval(pollEvents, Math.max(1000, config.eventPollIntervalMs));
   console.log(`Event listeners active (polling mode): interval=${config.eventPollIntervalMs}ms range=${config.eventMaxBlockRange} blocks`);
+  // Run catch-up in background so scheduler startup is not blocked by slow RPC.
+  void runInitialCatchUp();
 }
 
 async function start() {
@@ -333,15 +532,16 @@ async function start() {
   await connectMongo();
 
   await initBlockchain();
-  await syncUsersFromOnChainSnapshot();
-  await setupEventListeners();
-
-  // Auto-scheduler: generates predictions + resolves expired ones automatically
+  // Start scheduler immediately after blockchain init so it isn't blocked by
+  // potentially slow startup sync/backfill tasks.
   if (config.enableScheduler) {
     initScheduler(io);
   } else {
     console.log("[Scheduler] Disabled by config.");
   }
+
+  await syncUsersFromOnChainSnapshot();
+  await setupEventListeners();
 }
 
 start().catch((err) => {

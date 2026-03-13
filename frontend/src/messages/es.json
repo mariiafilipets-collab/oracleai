@@ -40,7 +40,11 @@
     "claimed": "Reclamado",
     "unclaimed": "No reclamado"
   },
-  "tiers": { "basic": "Basico", "pro": "Pro", "whale": "Ballena" },
+  "tiers": {
+    "basic": "Basico",
+    "pro": "Pro",
+    "whale": "Ballena"
+  },
   "hero": {
     "title1": "Predice el Futuro.",
     "title2": "Gana Recompensas Reales.",
@@ -50,7 +54,13 @@
     "communityShare": "Cuota Comunidad",
     "cta": "Conectar Wallet y Empezar",
     "ctaCheckin": "Check-In Diario",
-    "badges": { "bnb": "BNB Chain", "ai": "IA", "community": "58% Comunidad", "opensource": "Open Source", "nokyc": "Sin KYC" }
+    "badges": {
+      "bnb": "BNB Chain",
+      "ai": "IA",
+      "community": "58% Comunidad",
+      "opensource": "Open Source",
+      "nokyc": "Sin KYC"
+    }
   },
   "checkin": {
     "title": "Check-In Diario",
@@ -60,10 +70,25 @@
     "button": "Check-In {tier} ({amount} BNB) — Ganar {pts}",
     "confirming": "Confirma en tu wallet...",
     "processing": "Procesando en cadena...",
+    "alreadyToday": "Ya hiciste el check-in hoy",
     "streak": "Racha de {count} dias",
-    "fees": { "prizes": "50% Premios", "treasury": "15% Tesoreria", "referrals": "20% Referidos", "burn": "10% Quema", "stakers": "5% Stakers" }
+    "fees": {
+      "prizes": "50% Premios",
+      "treasury": "15% Tesoreria",
+      "referrals": "20% Referidos",
+      "burn": "10% Quema",
+      "stakers": "5% Stakers"
+    }
   },
-  "stats": { "totalPoints": "Puntos Totales", "weeklyPoints": "Puntos Semanales", "streak": "Racha", "prizePool": "Fondo de Premios", "totalUsers": "Usuarios", "totalCheckins": "Check-ins", "yourRank": "Tu Rango" },
+  "stats": {
+    "totalPoints": "Puntos Totales",
+    "weeklyPoints": "Puntos Semanales",
+    "streak": "Racha",
+    "prizePool": "Fondo de Premios",
+    "totalUsers": "Usuarios",
+    "totalCheckins": "Check-ins",
+    "yourRank": "Tu Rango"
+  },
   "categories": {
     "ALL": "Todos",
     "SPORTS": "Deportes",
@@ -112,24 +137,98 @@
       }
     },
     "alloc": {
-      "airdrop": { "name": "Airdrop Comunitario", "desc": "Distribuido proporcionalmente por puntos pre-TGE" },
-      "liquidity": { "name": "Liquidez", "desc": "Pares DEX, bloqueados 2 anos" },
-      "team": { "name": "Equipo y Asesores", "desc": "Vesting 2 anos, cliff 6 meses" },
-      "treasury": { "name": "Tesoreria (DAO)", "desc": "Fondo de desarrollo gobernado por DAO" },
-      "stakingRewards": { "name": "Recompensas de Staking", "desc": "Distribuidas en 4 anos" },
-      "prizePool": { "name": "Fondo de Premios (OAI)", "desc": "Premios semanales en OAI" },
-      "referral": { "name": "Recompensas de Referidos", "desc": "Bonos OAI para top referidores" },
-      "marketing": { "name": "Marketing", "desc": "Campanas y alianzas, vesting 1 ano" },
-      "ecosystem": { "name": "Fondo Ecosistema", "desc": "Subvenciones e integraciones" }
+      "airdrop": {
+        "name": "Airdrop Comunitario",
+        "desc": "Distribuido proporcionalmente por puntos pre-TGE"
+      },
+      "liquidity": {
+        "name": "Liquidez",
+        "desc": "Pares DEX, bloqueados 2 anos"
+      },
+      "team": {
+        "name": "Equipo y Asesores",
+        "desc": "Vesting 2 anos, cliff 6 meses"
+      },
+      "treasury": {
+        "name": "Tesoreria (DAO)",
+        "desc": "Fondo de desarrollo gobernado por DAO"
+      },
+      "stakingRewards": {
+        "name": "Recompensas de Staking",
+        "desc": "Distribuidas en 4 anos"
+      },
+      "prizePool": {
+        "name": "Fondo de Premios (OAI)",
+        "desc": "Premios semanales en OAI"
+      },
+      "referral": {
+        "name": "Recompensas de Referidos",
+        "desc": "Bonos OAI para top referidores"
+      },
+      "marketing": {
+        "name": "Marketing",
+        "desc": "Campanas y alianzas, vesting 1 ano"
+      },
+      "ecosystem": {
+        "name": "Fondo Ecosistema",
+        "desc": "Subvenciones e integraciones"
+      }
     },
-    "tiers": { "bronze": "Bronce", "silver": "Plata", "gold": "Oro", "diamond": "Diamante" },
+    "tiers": {
+      "bronze": "Bronce",
+      "silver": "Plata",
+      "gold": "Oro",
+      "diamond": "Diamante"
+    },
     "deflationItems": {
-      "buyback": { "title": "Buyback y Burn", "desc": "10% de fees -> comprar OAI -> quemar para siempre" },
-      "quarterly": { "title": "Quemas Trimestrales", "desc": "La tesoreria quema segun ingresos" },
-      "stakingLocks": { "title": "Bloqueos de Staking", "desc": "OAI en staking sale de circulacion" },
-      "vestingLocks": { "title": "Bloqueos de Vesting", "desc": "Tokens del equipo bloqueados por 2 anos" }
+      "buyback": {
+        "title": "Buyback y Burn",
+        "desc": "10% de fees -> comprar OAI -> quemar para siempre"
+      },
+      "quarterly": {
+        "title": "Quemas Trimestrales",
+        "desc": "La tesoreria quema segun ingresos"
+      },
+      "stakingLocks": {
+        "title": "Bloqueos de Staking",
+        "desc": "OAI en staking sale de circulacion"
+      },
+      "vestingLocks": {
+        "title": "Bloqueos de Vesting",
+        "desc": "Tokens del equipo bloqueados por 2 anos"
+      }
     },
-    "metrics": { "maxSupply": "Suministro Maximo", "tgeCirculating": "Circulante en TGE", "preTgeGoal": "Meta pre-TGE", "teamVesting": "Vesting del Equipo" }
+    "metrics": {
+      "maxSupply": "Suministro Maximo",
+      "tgeCirculating": "Circulante en TGE",
+      "preTgeGoal": "Meta pre-TGE",
+      "teamVesting": "Vesting del Equipo"
+    },
+    "creatorEconomy": {
+      "title": "Economia de creadores",
+      "desc": "Modelo hibrido para eventos de usuarios: comision de voto + recompensas al creador condicionadas por calidad.",
+      "voteFeeTitle": "Comision de voto en eventos de usuarios",
+      "voteFeeDesc": "Cada voto en un evento de usuario paga una pequena comision en BNB.",
+      "splitTitle": "Division 50/50",
+      "splitDesc": "50% va a recompensas del creador, 50% a distribucion del protocolo.",
+      "unlockTitle": "Desbloqueo por calidad",
+      "unlockDesc": "El pago al creador se desbloquea tras resolucion valida, minimo de votos unicos y estado de creador verificado.",
+      "protocolTitle": "Parte del protocolo como check-in",
+      "protocolDesc": "La parte del protocolo sigue la misma distribucion: premios/tesoreria/referidos/quema/staking.",
+      "batchTitle": "Distribucion por lotes cada 12h",
+      "batchDesc": "La parte del protocolo de los votos en eventos de usuario se distribuye cada 12 horas para reducir gas por voto."
+    },
+    "votingFees": {
+      "title": "Comisiones de voto y puntos",
+      "desc": "El voto usa comisiones por nivel en BNB y multiplicadores dinamicos de puntos.",
+      "tiersTitle": "Niveles de voto",
+      "formulaTitle": "Formula",
+      "distribution": "Todas las comisiones de voto siguen la distribucion del check-in: 50% premios, 15% tesoreria, 20% referidos, 10% quema, 5% staking.",
+      "collected": "Comisiones de voto recolectadas (on-chain)",
+      "distributed": "Comisiones de voto distribuidas (on-chain)",
+      "distributedHint": "La distribucion se aplica en cada transaccion de voto.",
+      "breakdown": "Desglose distribuido"
+    }
   },
   "litepaperPage": {
     "subtitle": "Litepaper v1.0 — Marzo 2026",
@@ -146,23 +245,59 @@
     "visionP1": "OracleAI Predict construye un mercado de predicciones altamente atractivo donde la IA genera eventos reales y todo funciona de forma transparente on-chain.",
     "visionP2": "Nuestra mision es hacer los mercados de prediccion accesibles, entretenidos y rentables para todos.",
     "problemItems": {
-      "1": { "title": "Aburrido y Complejo", "desc": "Los mercados tradicionales requieren mucha experiencia y asustan al usuario casual." },
-      "2": { "title": "Centralizado", "desc": "Muchas plataformas dependen de resolucion centralizada y confianza en el operador." },
-      "3": { "title": "Sin Retencion", "desc": "Falta gamificacion: rachas, ranking y funciones sociales." }
+      "1": {
+        "title": "Aburrido y Complejo",
+        "desc": "Los mercados tradicionales requieren mucha experiencia y asustan al usuario casual."
+      },
+      "2": {
+        "title": "Centralizado",
+        "desc": "Muchas plataformas dependen de resolucion centralizada y confianza en el operador."
+      },
+      "3": {
+        "title": "Sin Retencion",
+        "desc": "Falta gamificacion: rachas, ranking y funciones sociales."
+      }
     },
     "solutionIntro": "OracleAI Predict resuelve estos problemas con IA + blockchain + gamificacion:",
     "solutionItems": {
-      "aiGeneration": { "title": "Generacion de Eventos por IA", "desc": "OracleAI Event Engine, nuestra capa de IA propietaria creada especificamente para la plataforma, analiza datos en vivo y genera eventos relevantes cada 90 minutos en 5 categorias." },
-      "aiVerification": { "title": "Verificacion por IA", "desc": "Al expirar eventos, la IA verifica resultados reales automaticamente." },
-      "gamification": { "title": "Gamificacion", "desc": "Check-ins diarios, rachas, staking por niveles, referidos y premios semanales." },
-      "onchain": { "title": "Totalmente On-Chain", "desc": "Fees, puntos, predicciones y votos se registran en BNB Chain." }
+      "aiGeneration": {
+        "title": "Generacion de Eventos por IA",
+        "desc": "OracleAI Event Engine, nuestra capa de IA propietaria creada especificamente para la plataforma, analiza datos en vivo y genera eventos relevantes cada 90 minutos en 5 categorias."
+      },
+      "aiVerification": {
+        "title": "Verificacion por IA",
+        "desc": "Al expirar eventos, la IA verifica resultados reales automaticamente."
+      },
+      "gamification": {
+        "title": "Gamificacion",
+        "desc": "Check-ins diarios, rachas, staking por niveles, referidos y premios semanales."
+      },
+      "onchain": {
+        "title": "Totalmente On-Chain",
+        "desc": "Fees, puntos, predicciones y votos se registran en BNB Chain."
+      }
     },
     "howItems": {
-      "1": { "title": "Conecta Wallet", "desc": "MetaMask, Trust Wallet o cualquier wallet Web3. Sin registro y sin KYC." },
-      "2": { "title": "Check-In Diario", "desc": "Elige Basico/Pro/Ballena. Gana 100-1000 puntos por check-in y bonus por racha." },
-      "3": { "title": "Predice Eventos", "desc": "Vota De acuerdo/En desacuerdo. Correcto = +50 pts. Supera la IA = +100." },
-      "4": { "title": "Sube en el Ranking", "desc": "Top 100 comparte 40% de fees en BNB cada semana." },
-      "5": { "title": "Gana Airdrop $OAI", "desc": "Tus puntos se convierten en OAI en TGE. 40% del supply para la comunidad." }
+      "1": {
+        "title": "Conecta Wallet",
+        "desc": "MetaMask, Trust Wallet o cualquier wallet Web3. Sin registro y sin KYC."
+      },
+      "2": {
+        "title": "Check-In Diario",
+        "desc": "Elige Basico/Pro/Ballena. Gana 100-1000 puntos por check-in y bonus por racha."
+      },
+      "3": {
+        "title": "Predice Eventos",
+        "desc": "Vota De acuerdo/En desacuerdo. Correcto = +50 pts. Supera la IA = +100."
+      },
+      "4": {
+        "title": "Sube en el Ranking",
+        "desc": "Top 100 comparte 40% de fees en BNB cada semana."
+      },
+      "5": {
+        "title": "Gana Airdrop $OAI",
+        "desc": "Tus puntos se convierten en OAI en TGE. 40% del supply para la comunidad."
+      }
     },
     "tokenSupply": "Suministro Total: 1,000,000,000 OAI - Deflacionario por diseno",
     "tokenAllocation": "Asignacion de Tokens",
@@ -187,10 +322,45 @@
     },
     "oaiRequired": "OAI Requerido",
     "roadmapItems": {
-      "q1": { "title": "Fundacion", "items": { "1": "Smart contracts en BNB testnet", "2": "Motor IA v1", "3": "Lanzamiento web", "4": "Comunidad (10K usuarios)" } },
-      "q2": { "title": "Crecimiento", "items": { "1": "Despliegue en mainnet", "2": "Auditoria Certik/PeckShield", "3": "Telegram Mini-App", "4": "50K usuarios activos diarios", "5": "Partnerships con oraculos" } },
-      "q3": { "title": "Expansion de producto", "items": { "1": "Beta de app movil (React Native)", "2": "Modos premium de prediccion IA", "3": "Pilotos de mercados de prediccion RWA", "4": "Preparacion cross-chain e integraciones de puente", "5": "Campana de crecimiento pre-TGE y onboarding de ecosistema" } },
-      "q4": { "title": "TGE y Escala", "items": { "1": "Evento de generacion de token $OAI (TGE)", "2": "Listado en PancakeSwap y activacion de liquidez", "3": "Lanzamiento de staking con 4 niveles de bloqueo", "4": "Activacion de gobernanza DAO", "5": "100K+ usuarios activos diarios y objetivo de tesoreria: $4-15M" } }
+      "q1": {
+        "title": "Fundacion",
+        "items": {
+          "1": "Smart contracts en BNB testnet",
+          "2": "Motor IA v1",
+          "3": "Lanzamiento web",
+          "4": "Comunidad (10K usuarios)"
+        }
+      },
+      "q2": {
+        "title": "Crecimiento",
+        "items": {
+          "1": "Despliegue en mainnet",
+          "2": "Auditoria Certik/PeckShield",
+          "3": "Telegram Mini-App",
+          "4": "50K usuarios activos diarios",
+          "5": "Partnerships con oraculos"
+        }
+      },
+      "q3": {
+        "title": "Expansion de producto",
+        "items": {
+          "1": "Beta de app movil (React Native)",
+          "2": "Modos premium de prediccion IA",
+          "3": "Pilotos de mercados de prediccion RWA",
+          "4": "Preparacion cross-chain e integraciones de puente",
+          "5": "Campana de crecimiento pre-TGE y onboarding de ecosistema"
+        }
+      },
+      "q4": {
+        "title": "TGE y Escala",
+        "items": {
+          "1": "Evento de generacion de token $OAI (TGE)",
+          "2": "Listado en PancakeSwap y activacion de liquidez",
+          "3": "Lanzamiento de staking con 4 niveles de bloqueo",
+          "4": "Activacion de gobernanza DAO",
+          "5": "100K+ usuarios activos diarios y objetivo de tesoreria: $4-15M"
+        }
+      }
     },
     "tgeUtilityTitle": "Conversion en TGE y utilidad post-TGE",
     "pointsToOaiTitle": "Conversion de puntos a OAI",
@@ -198,7 +368,19 @@
     "pointsToOaiFormula": "Tus OAI = (TusPuntos / PuntosTotales) x PoolAirdrop",
     "pointsAfterTgeTitle": "Puntos despues del TGE",
     "pointsAfterTgeDesc": "Los puntos permanecen como capa estacional de reputacion para ranking, quests, campanas e incentivos de socios.",
-    "footerTagline": "OracleAI Predict - Mercado de Prediccion IA Descentralizado en BNB Chain"
+    "footerTagline": "OracleAI Predict - Mercado de Prediccion IA Descentralizado en BNB Chain",
+    "creatorEconomyTitle": "Economia de creadores",
+    "creatorEconomyFlowTitle": "Como funciona el flujo",
+    "creatorEconomyFlow1": "La creacion de eventos de usuario mantiene una tarifa fija de listado anti-spam.",
+    "creatorEconomyFlow2": "Cada voto en eventos de usuario paga una pequena comision.",
+    "creatorEconomyFlow3": "La comision se divide en parte del creador y parte del protocolo.",
+    "creatorEconomyFlow4": "La parte del protocolo sigue la misma logica de tesoreria/premios/referidos/quema/staking.",
+    "creatorEconomyFlow5": "La distribucion de la parte del protocolo se ejecuta en lotes cada 12 horas para reducir gas por voto.",
+    "creatorEconomyQualityTitle": "Filtros de calidad y anti-abuso",
+    "creatorEconomyQuality1": "La recompensa del creador solo se puede reclamar cuando el evento esta resuelto.",
+    "creatorEconomyQuality2": "Debe alcanzarse un umbral minimo de votos.",
+    "creatorEconomyQuality3": "El creador debe tener estado verificado al momento del pago.",
+    "creatorEconomyQuality4": "Si no se cumplen las condiciones, la parte del creador se redirige a la tesoreria de seguridad del protocolo."
   },
   "predictions": {
     "title": "Predicciones IA",
@@ -258,6 +440,29 @@
     "userCreateQualityHint": "Mejora la claridad de la pregunta",
     "userCreateSuccess": "Evento de usuario creado con exito",
     "userCreateFailed": "No se pudo crear el evento de usuario",
+    "userCreateWarnQuestionMark": "La pregunta debe terminar con '?' para mayor claridad.",
+    "userCreateWarnBinaryWording": "Usa una formulacion clara de SI/NO.",
+    "userCreateErrTitleLength": "El titulo debe tener entre 12 y 180 caracteres.",
+    "userCreateErrCategory": "Categoria no compatible.",
+    "userCreateErrSource": "Politica de fuente no compatible.",
+    "userCreateErrDeadline": "Fecha limite invalida.",
+    "userCreateErrDeadlineRange": "La fecha limite debe estar entre 10 minutos y 14 dias.",
+    "userCreateErrDuplicate": "Ya existe un evento activo similar.",
+    "userCreateErrBinary": "La pregunta no es claramente binaria (SI/NO). Aclara condiciones y fecha limite.",
+    "userCreateErrClarify": "La pregunta es demasiado vaga. Agrega una condicion medible y una fecha limite clara.",
+    "userCreateErrLanguage": "Se detecto el idioma. Mantén la pregunta clara y binaria (SI/NO).",
+    "userCreateErrAiRejected": "La validacion de IA rechazo este evento. Reformulalo.",
+    "creatorCannotVoteOwn": "No puedes votar en tu propio evento.",
+    "shareInvite": "Predice con IA en OracleAI Predict",
+    "connectToShareRef": "Conecta la wallet para compartir con tu enlace de referido",
+    "shareTelegram": "Telegram",
+    "shareX": "X",
+    "shareDiscord": "Discord",
+    "shareCopyLink": "Copiar enlace",
+    "shareLinkCopied": "Enlace de referido copiado",
+    "shareLinkCopyFailed": "No se pudo copiar el enlace de referido",
+    "discordCopied": "Texto de compartido copiado para Discord",
+    "discordCopyFailed": "No se pudo copiar el texto para Discord",
     "myVotes": "Mis votos",
     "noVoted": "Aun no hay eventos votados",
     "voteToSeeHistory": "Vota en eventos para ver aqui tu historial personal",
@@ -275,11 +480,195 @@
       "market": "Datos de mercado",
       "newswire": "Agencias de noticias",
       "oracle": "Feed de oraculo"
+    },
+    "userVoteFeeInfo": "Comision de voto en evento de usuario",
+    "creatorGets": "el creador recibe",
+    "creatorPayoutVotesMin": "desbloqueo de pago",
+    "eventStartsAt": "Inicio del evento",
+    "eventStartTbd": "Por definir",
+    "voteClosesAt": "La votacion cierra a las",
+    "verifyAt": "Verificacion a las",
+    "voteCloseIn": "La votacion cierra en",
+    "verifyIn": "Verificacion en",
+    "voteMultiplier": "Multiplicador",
+    "expectedPointsIfCorrect": "Si aciertas",
+    "pointsIfWrong": "Si fallas",
+    "votePointsCalculator": "Puntos base = 50 x multiplicador. La prediccion correcta da +100% bonus (x2).",
+    "whaleFormulaLabel": "Multiplicador Whale: 10 x sqrt(amount / 0.05).",
+    "basePointsLabel": "Base",
+    "voteButtonRewardHint": "+{points} pts si aciertas",
+    "alreadyVoted": "Ya votaste en este evento",
+    "alreadyVotedCard": "Ya votaste en este evento",
+    "checkInAlreadyToday": "Ya hiciste el check-in hoy"
+  },
+  "leaderboard": {
+    "title": "Clasificacion Semanal",
+    "subtitle": "Los 100 mejores comparten el fondo semanal",
+    "rank": "Rango",
+    "address": "Direccion",
+    "tier": "Nivel",
+    "streak": "Racha",
+    "points": "Puntos",
+    "you": "(Tu)",
+    "noParticipants": "Sin participantes. Se el primero!",
+    "weeklyPrizeClaimed": "Premio semanal reclamado",
+    "connectForWeeklyClaim": "Conecta wallet para verificar el reclamo semanal.",
+    "noClaimableWeeklyPrize": "No hay premio semanal reclamable para tu direccion en la epoca actual.",
+    "claimableWeeklyReward": "Recompensa semanal reclamable:",
+    "claiming": "Reclamando...",
+    "alreadyClaimed": "Ya reclamado",
+    "claimWeeklyPrize": "Reclamar premio semanal"
+  },
+  "profile": {
+    "title": "Tu Perfil",
+    "oracleScore": "Puntuacion Oracle",
+    "score": "Score",
+    "scoreDesc": "Consistencia + Precision + Referidos",
+    "accuracy": "Precision",
+    "checkins": "Check-ins",
+    "refEarnings": "Ganancias por referidos",
+    "bnbEarned": "BNB Ganado",
+    "referralProgram": "Programa de Referidos",
+    "sixLevels": "6 niveles",
+    "yourCode": "Tu Codigo de Referido",
+    "directRefs": "Refs Directos",
+    "levelRewards": "Por nivel: L1: 10% · L2: 5% · L3: 3% · L4: 2% · L5: 1.5% · L6: 1%",
+    "badges": "Logros",
+    "badgeItems": {
+      "firstCheckin": {
+        "name": "Primer Check-In",
+        "desc": "Completa tu primer check-in"
+      },
+      "streak3": {
+        "name": "Racha de 3 Dias",
+        "desc": "Mantener una racha de 3 dias"
+      },
+      "streak7": {
+        "name": "Guerrero Semanal",
+        "desc": "Alcanzar racha de 7 dias"
+      },
+      "predictor": {
+        "name": "Iniciado Oracle",
+        "desc": "Hacer 5 predicciones"
+      },
+      "accurate": {
+        "name": "Maestro Oracle",
+        "desc": "Alcanzar 90%+ de precision"
+      },
+      "referrer": {
+        "name": "Constructor de Red",
+        "desc": "Referir 5 amigos"
+      },
+      "whale": {
+        "name": "Estado Ballena",
+        "desc": "Hacer check-in como Ballena"
+      },
+      "top10": {
+        "name": "Top 10",
+        "desc": "Entrar al top 10 semanal"
+      }
+    },
+    "history": "Historial",
+    "noCheckins": "Sin check-ins aun",
+    "connectPrompt": "Conecta tu wallet para ver tu perfil",
+    "referralAnalytics": "Analitica de referidos",
+    "totalDownline": "Red total",
+    "newRefs7d": "Nuevos referidos (7d)",
+    "activeRefs7d": "Referidos activos (7d)",
+    "levelBreakdown": "Desglose de estructura de 6 niveles",
+    "levelN": "Nivel {n}",
+    "latestReferrals": "Ultimos referidos directos",
+    "noReferralsYet": "Aun no hay referidos",
+    "shareBySource": "Registros por fuente",
+    "shareByCampaign": "Registros por campana",
+    "shareByEvent": "Registros por evento",
+    "noShareStats": "Aun no hay datos de atribucion",
+    "socialCreatives": "Creativos para redes sociales",
+    "socialCreativesDesc": "Usa publicaciones listas para compartir tu enlace de referido rapidamente.",
+    "copyCreative": "Copiar creativo",
+    "copyTrackedLink": "Copiar enlace UTM",
+    "shareNow": "Compartir ahora",
+    "availableToWithdraw": "Disponible para retirar",
+    "withdrawEarnings": "Retirar ganancias",
+    "withdrawing": "Retirando...",
+    "refWithdrawSuccess": "Ganancias de referidos retiradas",
+    "creatorDashboard": "Panel del creador",
+    "creatorDashboardDesc": "Rendimiento de tus eventos creados por usuarios.",
+    "creatorCreated": "Creados",
+    "creatorActive": "Activos",
+    "creatorResolved": "Resueltos",
+    "creatorConversion": "Conversion de votos",
+    "creatorAvgVotes": "Promedio votos/evento",
+    "creatorDisputeRate": "Disputados/archivados",
+    "creatorTotalVotes": "Votos totales",
+    "creatorVoteFee": "Comision de voto",
+    "creatorShare": "Parte del creador",
+    "creatorAvailableToWithdraw": "Recompensas del creador disponibles",
+    "creatorRulesHint": "Las recompensas se habilitan tras resolucion valida, umbral minimo de votos y estado de creador verificado.",
+    "creatorWithdraw": "Retirar recompensas del creador",
+    "creatorWithdrawing": "Retirando...",
+    "creatorClaimSuccess": "Recompensas del creador retiradas",
+    "creatorVotes": "votos",
+    "creatorNoEvents": "Aun no hay eventos creados por usuarios",
+    "voteFeesCollected": "Comisiones de voto recolectadas (plataforma)",
+    "voteFeesDistributed": "Comisiones de voto distribuidas (plataforma)",
+    "voteFeesDistributedHint": "La distribucion se ejecuta en cada transaccion de voto.",
+    "voteFeesBreakdown": "Desglose de comisiones de voto (plataforma)",
+    "creativeCards": {
+      "x": {
+        "title": "Post para X"
+      },
+      "telegram": {
+        "title": "Post para Telegram"
+      },
+      "instagram": {
+        "title": "Historia para Instagram"
+      }
+    },
+    "creatives": {
+      "x1": "Estoy ganando con predicciones IA en BNB Chain. Unete con mi enlace:",
+      "x2": "OracleAI Predict ya esta activo. Check-ins diarios + predicciones + premios. Empieza aqui:",
+      "telegram": "Amigos, estoy farmeando puntos en OracleAI Predict. Conecten wallet y unanse a mi equipo:",
+      "story": "Predice. Gana. Vence. Unete a OracleAI Predict con mi invitacion:"
     }
   },
-  "leaderboard": { "title": "Clasificacion Semanal", "subtitle": "Los 100 mejores comparten el fondo semanal", "rank": "Rango", "address": "Direccion", "tier": "Nivel", "streak": "Racha", "points": "Puntos", "you": "(Tu)", "noParticipants": "Sin participantes. Se el primero!", "weeklyPrizeClaimed": "Premio semanal reclamado", "connectForWeeklyClaim": "Conecta wallet para verificar el reclamo semanal.", "noClaimableWeeklyPrize": "No hay premio semanal reclamable para tu direccion en la epoca actual.", "claimableWeeklyReward": "Recompensa semanal reclamable:", "claiming": "Reclamando...", "alreadyClaimed": "Ya reclamado", "claimWeeklyPrize": "Reclamar premio semanal" },
-  "profile": { "title": "Tu Perfil", "oracleScore": "Puntuacion Oracle", "score": "Score", "scoreDesc": "Consistencia + Precision + Referidos", "accuracy": "Precision", "checkins": "Check-ins", "refEarnings": "Ganancias por referidos", "bnbEarned": "BNB Ganado", "referralProgram": "Programa de Referidos", "sixLevels": "6 niveles", "yourCode": "Tu Codigo de Referido", "directRefs": "Refs Directos", "levelRewards": "Por nivel: L1: 10% · L2: 5% · L3: 3% · L4: 2% · L5: 1.5% · L6: 1%", "badges": "Logros", "badgeItems": { "firstCheckin": { "name": "Primer Check-In", "desc": "Completa tu primer check-in" }, "streak3": { "name": "Racha de 3 Dias", "desc": "Mantener una racha de 3 dias" }, "streak7": { "name": "Guerrero Semanal", "desc": "Alcanzar racha de 7 dias" }, "predictor": { "name": "Iniciado Oracle", "desc": "Hacer 5 predicciones" }, "accurate": { "name": "Maestro Oracle", "desc": "Alcanzar 90%+ de precision" }, "referrer": { "name": "Constructor de Red", "desc": "Referir 5 amigos" }, "whale": { "name": "Estado Ballena", "desc": "Hacer check-in como Ballena" }, "top10": { "name": "Top 10", "desc": "Entrar al top 10 semanal" } }, "history": "Historial", "noCheckins": "Sin check-ins aun", "connectPrompt": "Conecta tu wallet para ver tu perfil" },
-  "staking": { "title": "Staking OAI", "subtitle": "Haz stake de OAI para impulsar puntos y referidos", "yourStake": "Tu Stake", "totalStaked": "Total Stakeado", "pointsBoost": "Boost Puntos", "referralBoost": "Boost Referidos", "tierActive": "Nivel {tier} Activo", "noTier": "Sin nivel — Haz stake para desbloquear", "stakeTab": "Stake", "unstakeTab": "Retirar", "amountToStake": "Cantidad a stakear", "amountToUnstake": "Cantidad a retirar", "balance": "Balance", "staked": "Stakeado", "cooldown": "Enfriamiento (7 dias)", "claimUnstake": "Reclamar retiro", "connectPrompt": "Conecta wallet para staking", "txConfirmed": "Transaccion confirmada!", "tierHint": "Haz stake de 100+ OAI para Bronce, 1K para Plata, 10K para Oro, 100K para Diamante", "stakeRequired": "Stake Requerido", "approving": "Aprobando...", "approveOai": "Aprobar OAI", "staking": "Stakeando...", "stakeOai": "Stakear OAI", "unstakePending": "Retiro pendiente", "cooldownComplete": "Cooldown completo! Ya puedes retirar.", "cooldownEnds": "Cooldown termina", "requestUnstake": "Solicitar retiro (7 dias de cooldown)", "currentBoosts": "{points} boost de puntos, {referral} boost de referidos", "preTgeEtaTba": "Fecha de lanzamiento: por anunciar", "rangeBronze": "100 - 999", "rangeSilver": "1,000 - 9,999", "rangeGold": "10,000 - 99,999", "rangeDiamond": "100,000+", "lockDays": "{days}d" },
+  "staking": {
+    "title": "Staking OAI",
+    "subtitle": "Haz stake de OAI para impulsar puntos y referidos",
+    "yourStake": "Tu Stake",
+    "totalStaked": "Total Stakeado",
+    "pointsBoost": "Boost Puntos",
+    "referralBoost": "Boost Referidos",
+    "tierActive": "Nivel {tier} Activo",
+    "noTier": "Sin nivel — Haz stake para desbloquear",
+    "stakeTab": "Stake",
+    "unstakeTab": "Retirar",
+    "amountToStake": "Cantidad a stakear",
+    "amountToUnstake": "Cantidad a retirar",
+    "balance": "Balance",
+    "staked": "Stakeado",
+    "cooldown": "Enfriamiento (7 dias)",
+    "claimUnstake": "Reclamar retiro",
+    "connectPrompt": "Conecta wallet para staking",
+    "txConfirmed": "Transaccion confirmada!",
+    "tierHint": "Haz stake de 100+ OAI para Bronce, 1K para Plata, 10K para Oro, 100K para Diamante",
+    "stakeRequired": "Stake Requerido",
+    "approving": "Aprobando...",
+    "approveOai": "Aprobar OAI",
+    "staking": "Stakeando...",
+    "stakeOai": "Stakear OAI",
+    "unstakePending": "Retiro pendiente",
+    "cooldownComplete": "Cooldown completo! Ya puedes retirar.",
+    "cooldownEnds": "Cooldown termina",
+    "requestUnstake": "Solicitar retiro (7 dias de cooldown)",
+    "currentBoosts": "{points} boost de puntos, {referral} boost de referidos",
+    "preTgeEtaTba": "Fecha de lanzamiento: por anunciar",
+    "rangeBronze": "100 - 999",
+    "rangeSilver": "1,000 - 9,999",
+    "rangeGold": "10,000 - 99,999",
+    "rangeDiamond": "100,000+",
+    "lockDays": "{days}d"
+  },
   "guide": {
     "howItWorks": "Como Funciona",
     "tapForDetails": "Toca para detalles",
@@ -288,19 +677,69 @@
     "hideGuide": "Ocultar Guia",
     "step": "Paso",
     "steps": {
-      "1": { "title": "Conecta tu Wallet", "desc": "Conecta MetaMask o cualquier wallet Web3 para empezar", "detail": "Tu wallet es tu identidad. Todos los puntos y ganancias estan vinculados a tu direccion. Sin email ni registro." },
-      "2": { "title": "Check-In Diario", "desc": "Paga una pequena comision para registrarte y ganar puntos base", "detail": "Elige tu nivel: Basico (0.0015 BNB, 1x), Pro (0.01 BNB, 3x), Ballena (0.05 BNB, 10x). La racha diaria da hasta +50% de bonus!" },
-      "3": { "title": "Haz Predicciones", "desc": "Acepta o rechaza predicciones de la IA sobre eventos reales", "detail": "La IA crea predicciones sobre deportes, cripto, politica, economia, clima. Correcto = +50 pts. Supera la IA = +100 bonus!" },
-      "4": { "title": "Sube en la Clasificacion", "desc": "Compite semanalmente por premios en BNB", "detail": "El top 100 comparte el 40% de comisiones en BNB cada semana. #1=20%, #2-5=30%, #6-20=30%, #21-100=20%." },
-      "5": { "title": "Gana el Airdrop OAI", "desc": "Tus puntos se convierten en tokens OAI en el TGE", "detail": "El 40% del suministro de OAI (400M) se distribuye segun puntos. Cuota total de la comunidad: 58%!" }
+      "1": {
+        "title": "Conecta tu Wallet",
+        "desc": "Conecta MetaMask o cualquier wallet Web3 para empezar",
+        "detail": "Tu wallet es tu identidad. Todos los puntos y ganancias estan vinculados a tu direccion. Sin email ni registro."
+      },
+      "2": {
+        "title": "Check-In Diario",
+        "desc": "Paga una pequena comision para registrarte y ganar puntos base",
+        "detail": "Elige tu nivel: Basico (0.0015 BNB, 1x), Pro (0.01 BNB, 3x), Ballena (0.05 BNB, 10x). La racha diaria da hasta +50% de bonus!"
+      },
+      "3": {
+        "title": "Haz Predicciones",
+        "desc": "Acepta o rechaza predicciones de la IA sobre eventos reales",
+        "detail": "La IA crea predicciones sobre deportes, cripto, politica, economia, clima. Correcto = +50 pts. Supera la IA = +100 bonus!"
+      },
+      "4": {
+        "title": "Sube en la Clasificacion",
+        "desc": "Compite semanalmente por premios en BNB",
+        "detail": "El top 100 comparte el 40% de comisiones en BNB cada semana. #1=20%, #2-5=30%, #6-20=30%, #21-100=20%."
+      },
+      "5": {
+        "title": "Gana el Airdrop OAI",
+        "desc": "Tus puntos se convierten en tokens OAI en el TGE",
+        "detail": "El 40% del suministro de OAI (400M) se distribuye segun puntos. Cuota total de la comunidad: 58%!"
+      }
     },
     "earn": {
-      "checkin": { "title": "Check-In Diario", "pts": "100-1,000", "desc": "Basico (100), Pro (300), Ballena (1,000 pts)", "tip": "Racha de 7 dias = hasta +50% bonus!" },
-      "prediction": { "title": "Prediccion Correcta", "pts": "+50", "desc": "Vota Acuerdo/Desacuerdo. Correcto = +50 pts", "tip": "Supera la IA y gana +100 bonus!" },
-      "streak": { "title": "Bonus por Racha", "pts": "hasta +50%", "desc": "Check-ins diarios consecutivos aumentan los puntos", "tip": "Dia 1: +7%, Dia 3: +21%, Dia 7: +50%" },
-      "referrals": { "title": "Referidos", "pts": "6 niveles", "desc": "Gana % de las comisiones de tus referidos", "tip": "L1:10% L2:5% L3:3% L4:2% L5:1.5% L6:1%" },
-      "staking": { "title": "Boost por Staking", "pts": "+10-50%", "desc": "Niveles Bronce/Plata/Oro/Diamante", "tip": "Diamante: +50% puntos, +20% referidos!" },
-      "prizes": { "title": "Premios Semanales", "pts": "BNB", "desc": "El top 100 comparte 40% de comisiones en BNB", "tip": "#1=20% #2-5=30% #6-20=30% #21-100=20%" }
+      "checkin": {
+        "title": "Check-In Diario",
+        "pts": "100-1,000",
+        "desc": "Basico (100), Pro (300), Ballena (1,000 pts)",
+        "tip": "Racha de 7 dias = hasta +50% bonus!"
+      },
+      "prediction": {
+        "title": "Prediccion Correcta",
+        "pts": "+50",
+        "desc": "Vota Acuerdo/Desacuerdo. Correcto = +50 pts",
+        "tip": "Supera la IA y gana +100 bonus!"
+      },
+      "streak": {
+        "title": "Bonus por Racha",
+        "pts": "hasta +50%",
+        "desc": "Check-ins diarios consecutivos aumentan los puntos",
+        "tip": "Dia 1: +7%, Dia 3: +21%, Dia 7: +50%"
+      },
+      "referrals": {
+        "title": "Referidos",
+        "pts": "6 niveles",
+        "desc": "Gana % de las comisiones de tus referidos",
+        "tip": "L1:10% L2:5% L3:3% L4:2% L5:1.5% L6:1%"
+      },
+      "staking": {
+        "title": "Boost por Staking",
+        "pts": "+10-50%",
+        "desc": "Niveles Bronce/Plata/Oro/Diamante",
+        "tip": "Diamante: +50% puntos, +20% referidos!"
+      },
+      "prizes": {
+        "title": "Premios Semanales",
+        "pts": "BNB",
+        "desc": "El top 100 comparte 40% de comisiones en BNB",
+        "tip": "#1=20% #2-5=30% #6-20=30% #21-100=20%"
+      }
     }
   },
   "welcome": {
@@ -317,8 +756,19 @@
     "back": "Atras",
     "connectFirst": "Conecta tu wallet primero para empezar a ganar"
   },
-  "activity": { "title": "Actividad en Vivo", "subtitle": "Check-ins en tiempo real", "noActivity": "Sin actividad", "beFirst": "Se el primero en hacer check-in hoy!" },
-  "livePredictions": { "title": "Predicciones en Vivo", "subtitle": "Vota Acuerdo/Desacuerdo. Correcto = +50 pts. Supera IA = +100!", "noPredictions": "Sin predicciones", "autoGenerate": "IA genera nuevos eventos cada 90 min", "viewAll": "Ver las {count} predicciones y votar" },
+  "activity": {
+    "title": "Actividad en Vivo",
+    "subtitle": "Check-ins en tiempo real",
+    "noActivity": "Sin actividad",
+    "beFirst": "Se el primero en hacer check-in hoy!"
+  },
+  "livePredictions": {
+    "title": "Predicciones en Vivo",
+    "subtitle": "Vota Acuerdo/Desacuerdo. Correcto = +50 pts. Supera IA = +100!",
+    "noPredictions": "Sin predicciones",
+    "autoGenerate": "IA genera nuevos eventos cada 90 min",
+    "viewAll": "Ver las {count} predicciones y votar"
+  },
   "tgeClaim": {
     "title": "Claim y conversion de puntos",
     "subtitle": "Proyeccion transparente antes del TGE. La conversion final se fija en el snapshot.",

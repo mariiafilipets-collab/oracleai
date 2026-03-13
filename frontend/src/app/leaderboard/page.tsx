@@ -104,7 +104,7 @@ export default function LeaderboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-heading font-bold">
+        <h1 className="text-2xl sm:text-3xl font-heading font-bold">
           <span className="gradient-gold">{t("leaderboard.title")}</span>
         </h1>
         <p className="text-gray-400 text-sm mt-1">
@@ -170,7 +170,7 @@ export default function LeaderboardPage() {
             <button
               onClick={handleClaim}
               disabled={claimPending || claimData.claimed}
-              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-neon-purple to-neon-cyan text-dark-900 font-bold text-sm disabled:opacity-50"
+              className="min-h-11 px-5 py-2.5 rounded-xl bg-gradient-to-r from-neon-purple to-neon-cyan text-dark-900 font-bold text-sm disabled:opacity-50 w-full sm:w-auto"
             >
               {claimPending
                 ? tr("leaderboard.claiming", "Claiming...")
@@ -193,7 +193,7 @@ export default function LeaderboardPage() {
         <>
           {/* Top 3 Podium */}
           {top3.length >= 3 && (
-            <div className="flex items-end justify-center gap-4 py-6">
+            <div className="hidden sm:flex items-end justify-center gap-2 sm:gap-4 py-6">
               {[1, 0, 2].map((idx) => {
                 const user = top3[idx];
                 const heights = ["h-32", "h-24", "h-20"];
@@ -213,9 +213,7 @@ export default function LeaderboardPage() {
                     <span className="text-sm font-bold text-white mb-2">
                       {user.points?.toLocaleString()} {t("common.pts")}
                     </span>
-                    <div
-                      className={`w-20 ${heights[idx]} rounded-t-xl bg-gradient-to-t ${PODIUM_COLORS[idx]}`}
-                    />
+                    <div className={`w-16 sm:w-20 ${heights[idx]} rounded-t-xl bg-gradient-to-t ${PODIUM_COLORS[idx]}`} />
                   </motion.div>
                 );
               })}
@@ -224,7 +222,37 @@ export default function LeaderboardPage() {
 
           {/* Table */}
           <GlassCard hover={false} className="overflow-hidden p-0">
-            <div className="overflow-x-auto">
+            <div className="md:hidden p-3 space-y-2">
+              {leaderboard.map((user, i) => {
+                const isMe = user.address?.toLowerCase() === address?.toLowerCase();
+                return (
+                  <div
+                    key={user.address}
+                    className={`rounded-xl border p-3 ${
+                      isMe ? "border-neon-cyan/40 bg-neon-cyan/5" : "border-dark-500/60 bg-dark-700/40"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-gray-400">
+                        {i < 3 ? <AppIcon name={(["gold", "silver", "bronze"] as IconName[])[i]} className="w-4 h-4 inline" /> : `#${i + 1}`}
+                      </span>
+                      <span className="text-xs px-2 py-1 rounded-full border text-gray-300 border-dark-500/80">
+                        {user.tier || "BASIC"}
+                      </span>
+                    </div>
+                    <p className="text-sm font-mono text-gray-200 mt-2">
+                      {user.address?.slice(0, 6)}...{user.address?.slice(-4)}
+                      {isMe && <span className="ml-2 text-xs text-neon-cyan">{t("leaderboard.you")}</span>}
+                    </p>
+                    <div className="mt-2 flex items-center justify-between text-xs">
+                      <span className="text-gray-500">{t("leaderboard.streak")}: {user.streak || 0}</span>
+                      <span className="font-mono font-bold text-white">{user.points?.toLocaleString() || 0}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-dark-500">

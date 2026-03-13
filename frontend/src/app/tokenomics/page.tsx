@@ -1,9 +1,12 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import { formatEther } from "viem";
 import GlassCard from "@/components/GlassCard";
 import { useI18n } from "@/lib/i18n";
 import AppIcon from "@/components/icons/AppIcon";
+import { api } from "@/lib/api";
 
 const TOKEN_ALLOC = [
   { key: "airdrop", pct: 40, amount: "400M", color: "bg-neon-cyan" },
@@ -33,10 +36,36 @@ const TIER_KEYS = ["bronze", "silver", "gold", "diamond"];
 
 export default function TokenomicsPage() {
   const { t } = useI18n();
+  const [voteFeesBnb, setVoteFeesBnb] = useState(0);
+  const [voteBreakdown, setVoteBreakdown] = useState<Record<string, number>>({
+    prizes: 0,
+    treasury: 0,
+    referrals: 0,
+    burn: 0,
+    stakers: 0,
+  });
   const tr = (key: string, fallback: string) => {
     const value = t(key);
     return value === key ? fallback : value;
   };
+
+  useEffect(() => {
+    api.getStats()
+      .then((res) => {
+        if (!res?.success) return;
+        const raw = BigInt(String(res?.data?.totalVoteFeesCollected || "0"));
+        setVoteFeesBnb(Number(formatEther(raw)));
+        const split = res?.data?.voteFeesBreakdownWei || {};
+        setVoteBreakdown({
+          prizes: Number(formatEther(BigInt(String(split.prizes || "0")))),
+          treasury: Number(formatEther(BigInt(String(split.treasury || "0")))),
+          referrals: Number(formatEther(BigInt(String(split.referrals || "0")))),
+          burn: Number(formatEther(BigInt(String(split.burn || "0")))),
+          stakers: Number(formatEther(BigInt(String(split.stakers || "0")))),
+        });
+      })
+      .catch(() => {});
+  }, []);
 
   return (
     <div className="space-y-8">
@@ -84,6 +113,119 @@ export default function TokenomicsPage() {
               <div className="text-3xl mb-2 flex justify-center"><AppIcon name={f.icon as any} className="w-7 h-7 text-neon-cyan" /></div>
               <div className="text-2xl font-bold font-mono text-neon-cyan">{f.pct}%</div>
               <div className="text-sm font-bold text-white mt-1">{t(`checkin.fees.${FEE_KEYS[i]}`)}</div>
+            </div>
+          ))}
+        </div>
+      </GlassCard>
+
+      {/* Voting Fees and Points */}
+      <GlassCard hover={false}>
+        <h2 className="text-xl font-heading font-bold mb-2">
+          {tr("tokenomicsPage.votingFees.title", "Voting Fees and Points")}
+        </h2>
+        <p className="text-sm text-gray-500 mb-6">
+          {tr("tokenomicsPage.votingFees.desc", "Voting uses tiered BNB fees and dynamic point multipliers.")}
+        </p>
+        <div className="grid md:grid-cols-2 gap-3">
+          <div className="p-4 rounded-xl bg-dark-700/50 border border-dark-500/50">
+            <h3 className="text-sm font-bold text-white mb-2">{tr("tokenomicsPage.votingFees.tiersTitle", "Vote tiers")}</h3>
+            <ul className="text-xs text-gray-400 space-y-1">
+              <li>- Basic: 0.00015 BNB (x1)</li>
+              <li>- Pro: 0.005 BNB (x3)</li>
+              <li>- Whale: 0.05+ BNB (no limit)</li>
+            </ul>
+          </div>
+          <div className="p-4 rounded-xl bg-dark-700/50 border border-dark-500/50">
+            <h3 className="text-sm font-bold text-white mb-2">{tr("tokenomicsPage.votingFees.formulaTitle", "Formula")}</h3>
+            <ul className="text-xs text-gray-400 space-y-1">
+              <li>- Whale multiplier = 10 * sqrt(amount / 0.05)</li>
+              <li>- Base vote points scale by tier multiplier</li>
+              <li>- Correct prediction bonus: +100% (x2)</li>
+            </ul>
+          </div>
+        </div>
+        <p className="text-xs text-gray-400 mt-4">
+          {tr("tokenomicsPage.votingFees.distribution", "All vote fees follow check-in distribution: 50% prizes, 15% treasury, 20% referrals, 10% burn reserve, 5% staking rewards.")}
+        </p>
+        <div className="grid sm:grid-cols-2 gap-3 mt-4">
+          <div className="p-4 rounded-xl bg-dark-700/50 border border-dark-500/50">
+            <div className="text-xs text-gray-500 mb-1">{tr("tokenomicsPage.votingFees.collected", "Vote fees collected (on-chain)")}</div>
+            <div className="text-lg font-mono text-neon-cyan">{voteFeesBnb.toFixed(6)} BNB</div>
+          </div>
+          <div className="p-4 rounded-xl bg-dark-700/50 border border-dark-500/50">
+            <div className="text-xs text-gray-500 mb-1">{tr("tokenomicsPage.votingFees.distributed", "Vote fees distributed (on-chain)")}</div>
+            <div className="text-lg font-mono text-neon-gold">{voteFeesBnb.toFixed(6)} BNB</div>
+            <div className="text-[11px] text-gray-500 mt-1">
+              {tr("tokenomicsPage.votingFees.distributedHint", "Distribution is applied immediately on each vote transaction.")}
+            </div>
+          </div>
+        </div>
+        <div className="mt-4 p-4 rounded-xl bg-dark-700/50 border border-dark-500/50">
+          <div className="text-xs text-gray-500 mb-2">{tr("tokenomicsPage.votingFees.breakdown", "Distributed breakdown")}</div>
+          <div className="grid sm:grid-cols-5 gap-2 text-xs">
+            <div className="text-gray-300">{t("checkin.fees.prizes")}: <span className="font-mono text-neon-cyan">{voteBreakdown.prizes.toFixed(6)} BNB</span></div>
+            <div className="text-gray-300">{t("checkin.fees.treasury")}: <span className="font-mono text-neon-cyan">{voteBreakdown.treasury.toFixed(6)} BNB</span></div>
+            <div className="text-gray-300">{t("checkin.fees.referrals")}: <span className="font-mono text-neon-cyan">{voteBreakdown.referrals.toFixed(6)} BNB</span></div>
+            <div className="text-gray-300">{t("checkin.fees.burn")}: <span className="font-mono text-neon-cyan">{voteBreakdown.burn.toFixed(6)} BNB</span></div>
+            <div className="text-gray-300">{t("checkin.fees.stakers")}: <span className="font-mono text-neon-cyan">{voteBreakdown.stakers.toFixed(6)} BNB</span></div>
+          </div>
+        </div>
+      </GlassCard>
+
+      {/* Creator Economy */}
+      <GlassCard hover={false}>
+        <h2 className="text-xl font-heading font-bold mb-2">
+          {tr("tokenomicsPage.creatorEconomy.title", "Creator Economy")}
+        </h2>
+        <p className="text-sm text-gray-500 mb-6">
+          {tr(
+            "tokenomicsPage.creatorEconomy.desc",
+            "User-created events use a hybrid model: small vote fee, quality gating, and delayed creator payout."
+          )}
+        </p>
+        <div className="grid md:grid-cols-2 gap-3">
+          {[
+            {
+              icon: "prediction",
+              title: tr("tokenomicsPage.creatorEconomy.voteFeeTitle", "Vote fee on user events"),
+              desc: tr("tokenomicsPage.creatorEconomy.voteFeeDesc", "Each vote on a user event pays a small BNB fee."),
+            },
+            {
+              icon: "pool",
+              title: tr("tokenomicsPage.creatorEconomy.splitTitle", "50/50 split"),
+              desc: tr("tokenomicsPage.creatorEconomy.splitDesc", "50% accrues for creator rewards, 50% goes to protocol distribution."),
+            },
+            {
+              icon: "check",
+              title: tr("tokenomicsPage.creatorEconomy.unlockTitle", "Quality unlock"),
+              desc: tr(
+                "tokenomicsPage.creatorEconomy.unlockDesc",
+                "Creator payout unlocks only after valid resolution, minimum unique voter threshold, and verified creator status."
+              ),
+            },
+            {
+              icon: "bank",
+              title: tr("tokenomicsPage.creatorEconomy.protocolTitle", "Protocol side mirrors check-in"),
+              desc: tr(
+                "tokenomicsPage.creatorEconomy.protocolDesc",
+                "Protocol share keeps the same allocation logic: prizes, treasury, referrals, burn reserve, and staking rewards."
+              ),
+            },
+            {
+              icon: "clock",
+              title: tr("tokenomicsPage.creatorEconomy.batchTitle", "12h batched distribution"),
+              desc: tr(
+                "tokenomicsPage.creatorEconomy.batchDesc",
+                "Protocol-side fees from user-event votes are distributed in 12-hour batches to reduce per-vote gas overhead."
+              ),
+            },
+          ].map((item, idx) => (
+            <div key={idx} className="flex items-start gap-3 p-4 rounded-xl bg-dark-700/50 border border-dark-500/50">
+              <div className="text-neon-cyan"><AppIcon name={item.icon as any} className="w-5 h-5" /></div>
+              <div>
+                <h3 className="text-sm font-bold text-white">{item.title}</h3>
+                <p className="text-xs text-gray-400 mt-1">{item.desc}</p>
+              </div>
             </div>
           ))}
         </div>

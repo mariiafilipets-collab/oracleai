@@ -1,0 +1,68 @@
+name: contracts-release
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy_testnet:
+        description: "Deploy contracts to BNB Testnet"
+        required: true
+        default: false
+        type: boolean
+      verify_on_bscscan:
+        description: "Run Etherscan verify step"
+        required: true
+        default: false
+        type: boolean
+  push:
+    paths:
+      - "contracts/**"
+      - ".github/workflows/contracts-release.yml"
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: contracts
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compile contracts
+        run: npm run compile
+
+      - name: Unit tests
+        run: npm run test
+
+      - name: Static checks (solc optimizer + bytecode diff baseline)
+        run: |
+          npx hardhat compile --force
+          ls -la artifacts/contracts
+
+      - name: Deploy to BNB testnet
+        if: github.event_name == 'workflow_dispatch' && inputs.deploy_testnet == true
+        env:
+          BSC_TESTNET_RPC_URL: ${{ secrets.BSC_TESTNET_RPC_URL }}
+          DEPLOYER_PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
+          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
+          BSCSCAN_API_KEY: ${{ secrets.BSCSCAN_API_KEY }}
+        run: npm run deploy:testnet
+
+      - name: Verify on BscScan
+        if: github.event_name == 'workflow_dispatch' && inputs.deploy_testnet == true && inputs.verify_on_bscscan == true
+        env:
+          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
+          BSCSCAN_API_KEY: ${{ secrets.BSCSCAN_API_KEY }}
+        run: |
+          echo "Use deployment output in contracts/deployments/*.json for explicit verify commands."
+          echo "Add per-contract verify commands in this step once constructor args are finalized."

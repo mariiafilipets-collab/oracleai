@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { ethers } from "ethers";
 import User from "../models/User.js";
 import CheckInRecord from "../models/CheckInRecord.js";
 import PredictionEvent from "../models/PredictionEvent.js";
@@ -7,9 +8,37 @@ import config from "../config/index.js";
 
 const router = Router();
 const SYSTEM_REFERRAL_CODE = "ORACLEAI";
+const CHAIN_READ_TIMEOUT_MS = 8000;
+
+async function withTimeout(promise, timeoutMs = CHAIN_READ_TIMEOUT_MS) {
+  return await Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error("chain-read-timeout")), timeoutMs)),
+  ]);
+}
 
 function buildReferralCode(address) {
   return String(address || "").toLowerCase().slice(2, 10).toUpperCase();
+}
+
+function parseReferralAttribution(input) {
+  const src = String(input?.utmSource || "").trim().slice(0, 64);
+  const med = String(input?.utmMedium || "").trim().slice(0, 64);
+  const camp = String(input?.utmCampaign || "").trim().slice(0, 96);
+  const content = String(input?.utmContent || "").trim().slice(0, 96);
+  const landingPath = String(input?.landingPath || "").trim().slice(0, 256);
+  const eventIdRaw = Number(input?.eventId || 0);
+  const eventId = Number.isFinite(eventIdRaw) && eventIdRaw > 0 ? eventIdRaw : null;
+  if (!src && !camp && !eventId) return null;
+  return {
+    utmSource: src,
+    utmMedium: med,
+    utmCampaign: camp,
+    utmContent: content,
+    eventId,
+    landingPath,
+    attributedAt: new Date(),
+  };
 }
 
 async function ensureSystemReferrerUser() {
@@ -37,6 +66,26 @@ function isAccessControlError(err) {
   return msg.includes("AccessControlUnauthorizedAccount") || msg.includes("missing role");
 }
 
+async function readPredictionValueNoArgs(prediction, fragment, methodName, fallback) {
+  try {
+    if (typeof prediction?.[methodName] === "function") {
+      return await prediction[methodName]();
+    }
+  } catch {}
+  try {
+    const provider = prediction?.runner?.provider;
+    const to = prediction?.target || prediction?.address;
+    if (!provider || !to) return fallback;
+    const iface = new ethers.Interface([fragment]);
+    const data = iface.encodeFunctionData(methodName, []);
+    const raw = await withTimeout(provider.call({ to, data }));
+    const decoded = iface.decodeFunctionResult(methodName, raw);
+    return decoded?.[0] ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 router.get("/:address/referral-stats", async (req, res) => {
   try {
     const address = req.params.address.toLowerCase();
@@ -44,7 +93,7 @@ router.get("/:address/referral-stats", async (req, res) => {
     const sevenDaysAgo = new Date(now - 7 * 24 * 60 * 60 * 1000);
 
     const directRefs = await User.find({ referrer: address })
-      .select("address joinedAt totalPoints weeklyPoints totalCheckIns tier")
+      .select("address joinedAt totalPoints weeklyPoints totalCheckIns tier referralAttribution")
       .sort({ joinedAt: -1 })
       .lean();
 
@@ -85,6 +134,25 @@ router.get("/:address/referral-stats", async (req, res) => {
     const recentDirect7d = directRefs.filter((u) => new Date(u.joinedAt).getTime() >= sevenDaysAgo.getTime()).length;
     const totalDownline = levels.reduce((acc, lvl) => acc + lvl.count, 0);
 
+    const sourceCounts = {};
+    const campaignCounts = {};
+    const eventCounts = {};
+    for (const u of directRefs) {
+      const attr = u?.referralAttribution || {};
+      const src = String(attr.utmSource || "").trim().toLowerCase();
+      const campaign = String(attr.utmCampaign || "").trim();
+      const eventId = Number(attr.eventId || 0);
+      if (src) sourceCounts[src] = (sourceCounts[src] || 0) + 1;
+      if (campaign) campaignCounts[campaign] = (campaignCounts[campaign] || 0) + 1;
+      if (eventId > 0) eventCounts[String(eventId)] = (eventCounts[String(eventId)] || 0) + 1;
+    }
+
+    const top = (obj, limit = 8) =>
+      Object.entries(obj)
+        .map(([key, count]) => ({ key, count: Number(count || 0) }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, limit);
+
     res.json({
       success: true,
       data: {
@@ -94,6 +162,11 @@ router.get("/:address/referral-stats", async (req, res) => {
         recentDirect7d,
         activeDirect7d,
         directRefs: directRefs.slice(0, 20),
+        shareAttribution: {
+          bySource: top(sourceCounts),
+          byCampaign: top(campaignCounts),
+          byEvent: top(eventCounts),
+        },
       },
     });
   } catch (err) {
@@ -104,8 +177,10 @@ router.get("/:address/referral-stats", async (req, res) => {
 router.get("/:address/creator-stats", async (req, res) => {
   try {
     const address = req.params.address.toLowerCase();
+    const creatorMatch = new RegExp(`^${address}$`, "i");
+    const { Prediction } = getContracts();
     const [summary] = await PredictionEvent.aggregate([
-      { $match: { isUserEvent: true, creator: address } },
+      { $match: { isUserEvent: true, creator: creatorMatch } },
       {
         $group: {
           _id: null,
@@ -152,7 +227,7 @@ router.get("/:address/creator-stats", async (req, res) => {
       },
     ]);
 
-    const latestEvents = await PredictionEvent.find({ isUserEvent: true, creator: address })
+    const latestEvents = await PredictionEvent.find({ isUserEvent: true, creator: creatorMatch })
       .sort({ createdAt: -1 })
       .limit(10)
       .select("eventId title category deadline resolved totalVotesYes totalVotesNo listingFeeWei sourcePolicy")
@@ -161,6 +236,45 @@ router.get("/:address/creator-stats", async (req, res) => {
     const createdCount = Number(summary?.createdCount || 0);
     const conversionPct = createdCount > 0 ? Math.round((Number(summary?.eventsWithVotes || 0) / createdCount) * 100) : 0;
     const avgVotesPerEvent = createdCount > 0 ? Number(summary?.totalVotes || 0) / createdCount : 0;
+    let onChainCreatorClaimableWei = "0";
+    let voteFeeWei = "0";
+    let creatorShareBps = 5000;
+    let minCreatorPayoutVotes = 20;
+    if (Prediction) {
+      try {
+        if (typeof Prediction.creatorClaimableWei === "function") {
+          onChainCreatorClaimableWei = String(await withTimeout(Prediction.creatorClaimableWei(address)));
+        } else {
+          const provider = Prediction?.runner?.provider;
+          const to = Prediction?.target || Prediction?.address;
+          if (provider && to) {
+            const iface = new ethers.Interface(["function creatorClaimableWei(address) view returns (uint256)"]);
+            const data = iface.encodeFunctionData("creatorClaimableWei", [address]);
+            const raw = await withTimeout(provider.call({ to, data }));
+            const dec = iface.decodeFunctionResult("creatorClaimableWei", raw);
+            onChainCreatorClaimableWei = String(dec?.[0] ?? 0n);
+          }
+        }
+      } catch {}
+      voteFeeWei = String(await readPredictionValueNoArgs(
+        Prediction,
+        "function userEventVoteFee() view returns (uint256)",
+        "userEventVoteFee",
+        0n
+      ));
+      creatorShareBps = Number(await readPredictionValueNoArgs(
+        Prediction,
+        "function creatorShareBps() view returns (uint16)",
+        "creatorShareBps",
+        5000n
+      ));
+      minCreatorPayoutVotes = Number(await readPredictionValueNoArgs(
+        Prediction,
+        "function minCreatorPayoutVotes() view returns (uint256)",
+        "minCreatorPayoutVotes",
+        20n
+      ));
+    }
 
     res.json({
       success: true,
@@ -174,6 +288,10 @@ router.get("/:address/creator-stats", async (req, res) => {
         conversionPct,
         avgVotesPerEvent,
         listingFeeWeiTotal: String(summary?.listingFeeWeiTotal || "0"),
+        onChainCreatorClaimableWei,
+        voteFeeWei,
+        creatorShareBps,
+        minCreatorPayoutVotes,
         latestEvents,
       },
     });
@@ -202,7 +320,7 @@ router.get("/:address/onboarding", async (req, res) => {
     const { Referral } = getContracts();
     if (Referral) {
       try {
-        hasReferrerOnChain = await Referral.hasReferrer(address);
+        hasReferrerOnChain = await withTimeout(Referral.hasReferrer(address));
       } catch {}
     }
 
@@ -230,7 +348,7 @@ router.get("/:address", async (req, res) => {
     let onChainData = {};
     if (Points) {
       try {
-        const pts = await Points.getUserPoints(address);
+        const pts = await withTimeout(Points.getUserPoints(address));
         onChainData.points = Number(pts.points);
         onChainData.weeklyPoints = Number(pts.weeklyPoints);
         onChainData.streak = Number(pts.streak);
@@ -240,7 +358,7 @@ router.get("/:address", async (req, res) => {
 
     if (CheckIn) {
       try {
-        const rec = await CheckIn.getRecord(address);
+        const rec = await withTimeout(CheckIn.getRecord(address));
         onChainData.lastCheckIn = Number(rec.lastCheckIn);
         onChainData.lastTier = ["BASIC", "PRO", "WHALE"][Number(rec.lastTier)];
       } catch {}
@@ -248,7 +366,7 @@ router.get("/:address", async (req, res) => {
 
     if (Staking) {
       try {
-        const stake = await Staking.getStakeInfo(address);
+        const stake = await withTimeout(Staking.getStakeInfo(address));
         onChainData.staked = stake.amount.toString();
         onChainData.stakedAt = Number(stake.stakedAt);
       } catch {}
@@ -256,10 +374,10 @@ router.get("/:address", async (req, res) => {
 
     if (Referral) {
       try {
-        const refs = await Referral.getDirectReferrals(address);
+        const refs = await withTimeout(Referral.getDirectReferrals(address));
         onChainData.directReferrals = refs.length;
-        onChainData.hasReferrer = await Referral.hasReferrer(address);
-        onChainData.referralEarnings = (await Referral.totalEarnings(address)).toString();
+        onChainData.hasReferrer = await withTimeout(Referral.hasReferrer(address));
+        onChainData.referralEarnings = (await withTimeout(Referral.totalEarnings(address))).toString();
       } catch {}
     }
 
@@ -272,6 +390,9 @@ router.get("/:address", async (req, res) => {
         totalCheckIns: typeof onChainData.totalCheckIns === "number" ? onChainData.totalCheckIns : 0,
       };
       if (onChainData.lastTier) update.tier = onChainData.lastTier;
+      if (typeof onChainData.lastCheckIn === "number" && onChainData.lastCheckIn > 0) {
+        update.lastCheckIn = new Date(onChainData.lastCheckIn * 1000);
+      }
 
       await User.findOneAndUpdate(
         { address },
@@ -331,6 +452,7 @@ router.post("/:address/referral", async (req, res) => {
     }
     const referrerCode = String(req.body?.referrerCode || "").trim().toUpperCase();
     const isSystemCode = referrerCode === SYSTEM_REFERRAL_CODE;
+    const referralAttribution = parseReferralAttribution(req.body?.attribution);
 
     if (!referrerCode) {
       return res.status(400).json({ success: false, error: "Referral code required" });
@@ -357,10 +479,14 @@ router.post("/:address/referral", async (req, res) => {
     // but no on-chain referrer link is set, so referral fee share
     // flows to treasury via CheckIn fallback instead of referral payouts.
     if (isSystemCode) {
+      const update = {
+        referrer: referrerUser.address,
+      };
+      if (referralAttribution) update.referralAttribution = referralAttribution;
       await User.findOneAndUpdate(
         { address: userAddress },
         {
-          $set: { referrer: referrerUser.address },
+          $set: update,
           $setOnInsert: { address: userAddress, referralCode: buildReferralCode(userAddress), joinedAt: new Date() },
         },
         { upsert: true }
@@ -383,7 +509,7 @@ router.post("/:address/referral", async (req, res) => {
 
     let already = false;
     try {
-      already = await Referral.hasReferrer(userAddress);
+      already = await withTimeout(Referral.hasReferrer(userAddress));
     } catch (err) {
       if (isBadContractDataError(err)) {
         return res.status(503).json({
@@ -417,10 +543,14 @@ router.post("/:address/referral", async (req, res) => {
     }
     await tx.wait();
 
+    const update = {
+      referrer: referrerUser.address,
+    };
+    if (referralAttribution) update.referralAttribution = referralAttribution;
     await User.findOneAndUpdate(
       { address: userAddress },
       {
-        $set: { referrer: referrerUser.address },
+        $set: update,
         $setOnInsert: { address: userAddress, referralCode: buildReferralCode(userAddress), joinedAt: new Date() },
       },
       { upsert: true }

@@ -1,0 +1,51 @@
+name: agent-dispatch
+
+on:
+  issues:
+    types: [opened, edited, labeled]
+  workflow_dispatch:
+    inputs:
+      role:
+        required: true
+        type: choice
+        options:
+          - ChiefEngineer
+          - BlockchainEngineer
+          - FullstackEngineer
+          - QAEngineer
+          - MarketingLead
+          - DesignLead
+      objective:
+        required: true
+        type: string
+
+jobs:
+  prepare:
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      contains(join(github.event.issue.labels.*.name, ','), 'agent-task')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build task packet
+        run: |
+          mkdir -p .tmp
+          cat > .tmp/agent-task.json <<'EOF'
+          {
+            "event": "${{ github.event_name }}",
+            "role": "${{ github.event.inputs.role || 'ChiefEngineer' }}",
+            "objective": "${{ github.event.inputs.objective || github.event.issue.title }}",
+            "issueBody": "${{ github.event.issue.body || '' }}",
+            "issueUrl": "${{ github.event.issue.html_url || '' }}",
+            "sha": "${{ github.sha }}"
+          }
+          EOF
+          cat .tmp/agent-task.json
+
+      - name: Upload task packet
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-task
+          path: .tmp/agent-task.json

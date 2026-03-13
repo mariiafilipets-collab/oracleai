@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 interface IPoints {
     function addPredictionBonus(address user, uint256 bonus, bool correct) external;
@@ -16,7 +17,12 @@ interface IPoints {
     );
 }
 
-contract Prediction is AccessControl {
+interface IReferralPrediction {
+    function hasReferrer(address user) external view returns (bool);
+    function distributeReferralFees(address user, uint256 totalReferralFee) external payable;
+}
+
+contract Prediction is AccessControl, ReentrancyGuard {
     bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
 
     enum Category { SPORTS, POLITICS, ECONOMY, CRYPTO, CLIMATE }
@@ -43,19 +49,40 @@ contract Prediction is AccessControl {
     }
 
     IPoints public pointsContract;
+    IReferralPrediction public referralContract;
+    address public prizePool;
     address public treasury;
+    address public burnReserve;
+    address public stakingRewards;
     uint256 public eventCount;
 
-    uint256 public constant CORRECT_BONUS = 50;
-    uint256 public constant BEAT_AI_BONUS = 100;
+    uint256 public constant VOTE_BASE_POINTS = 50;
     uint256 public constant DAY = 86400;
     uint256 public constant USER_EVENT_FEE = 0.0015 ether;
+    uint256 public userEventVoteFee = 0.0002 ether;
+    uint256 public constant VOTE_BASIC_FEE = 0.00015 ether;
+    uint256 public constant VOTE_PRO_FEE = 0.005 ether;
+    uint256 public constant VOTE_WHALE_MIN_FEE = 0.05 ether;
     uint256 public constant USER_EVENT_COOLDOWN = DAY;
     uint256 public constant VERIFIED_CREATOR_COOLDOWN = DAY / 3;
     uint256 public constant VERIFIED_MIN_POINTS = 5000;
     uint256 public constant MAX_TITLE_LENGTH = 180;
     uint256 public constant MAX_SOURCE_POLICY_LENGTH = 120;
     uint256 public constant MAX_RESOLVE_BATCH = 300;
+    uint16 public constant BPS_DENOMINATOR = 10000;
+
+    // Vote-fee split for user-created events:
+    // 50% creator pool, 50% protocol pool.
+    uint16 public creatorShareBps = 5000;
+    uint256 public minCreatorPayoutVotes = 20;
+
+    // Protocol pool split mirrors CheckIn percentages.
+    uint16 public constant PRIZE_SHARE = 5000;      // 50%
+    uint16 public constant TREASURY_SHARE = 1500;   // 15%
+    uint16 public constant REFERRAL_SHARE = 2000;   // 20%
+    uint16 public constant BURN_SHARE = 1000;       // 10%
+    uint16 public constant STAKING_SHARE = 500;     // 5%
+    uint256 public constant PROTOCOL_DISTRIBUTION_INTERVAL = 12 hours;
 
     mapping(uint256 => PredictionEvent) public events;
     mapping(uint256 => mapping(address => UserVote)) public userVotes;
@@ -66,6 +93,13 @@ contract Prediction is AccessControl {
     mapping(uint256 => uint256) public resolvedWinners;
     mapping(uint256 => bool) private _pendingOutcome;
     mapping(uint256 => bool) private _pendingAiWasRight;
+    mapping(uint256 => uint256) public creatorPendingByEvent;
+    mapping(address => uint256) public creatorClaimableWei;
+    mapping(uint256 => bool) public creatorPayoutFinalized;
+    mapping(uint256 => mapping(address => uint256)) public voteMultiplierBps;
+    uint256 public pendingProtocolFeesWei;
+    uint256 public nextProtocolDistributionAt;
+    uint256 public totalVoteFeesCollected;
 
     event EventCreated(uint256 indexed id, string title, Category category, uint256 deadline);
     event UserEventCreated(uint256 indexed id, address indexed creator, uint256 feePaid, uint256 nextAllowedAt);
@@ -73,13 +107,36 @@ contract Prediction is AccessControl {
     event EventResolutionStarted(uint256 indexed id, bool outcome, uint256 voters);
     event EventResolutionProgress(uint256 indexed id, uint256 from, uint256 to, uint256 total);
     event EventResolved(uint256 indexed id, bool outcome, uint256 winnersCount);
+    event CreatorRewardsAccrued(uint256 indexed eventId, address indexed creator, uint256 amount);
+    event CreatorRewardsRedirected(uint256 indexed eventId, address indexed creator, uint256 amount, string reason);
+    event CreatorRewardsClaimed(address indexed creator, uint256 amount);
+    event VoteFeeDistributed(uint256 indexed eventId, address indexed voter, uint256 totalFee, uint256 creatorCut, uint256 protocolCut);
+    event FeeConfigUpdated(uint256 voteFee, uint16 creatorShareBps, uint256 minCreatorPayoutVotes);
+    event FeeReceiversUpdated(address prizePool, address treasury, address referralContract, address burnReserve, address stakingRewards);
+    event ProtocolFeesDistributionScheduled(uint256 pendingAmount, uint256 nextAt);
+    event ProtocolFeesDistributed(uint256 distributedAmount, uint256 prize, uint256 treasury, uint256 referralFallback, uint256 burn, uint256 staking);
 
-    constructor(address _points, address _treasury) {
+    constructor(
+        address _points,
+        address _treasury,
+        address _prizePool,
+        address _referralContract,
+        address _burnReserve,
+        address _stakingRewards
+    ) {
         require(_treasury != address(0), "Zero treasury");
+        require(_prizePool != address(0), "Zero prize");
+        require(_burnReserve != address(0), "Zero burn");
+        require(_stakingRewards != address(0), "Zero staking");
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(OPERATOR_ROLE, msg.sender);
         pointsContract = IPoints(_points);
+        referralContract = IReferralPrediction(_referralContract);
+        prizePool = _prizePool;
         treasury = _treasury;
+        burnReserve = _burnReserve;
+        stakingRewards = _stakingRewards;
+        nextProtocolDistributionAt = block.timestamp + PROTOCOL_DISTRIBUTION_INTERVAL;
     }
 
     function createEvent(
@@ -117,7 +174,7 @@ contract Prediction is AccessControl {
         Category category,
         uint256 deadline,
         string calldata sourcePolicy
-    ) external payable returns (uint256) {
+    ) external payable nonReentrant returns (uint256) {
         require(bytes(title).length > 10 && bytes(title).length <= MAX_TITLE_LENGTH, "Invalid title length");
         require(bytes(sourcePolicy).length > 0 && bytes(sourcePolicy).length <= MAX_SOURCE_POLICY_LENGTH, "Invalid source");
         require(msg.value == USER_EVENT_FEE, "Invalid fee");
@@ -163,21 +220,32 @@ contract Prediction is AccessControl {
         return USER_EVENT_COOLDOWN;
     }
 
-    function submitPrediction(uint256 eventId, bool _prediction) external {
+    function submitPrediction(uint256 eventId, bool _prediction) external payable nonReentrant {
         PredictionEvent storage evt = events[eventId];
         require(evt.id != 0, "Event not found");
         require(!evt.resolved, "Already resolved");
         require(!resolveInProgress[eventId], "Resolving in progress");
         require(block.timestamp < evt.deadline, "Past deadline");
         require(!userVotes[eventId][msg.sender].voted, "Already voted");
+        if (evt.isUserEvent) {
+            require(msg.sender != evt.creator, "Creator cannot vote own event");
+        }
+        uint256 multiplierBps = _getVoteMultiplierBps(msg.value);
         (, , , uint256 lastCheckIn, , , ) = pointsContract.users(msg.sender);
         require(lastCheckIn / DAY == block.timestamp / DAY, "Check-in required today");
 
         userVotes[eventId][msg.sender] = UserVote(true, _prediction);
+        voteMultiplierBps[eventId][msg.sender] = multiplierBps;
         eventVoters[eventId].push(msg.sender);
 
         if (_prediction) evt.totalVotesYes++;
         else evt.totalVotesNo++;
+
+        if (msg.value > 0) {
+            totalVoteFeesCollected += msg.value;
+            _distributeVoteFees(msg.sender, msg.value);
+            emit VoteFeeDistributed(eventId, msg.sender, msg.value, 0, msg.value);
+        }
 
         emit VoteSubmitted(eventId, msg.sender, _prediction);
     }
@@ -217,8 +285,11 @@ contract Prediction is AccessControl {
             bool userCorrect = vote.prediction == _pendingOutcome[eventId];
             if (userCorrect) {
                 resolvedWinners[eventId]++;
-                uint256 bonus = CORRECT_BONUS;
-                if (!_pendingAiWasRight[eventId]) bonus += BEAT_AI_BONUS;
+                uint256 multiplierBps = voteMultiplierBps[eventId][voters[i]];
+                if (multiplierBps == 0) multiplierBps = 10000; // backward-safe default (Basic)
+                uint256 basePoints = (VOTE_BASE_POINTS * multiplierBps) / 10000;
+                // +100% for correct prediction (x2 on all tiers, incl. Whale).
+                uint256 bonus = basePoints * 2;
                 pointsContract.addPredictionBonus(voters[i], bonus, true);
             } else {
                 pointsContract.addPredictionBonus(voters[i], 0, false);
@@ -232,9 +303,190 @@ contract Prediction is AccessControl {
             evt.resolved = true;
             evt.outcome = _pendingOutcome[eventId];
             resolveInProgress[eventId] = false;
+            _finalizeCreatorPayout(eventId, voters.length, evt.creator, evt.isUserEvent);
             delete _pendingOutcome[eventId];
             delete _pendingAiWasRight[eventId];
             emit EventResolved(eventId, evt.outcome, resolvedWinners[eventId]);
+        }
+    }
+
+    function _safeSend(address recipient, uint256 amount) internal returns (bool) {
+        if (amount == 0 || recipient == address(0)) return true;
+        (bool ok, ) = payable(recipient).call{value: amount}("");
+        return ok;
+    }
+
+    function _distributeVoteFees(address user, uint256 amount) internal {
+        if (amount == 0) return;
+
+        uint256 prizeAmount = (amount * PRIZE_SHARE) / BPS_DENOMINATOR;
+        uint256 treasuryAmount = (amount * TREASURY_SHARE) / BPS_DENOMINATOR;
+        uint256 referralAmount = (amount * REFERRAL_SHARE) / BPS_DENOMINATOR;
+        uint256 burnAmount = (amount * BURN_SHARE) / BPS_DENOMINATOR;
+        uint256 stakingAmount = amount - prizeAmount - treasuryAmount - referralAmount - burnAmount;
+
+        if (!_safeSend(prizePool, prizeAmount)) {
+            _safeSend(treasury, prizeAmount);
+        }
+        if (!_safeSend(treasury, treasuryAmount)) {
+            revert("Treasury transfer failed");
+        }
+        bool referralHandled = false;
+        if (address(referralContract) != address(0) && referralAmount > 0) {
+            try referralContract.hasReferrer(user) returns (bool hasRef) {
+                if (hasRef) {
+                    try referralContract.distributeReferralFees{value: referralAmount}(user, referralAmount) {
+                        referralHandled = true;
+                    } catch {}
+                }
+            } catch {}
+        }
+        if (!referralHandled) {
+            if (!_safeSend(treasury, referralAmount)) {
+                revert("Referral fallback failed");
+            }
+        }
+
+        if (!_safeSend(burnReserve, burnAmount)) {
+            _safeSend(treasury, burnAmount);
+        }
+        if (!_safeSend(stakingRewards, stakingAmount)) {
+            _safeSend(treasury, stakingAmount);
+        }
+        emit ProtocolFeesDistributed(amount, prizeAmount, treasuryAmount, referralAmount, burnAmount, stakingAmount);
+    }
+
+    function distributeProtocolFees() public nonReentrant {
+        require(block.timestamp >= nextProtocolDistributionAt, "Distribution cooldown");
+        uint256 amount = pendingProtocolFeesWei;
+        require(amount > 0, "No protocol fees");
+        pendingProtocolFeesWei = 0;
+        _distributeVoteFees(address(0), amount);
+        nextProtocolDistributionAt = block.timestamp + PROTOCOL_DISTRIBUTION_INTERVAL;
+    }
+
+    function _finalizeCreatorPayout(
+        uint256 eventId,
+        uint256 voterCount,
+        address creator,
+        bool isUserEvent
+    ) internal {
+        if (!isUserEvent || creatorPayoutFinalized[eventId]) return;
+        creatorPayoutFinalized[eventId] = true;
+
+        uint256 pending = creatorPendingByEvent[eventId];
+        creatorPendingByEvent[eventId] = 0;
+        if (pending == 0) return;
+
+        bool eligible = voterCount >= minCreatorPayoutVotes && creator != address(0) && isVerifiedCreator(creator);
+        if (eligible) {
+            creatorClaimableWei[creator] += pending;
+            emit CreatorRewardsAccrued(eventId, creator, pending);
+            return;
+        }
+
+        if (!_safeSend(treasury, pending)) {
+            revert("Redirect failed");
+        }
+        emit CreatorRewardsRedirected(
+            eventId,
+            creator,
+            pending,
+            voterCount < minCreatorPayoutVotes ? "low-participation" : "creator-not-verified"
+        );
+    }
+
+    function claimCreatorFees() external nonReentrant {
+        uint256 amount = creatorClaimableWei[msg.sender];
+        require(amount > 0, "No creator fees");
+        creatorClaimableWei[msg.sender] = 0;
+        require(_safeSend(msg.sender, amount), "Creator withdraw failed");
+        emit CreatorRewardsClaimed(msg.sender, amount);
+    }
+
+    function setCreatorEconomics(
+        uint256 _userEventVoteFee,
+        uint16 _creatorShareBps,
+        uint256 _minCreatorPayoutVotes
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(_creatorShareBps <= BPS_DENOMINATOR, "Bad creator share");
+        require(_minCreatorPayoutVotes > 0 && _minCreatorPayoutVotes <= 10000, "Bad min votes");
+        userEventVoteFee = _userEventVoteFee;
+        creatorShareBps = _creatorShareBps;
+        minCreatorPayoutVotes = _minCreatorPayoutVotes;
+        emit FeeConfigUpdated(_userEventVoteFee, _creatorShareBps, _minCreatorPayoutVotes);
+    }
+
+    function _sqrt(uint256 x) internal pure returns (uint256 y) {
+        if (x == 0) return 0;
+        uint256 z = (x + 1) / 2;
+        y = x;
+        while (z < y) {
+            y = z;
+            z = (x / z + z) / 2;
+        }
+    }
+
+    function _getVoteMultiplierBps(uint256 amount) internal pure returns (uint256) {
+        if (amount == VOTE_BASIC_FEE) return 10000; // 1x
+        if (amount == VOTE_PRO_FEE) return 30000;   // 3x
+        require(amount >= VOTE_WHALE_MIN_FEE, "Invalid vote fee tier");
+        // multiplier = 10 * sqrt(amount / 0.05)
+        // return in bps (1x = 10000 bps)
+        uint256 ratio1e18 = (amount * 1e18) / VOTE_WHALE_MIN_FEE;
+        uint256 sqrtRatio1e9 = _sqrt(ratio1e18); // sqrt(1e18)=1e9
+        uint256 multBps = (100000 * sqrtRatio1e9) / 1e9; // 10x at min whale
+        if (multBps < 100000) multBps = 100000;
+        return multBps;
+    }
+
+    function setFeeReceivers(
+        address _prizePool,
+        address _treasury,
+        address _referralContract,
+        address _burnReserve,
+        address _stakingRewards
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(_prizePool != address(0), "Zero prize");
+        require(_treasury != address(0), "Zero treasury");
+        require(_burnReserve != address(0), "Zero burn");
+        require(_stakingRewards != address(0), "Zero staking");
+        prizePool = _prizePool;
+        treasury = _treasury;
+        referralContract = IReferralPrediction(_referralContract);
+        burnReserve = _burnReserve;
+        stakingRewards = _stakingRewards;
+        emit FeeReceiversUpdated(_prizePool, _treasury, _referralContract, _burnReserve, _stakingRewards);
+    }
+
+    function getCreatorEventPayoutPreview(uint256 eventId)
+        external
+        view
+        returns (
+            uint256 pendingCreatorCut,
+            uint256 voterCount,
+            bool eligibleNow,
+            uint256 requiredVotes
+        )
+    {
+        PredictionEvent memory evt = events[eventId];
+        pendingCreatorCut = creatorPendingByEvent[eventId];
+        voterCount = eventVoters[eventId].length;
+        requiredVotes = minCreatorPayoutVotes;
+        eligibleNow = evt.isUserEvent && evt.creator != address(0) && isVerifiedCreator(evt.creator) && voterCount >= minCreatorPayoutVotes;
+    }
+
+    function getProtocolDistributionState()
+        external
+        view
+        returns (uint256 pendingAmount, uint256 nextAt, uint256 secondsLeft)
+    {
+        pendingAmount = pendingProtocolFeesWei;
+        nextAt = nextProtocolDistributionAt;
+        if (block.timestamp >= nextAt) {
+            secondsLeft = 0;
+        } else {
+            secondsLeft = nextAt - block.timestamp;
         }
     }
 
@@ -261,4 +513,6 @@ contract Prediction is AccessControl {
         }
         return result;
     }
+
+    receive() external payable {}
 }

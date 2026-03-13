@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useAccount, useWriteContract, useWaitForTransactionReceipt, useReadContract } from "wagmi";
 import { formatEther, parseEther } from "viem";
 import { motion, AnimatePresence } from "framer-motion";
@@ -10,6 +10,7 @@ import { useContractAddresses } from "@/hooks/useContracts";
 import { CheckInABI, PointsABI, PredictionABI } from "@/lib/contracts";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
+import { formatInOffset, getEffectiveOffsetMinutes, useTimezone } from "@/lib/timezone";
 import AppIcon from "@/components/icons/AppIcon";
 
 const CAT_KEYS = ["ALL", "SPORTS", "POLITICS", "ECONOMY", "CRYPTO", "CLIMATE"];
@@ -27,10 +28,23 @@ const CHECKIN_TIERS = [
   { key: "pro", amount: "0.01", pts: "300", color: "text-neon-cyan" },
   { key: "whale", amount: "0.05", pts: "1000", color: "text-neon-gold" },
 ];
+const VOTE_TIERS = {
+  basic: "0.00015",
+  pro: "0.005",
+  whaleMin: "0.05",
+} as const;
 const USER_EVENT_CATEGORIES = ["SPORTS", "POLITICS", "ECONOMY", "CRYPTO", "CLIMATE"] as const;
 const USER_EVENT_SOURCES = ["official", "market", "newswire", "oracle"] as const;
 
-function CountdownTimer({ deadline }: { deadline: string }) {
+function formatSeconds(total: number) {
+  const sec = Math.max(0, Math.floor(total));
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
+function CountdownTimer({ deadline, compact = false }: { deadline: string; compact?: boolean }) {
   const [timeLeft, setTimeLeft] = useState("");
 
   useEffect(() => {
@@ -55,7 +69,7 @@ function CountdownTimer({ deadline }: { deadline: string }) {
     new Date(deadline).getTime() - Date.now() > 0;
 
   return (
-    <span className={`font-mono text-xs ${isUrgent ? "text-neon-red animate-pulse" : "text-neon-gold"}`}>
+    <span className={`font-mono ${compact ? "text-[11px]" : "text-xs"} ${isUrgent ? "text-neon-red animate-pulse" : "text-neon-gold"}`}>
       {timeLeft}
     </span>
   );
@@ -89,20 +103,85 @@ export default function PredictionsPage() {
   const [loading, setLoading] = useState(true);
   const [schedulerInfo, setSchedulerInfo] = useState<any>(null);
   const [votedPredictions, setVotedPredictions] = useState<any[]>([]);
+  const [referralCode, setReferralCode] = useState("");
+  const [lastSubmittedVote, setLastSubmittedVote] = useState<{ eventId: number; prediction: boolean } | null>(null);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
   const requestSeqRef = useRef(0);
+  const predictionsRef = useRef<any[]>([]);
 
   const { t, locale } = useI18n();
+  const { mode: tzMode, fixedOffsetMinutes } = useTimezone();
+  const userOffsetMinutes = getEffectiveOffsetMinutes(tzMode, fixedOffsetMinutes);
   const tr = useCallback((key: string, fallback: string) => {
     const translated = t(key);
     return translated === key ? fallback : translated;
   }, [t]);
+  const localizeUserCreateMessage = useCallback((raw: string, kind: "error" | "warning" = "error") => {
+    const message = String(raw || "").trim();
+    const lower = message.toLowerCase();
+    if (!message) {
+      return kind === "warning"
+        ? tr("predictions.userCreateQualityHint", "Improve question clarity")
+        : tr("predictions.userCreateFailed", "Failed to create user event");
+    }
+
+    if (kind === "warning") {
+      if (lower.includes("question should end with")) {
+        return tr("predictions.userCreateWarnQuestionMark", "Question should end with '?' for clarity.");
+      }
+      if (lower.includes("clear binary wording")) {
+        return tr("predictions.userCreateWarnBinaryWording", "Use clear YES/NO wording.");
+      }
+      return message;
+    }
+
+    if (lower.includes("title must be")) {
+      return tr("predictions.userCreateErrTitleLength", "Title must be between 12 and 180 characters.");
+    }
+    if (lower.includes("unsupported category")) {
+      return tr("predictions.userCreateErrCategory", "Unsupported category.");
+    }
+    if (lower.includes("unsupported source policy")) {
+      return tr("predictions.userCreateErrSource", "Unsupported source policy.");
+    }
+    if (lower.includes("invalid deadline")) {
+      return tr("predictions.userCreateErrDeadline", "Invalid deadline.");
+    }
+    if (lower.includes("deadline must be in")) {
+      return tr("predictions.userCreateErrDeadlineRange", "Deadline must be within 10 minutes to 14 days.");
+    }
+    if (lower.includes("duplicate active event")) {
+      return tr("predictions.userCreateErrDuplicate", "A similar active event already exists.");
+    }
+    if (lower.includes("cooldown active")) {
+      return tr("predictions.cooldownActive", "Cooldown is active. Try later.");
+    }
+    if (lower.includes("not a prediction about a binary event")
+      || lower.includes("not binary")
+      || lower.includes("non-binary")
+      || lower.includes("vague question")) {
+      return tr("predictions.userCreateErrBinary", "Question is not clearly binary (YES/NO). Clarify conditions and deadline.");
+    }
+    if (lower.includes("requires clarification") || lower.includes("too vague") || lower.includes("unclear")) {
+      return tr("predictions.userCreateErrClarify", "Question is too vague. Add measurable condition and clear deadline.");
+    }
+    if (lower.includes("ai validation rejected")) {
+      return tr("predictions.userCreateErrAiRejected", "AI validation rejected this event. Please rephrase.");
+    }
+    if (lower.includes("question is in ")) {
+      return tr("predictions.userCreateErrLanguage", "Language detected. Please keep the question clear and binary (YES/NO).");
+    }
+
+    return message;
+  }, [tr]);
   const predictionAddress = addresses?.Prediction as `0x${string}` | undefined;
   const checkInAddress = addresses?.CheckIn as `0x${string}` | undefined;
   const pointsAddress = addresses?.Points as `0x${string}` | undefined;
   const [checkInModalOpen, setCheckInModalOpen] = useState(false);
   const [selectedTier, setSelectedTier] = useState(0);
   const [pendingVote, setPendingVote] = useState<{ eventId: number; prediction: boolean } | null>(null);
+  const [voteTier, setVoteTier] = useState<"basic" | "pro" | "whale">("basic");
+  const [whaleVoteAmount, setWhaleVoteAmount] = useState("0.05");
   const [createOpen, setCreateOpen] = useState(false);
   const [creatingEvent, setCreatingEvent] = useState(false);
   const [expectedCreatedEventId, setExpectedCreatedEventId] = useState<number | null>(null);
@@ -124,6 +203,8 @@ export default function PredictionsPage() {
     query: { enabled: !!address && !!pointsAddress },
   });
   const up = userPoints as any;
+  const lastCheckIn = Number(up?.lastCheckIn ?? up?.[3] ?? 0);
+  const checkedToday = Math.floor(lastCheckIn / 86400) === Math.floor(Date.now() / 1000 / 86400);
   const { data: userEventFeeRaw } = useReadContract({
     address: predictionAddress,
     abi: PredictionABI,
@@ -167,6 +248,8 @@ export default function PredictionsPage() {
   const userEventFeeDisplay = Number(formatEther(userEventFeeWei)).toFixed(4);
   const nextUserEventAt = Number(nextUserEventAtRaw ?? BigInt(0));
   const cooldownSeconds = Math.max(0, nextUserEventAt - Math.floor(Date.now() / 1000));
+  const nextCreateAtText =
+    nextUserEventAt > 0 ? formatInOffset(nextUserEventAt * 1000, userOffsetMinutes) : "";
   const isVerifiedCreator = Boolean(isVerifiedCreatorRaw);
   const creatorCooldownHours = Math.round(Number(creatorCooldownRaw ?? BigInt(86400)) / 3600);
   const verifiedMinPoints = Number(verifiedMinPointsRaw ?? BigInt(5000));
@@ -177,25 +260,81 @@ export default function PredictionsPage() {
   const { isLoading: isCheckInConfirming, isSuccess: isCheckInSuccess } = useWaitForTransactionReceipt({ hash: checkInHash });
   const { writeContract: writeCreateEvent, data: createHash, isPending: isCreatePending } = useWriteContract();
   const { isSuccess: isCreateSuccess } = useWaitForTransactionReceipt({ hash: createHash });
+  const selectedVoteFeeWei = useMemo(() => {
+    try {
+      if (voteTier === "basic") return parseEther(VOTE_TIERS.basic);
+      if (voteTier === "pro") return parseEther(VOTE_TIERS.pro);
+      const amount = Number(whaleVoteAmount || "0");
+      if (!Number.isFinite(amount) || amount < Number(VOTE_TIERS.whaleMin)) return null;
+      return parseEther(String(amount));
+    } catch {
+      return null;
+    }
+  }, [voteTier, whaleVoteAmount]);
+  const voteTierMultiplier = useMemo(() => {
+    const whaleAmount = Number(whaleVoteAmount || "0");
+    if (voteTier === "basic") return 1;
+    if (voteTier === "pro") return 3;
+    if (!Number.isFinite(whaleAmount) || whaleAmount < Number(VOTE_TIERS.whaleMin)) return 0;
+    return 10 * Math.sqrt(whaleAmount / Number(VOTE_TIERS.whaleMin));
+  }, [voteTier, whaleVoteAmount]);
+  const expectedPointsCorrect = useMemo(() => {
+    if (voteTierMultiplier <= 0) return 0;
+    return Math.max(0, Math.floor(50 * voteTierMultiplier * 2));
+  }, [voteTierMultiplier]);
+  const expectedPointsBase = useMemo(() => {
+    if (voteTierMultiplier <= 0) return 0;
+    return Math.max(0, Math.floor(50 * voteTierMultiplier));
+  }, [voteTierMultiplier]);
+  const voteButtonRewardHint = useMemo(() => {
+    const msg = t("predictions.voteButtonRewardHint", { points: expectedPointsCorrect });
+    if (msg === "predictions.voteButtonRewardHint") {
+      return `+${expectedPointsCorrect} ${t("common.pts")} if correct`;
+    }
+    return msg;
+  }, [t, expectedPointsCorrect]);
 
   const loadPredictions = useCallback(async (lang?: string) => {
     const seq = ++requestSeqRef.current;
     const requestedLang = lang ?? locale;
     try {
       const [activeRes, resolvedRes] = await Promise.all([
-        api.getPredictions(requestedLang),
-        api.getResolvedPredictions(requestedLang),
+        api.getPredictions(requestedLang, address),
+        api.getResolvedPredictions(requestedLang, address),
       ]);
       if (seq !== requestSeqRef.current) return;
       const active = activeRes.success ? activeRes.data || [] : [];
       const resolved = resolvedRes.success ? resolvedRes.data || [] : [];
-      setPredictions([
+      const next = [
         ...active.map((p: any) => ({ ...p, _status: "active" })),
         ...resolved.map((p: any) => ({ ...p, _status: "resolved" })),
-      ]);
+      ];
+      // Preserve local vote state until backend poll/index catches up.
+      const localById = new Map(predictionsRef.current.map((p) => [Number(p.eventId), p]));
+      const merged = next.map((row) => {
+        const local = localById.get(Number(row.eventId));
+        if (!local) return row;
+        const withLocalVote =
+          typeof local.userPrediction === "boolean"
+            ? {
+                ...row,
+                userPrediction: local.userPrediction,
+                userCorrect: local.userCorrect,
+                aiWasRight: local.aiWasRight,
+                beatAi: local.beatAi,
+                rewardPoints: local.rewardPoints,
+              }
+            : row;
+        return {
+          ...withLocalVote,
+          totalVotesYes: Math.max(Number(withLocalVote.totalVotesYes || 0), Number(local.totalVotesYes || 0)),
+          totalVotesNo: Math.max(Number(withLocalVote.totalVotesNo || 0), Number(local.totalVotesNo || 0)),
+        };
+      });
+      setPredictions(merged);
     } catch {}
     if (seq === requestSeqRef.current) setLoading(false);
-  }, [locale]);
+  }, [locale, address]);
 
   const loadSchedulerStatus = useCallback(async () => {
     try {
@@ -232,12 +371,53 @@ export default function PredictionsPage() {
   }, [loadPredictions, loadSchedulerStatus, loadVotedPredictions, locale, address]);
 
   useEffect(() => {
+    predictionsRef.current = predictions;
+  }, [predictions]);
+
+  useEffect(() => {
+    if (!address) {
+      setReferralCode("");
+      return;
+    }
+    api.getReferralCode(address)
+      .then((res) => {
+        if (res?.success) setReferralCode(String(res?.data?.code || ""));
+      })
+      .catch(() => {});
+  }, [address]);
+
+  useEffect(() => {
     if (isVoteSuccess && voteHash && voteHandledRef.current !== voteHash) {
       voteHandledRef.current = voteHash;
       toast.success(t("predictions.submitted"));
+      if (lastSubmittedVote) {
+        const { eventId, prediction } = lastSubmittedVote;
+        setPredictions((prev) =>
+          prev.map((p) => {
+            if (Number(p.eventId) !== Number(eventId)) return p;
+            if (typeof p.userPrediction === "boolean") return p;
+            return {
+              ...p,
+              userPrediction: prediction,
+              totalVotesYes: Number(p.totalVotesYes || 0) + (prediction ? 1 : 0),
+              totalVotesNo: Number(p.totalVotesNo || 0) + (!prediction ? 1 : 0),
+            };
+          })
+        );
+        setVotedPredictions((prev) => {
+          const exists = prev.some((p) => Number(p.eventId) === Number(eventId));
+          if (exists) return prev;
+          const src = predictionsRef.current.find((p) => Number(p.eventId) === Number(eventId));
+          if (!src) return prev;
+          return [{ ...src, userPrediction: prediction }, ...prev];
+        });
+      }
+      if (address) {
+        void loadVotedPredictions(address);
+      }
       loadPredictions();
     }
-  }, [isVoteSuccess, voteHash, loadPredictions, t]);
+  }, [isVoteSuccess, voteHash, loadPredictions, loadVotedPredictions, t, lastSubmittedVote, address]);
 
   useEffect(() => {
     if (!isCheckInSuccess || !checkInHash || checkInHandledRef.current === checkInHash) return;
@@ -250,10 +430,12 @@ export default function PredictionsPage() {
         abi: PredictionABI,
         functionName: "submitPrediction",
         args: [BigInt(pendingVote.eventId), pendingVote.prediction],
+        value: selectedVoteFeeWei ?? undefined,
       });
+      setLastSubmittedVote({ eventId: pendingVote.eventId, prediction: pendingVote.prediction });
       setPendingVote(null);
     }
-  }, [isCheckInSuccess, checkInHash, pendingVote, predictionAddress, tr, writeVote]);
+  }, [isCheckInSuccess, checkInHash, pendingVote, predictionAddress, selectedVoteFeeWei, tr, writeVote]);
 
   useEffect(() => {
     if (!isCreateSuccess || !createHash || createHandledRef.current === createHash) return;
@@ -275,12 +457,29 @@ export default function PredictionsPage() {
       toast.error(t("predictions.contractsNotLoaded"));
       return;
     }
-    const lastCheckIn = Number(up?.lastCheckIn ?? up?.[3] ?? 0);
-    const checkedToday = Math.floor(lastCheckIn / 86400) === Math.floor(Date.now() / 1000 / 86400);
     if (!checkedToday) {
       setPendingVote({ eventId, prediction });
       setCheckInModalOpen(true);
       toast.error(tr("predictions.checkInRequiredToast", "Complete today's check-in before voting"));
+      return;
+    }
+    const target = predictions.find((p) => Number(p.eventId) === Number(eventId));
+    if (typeof target?.userPrediction === "boolean") {
+      toast.error(tr("predictions.alreadyVoted", "You already voted on this event"));
+      return;
+    }
+    const isUserEvent = Boolean(target?.isUserEvent);
+    const isOwnUserEvent = Boolean(
+      isUserEvent
+      && address
+      && String(target?.creator || "").toLowerCase() === address.toLowerCase()
+    );
+    if (isOwnUserEvent) {
+      toast.error(tr("predictions.creatorCannotVoteOwn", "You cannot vote on your own event"));
+      return;
+    }
+    if (!selectedVoteFeeWei) {
+      toast.error(tr("predictions.invalidVoteFee", "Invalid vote fee amount"));
       return;
     }
     writeVote({
@@ -288,12 +487,18 @@ export default function PredictionsPage() {
       abi: PredictionABI,
       functionName: "submitPrediction",
       args: [BigInt(eventId), prediction],
+      value: selectedVoteFeeWei,
     });
+    setLastSubmittedVote({ eventId, prediction });
   };
 
   const handleCheckInFromModal = () => {
     if (!checkInAddress) {
       toast.error(t("predictions.contractsNotLoaded"));
+      return;
+    }
+    if (checkedToday) {
+      toast(tr("predictions.checkInAlreadyToday", "You already completed check-in today"));
       return;
     }
     writeCheckIn({
@@ -310,7 +515,7 @@ export default function PredictionsPage() {
       return;
     }
     if (cooldownSeconds > 0) {
-      toast.error(tr("predictions.cooldownActive", "Cooldown is active. Try later."));
+      toast.error(`${tr("predictions.cooldownActive", "Cooldown is active.")} ${tr("predictions.nextCreateIn", "Next event in")} ${formatSeconds(cooldownSeconds)}`);
       return;
     }
 
@@ -329,24 +534,30 @@ export default function PredictionsPage() {
         category: newEvent.category,
         deadlineMs,
         sourcePolicy: newEvent.sourcePolicy,
+        creator: address,
       });
       if (!validation?.success) {
+        const left = Number(validation?.data?.secondsLeft || 0);
+        if (left > 0) {
+          throw new Error(`${tr("predictions.cooldownActive", "Cooldown is active.")} ${tr("predictions.nextCreateIn", "Next event in")} ${formatSeconds(left)}`);
+        }
         throw new Error(validation?.error || "Validation failed");
       }
 
       const warnings = validation?.data?.qualityWarnings || [];
       if (warnings.length) {
-        toast((warnings[0] as string) || tr("predictions.userCreateQualityHint", "Improve question clarity"));
+        toast(localizeUserCreateMessage((warnings[0] as string) || "", "warning"));
       }
 
       const currentEventCount = Number(eventCountRaw ?? BigInt(0));
       setExpectedCreatedEventId(currentEventCount + 1);
+      const titleForChain = String(validation?.data?.normalizedTitleAi || title).trim().slice(0, 180) || title;
       writeCreateEvent({
         address: predictionAddress,
         abi: PredictionABI,
         functionName: "createUserEvent",
         args: [
-          title,
+          titleForChain,
           categoryIdx,
           BigInt(Math.floor(deadlineMs / 1000)),
           newEvent.sourcePolicy,
@@ -356,12 +567,86 @@ export default function PredictionsPage() {
     } catch (err: any) {
       setCreatingEvent(false);
       setExpectedCreatedEventId(null);
-      toast.error(err?.message || tr("predictions.userCreateFailed", "Failed to create user event"));
+      toast.error(localizeUserCreateMessage(err?.message || tr("predictions.userCreateFailed", "Failed to create user event"), "error"));
     }
   };
 
-  const activePredictions = predictions.filter((p) => p._status === "active");
-  const resolvedPredictions = predictions.filter((p) => p._status === "resolved");
+  const buildEventShareLink = useCallback((pred: any, source: "telegram" | "x" | "discord" | "copy") => {
+    if (typeof window === "undefined") return "";
+    const eventId = Number(pred?.eventId || 0);
+    const category = String(pred?.category || "general").toLowerCase();
+    const params = new URLSearchParams({
+      eventId: String(eventId),
+      utm_source: source,
+      utm_medium: "social",
+      utm_campaign: `event_share_${category}`,
+      utm_content: `event_${eventId}`,
+    });
+    if (referralCode) params.set("ref", referralCode);
+    return `${window.location.origin}/predictions?${params.toString()}`;
+  }, [referralCode]);
+
+  const shareEvent = useCallback((platform: "telegram" | "x" | "discord", pred: any) => {
+    if (!isConnected || !referralCode) {
+      toast.error(tr("predictions.connectToShareRef", "Connect wallet to share with your referral link"));
+      return;
+    }
+    const link = buildEventShareLink(pred, platform);
+    const text = `${pred?.title || tr("predictions.title", "Predictions")} — ${tr("predictions.shareInvite", "Predict with AI on OracleAI Predict")}`;
+    const payload = `${text} ${link}`.trim();
+    if (platform === "telegram") {
+      window.open(`https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+      return;
+    }
+    if (platform === "x") {
+      window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(payload)}`, "_blank", "noopener,noreferrer");
+      return;
+    }
+    navigator.clipboard.writeText(payload).then(() => {
+      toast.success(tr("predictions.discordCopied", "Share text copied for Discord"));
+      window.open("https://discord.com/channels/@me", "_blank", "noopener,noreferrer");
+    }).catch(() => {
+      toast.error(tr("predictions.discordCopyFailed", "Failed to copy Discord share text"));
+    });
+  }, [isConnected, referralCode, buildEventShareLink, tr]);
+
+  const copyEventLink = useCallback((pred: any) => {
+    if (!isConnected || !referralCode) {
+      toast.error(tr("predictions.connectToShareRef", "Connect wallet to share with your referral link"));
+      return;
+    }
+    const link = buildEventShareLink(pred, "copy");
+    navigator.clipboard.writeText(link).then(() => {
+      toast.success(tr("predictions.shareLinkCopied", "Referral link copied"));
+    }).catch(() => {
+      toast.error(tr("predictions.shareLinkCopyFailed", "Failed to copy referral link"));
+    });
+  }, [isConnected, referralCode, buildEventShareLink, tr]);
+
+  const votedByEventId = useMemo(() => {
+    const map = new Map<number, any>();
+    for (const row of votedPredictions) {
+      const id = Number(row?.eventId || 0);
+      if (id > 0) map.set(id, row);
+    }
+    return map;
+  }, [votedPredictions]);
+
+  const attachVoteMeta = useCallback((pred: any) => {
+    const vote = votedByEventId.get(Number(pred?.eventId || 0));
+    if (!vote) return pred;
+    return {
+      ...pred,
+      userPrediction: vote.userPrediction,
+      userCorrect: vote.userCorrect,
+      aiWasRight: vote.aiWasRight,
+      beatAi: vote.beatAi,
+      rewardPoints: vote.rewardPoints,
+    };
+  }, [votedByEventId]);
+
+  const activePredictions = predictions.filter((p) => p._status === "active").map(attachVoteMeta);
+  const resolvedPredictions = predictions.filter((p) => p._status === "resolved").map(attachVoteMeta);
   const displayList =
     activeTab === "active"
       ? activePredictions
@@ -376,35 +661,40 @@ export default function PredictionsPage() {
     return Boolean(p.isUserEvent);
   });
 
+  const formatUserTime = useCallback(
+    (iso: string) => formatInOffset(iso, userOffsetMinutes),
+    [userOffsetMinutes]
+  );
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Points info banner */}
-      <div className="glass rounded-xl p-4 border border-neon-purple/20 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+      <div className="glass rounded-xl p-3.5 sm:p-4 border border-neon-purple/20 flex flex-col sm:flex-row items-start sm:items-center gap-3">
         <span className="text-2xl"><AppIcon name="brain" className="w-7 h-7 text-neon-cyan" /></span>
         <div className="flex-1">
-          <p suppressHydrationWarning className="text-sm text-gray-200">
+          <p suppressHydrationWarning className="text-xs sm:text-sm text-gray-200">
             <strong suppressHydrationWarning className="text-neon-cyan">{t("predictions.howVoting")}</strong> {t("predictions.clickAgree")}
             <span className="text-neon-green font-bold"> {t("predictions.agree")}</span> {t("predictions.orDisagree")}
-            <span className="text-neon-red font-bold"> {t("predictions.disagree")}</span>.
+            <span className="text-neon-red font-bold"> {t("predictions.disagree")}</span>.{" "}
             {t("predictions.correctReward")}.
             <span className="text-neon-gold font-bold"> {t("predictions.beatAi")}</span>
           </p>
+          <p className="text-xs text-gray-500 mt-1">{tr("predictions.voteFeeFormulaSummary", "Vote points: Basic x1 (0.00015), Pro x3 (0.005), Whale 10*sqrt(amount/0.05). Correct prediction gives +100% bonus (x2).")}</p>
           <p className="text-xs text-gray-500 mt-1">{t("predictions.autoResolve")}</p>
         </div>
       </div>
 
       {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 sm:gap-3">
         <div>
-          <h1 className="text-3xl font-heading font-bold">
-            <span className="gradient-cyan">AI</span>{" "}
+          <h1 className="text-[1.7rem] sm:text-3xl font-heading font-bold">
             <span className="text-white">{t("predictions.title")}</span>
           </h1>
           <p className="text-gray-400 text-sm mt-1">{t("predictions.subtitle")}</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {/* Scheduler Status Badge */}
-          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-dark-700 border border-dark-500 text-xs">
+          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-dark-700 border border-dark-500 text-xs w-fit">
             <span className="w-2 h-2 rounded-full bg-neon-green animate-pulse" />
             <span className="text-gray-400">{t("predictions.autoCycle")}</span>
             <span className="text-neon-cyan font-mono">{activePredictions.length} {t("common.active")}</span>
@@ -413,8 +703,8 @@ export default function PredictionsPage() {
       </div>
 
       {/* Active / Resolved Tabs */}
-      <GlassCard className="space-y-3" glow="purple" hover={false}>
-        <div className="flex items-center justify-between gap-3">
+      <GlassCard className="space-y-3 p-3.5 sm:p-6" glow="purple" hover={false}>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h3 className="text-base font-semibold text-white">
               {tr("predictions.userCreateTitle", "Create your own event")}
@@ -441,27 +731,28 @@ export default function PredictionsPage() {
           </div>
           <button
             onClick={() => setCreateOpen((v) => !v)}
-            className="px-4 py-2 rounded-xl bg-neon-purple/20 border border-neon-purple/40 text-neon-purple text-sm font-bold"
+            className="min-h-11 px-4 py-2 rounded-xl bg-neon-purple/20 border border-neon-purple/40 text-neon-purple text-sm font-bold w-full sm:w-auto"
           >
             {createOpen ? tr("common.close", "Close") : tr("predictions.openCreate", "Create Event")}
           </button>
         </div>
         {cooldownSeconds > 0 && (
           <p className="text-xs text-neon-gold">
-            {tr("predictions.nextCreateIn", "Next event in")} {Math.ceil(cooldownSeconds / 3600)}h
+            {tr("predictions.nextCreateIn", "Next event in")} {formatSeconds(cooldownSeconds)}
+            {nextCreateAtText ? ` (${nextCreateAtText})` : ""}
           </p>
         )}
         {createOpen && (
-          <div className="grid md:grid-cols-2 gap-3">
+          <div className="grid md:grid-cols-2 gap-2.5 sm:gap-3">
             <input
-              className="bg-dark-700 border border-dark-500 rounded-xl px-3 py-2 text-sm text-white"
+              className="bg-dark-700 border border-dark-500 rounded-xl px-3 py-2.5 text-sm text-white min-h-11"
               placeholder={tr("predictions.userCreateTitleInput", "Will BTC close above 80k by Friday?")}
               value={newEvent.title}
               onChange={(e) => setNewEvent((p) => ({ ...p, title: e.target.value }))}
               maxLength={180}
             />
             <select
-              className="bg-dark-700 border border-dark-500 rounded-xl px-3 py-2 text-sm text-white"
+              className="bg-dark-700 border border-dark-500 rounded-xl px-3 py-2.5 text-sm text-white min-h-11"
               value={newEvent.category}
               onChange={(e) => setNewEvent((p) => ({ ...p, category: e.target.value }))}
             >
@@ -470,7 +761,7 @@ export default function PredictionsPage() {
               ))}
             </select>
             <select
-              className="bg-dark-700 border border-dark-500 rounded-xl px-3 py-2 text-sm text-white"
+              className="bg-dark-700 border border-dark-500 rounded-xl px-3 py-2.5 text-sm text-white min-h-11"
               value={newEvent.hoursToDeadline}
               onChange={(e) => setNewEvent((p) => ({ ...p, hoursToDeadline: Number(e.target.value) }))}
             >
@@ -479,7 +770,7 @@ export default function PredictionsPage() {
               ))}
             </select>
             <select
-              className="bg-dark-700 border border-dark-500 rounded-xl px-3 py-2 text-sm text-white"
+              className="bg-dark-700 border border-dark-500 rounded-xl px-3 py-2.5 text-sm text-white min-h-11"
               value={newEvent.sourcePolicy}
               onChange={(e) => setNewEvent((p) => ({ ...p, sourcePolicy: e.target.value }))}
             >
@@ -491,7 +782,7 @@ export default function PredictionsPage() {
               <button
                 onClick={handleCreateUserEvent}
                 disabled={creatingEvent || isCreatePending || cooldownSeconds > 0}
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-neon-cyan to-neon-purple text-dark-900 font-bold disabled:opacity-50"
+                className="w-full min-h-11 py-3 rounded-xl bg-gradient-to-r from-neon-cyan to-neon-purple text-dark-900 font-bold disabled:opacity-50"
               >
                 {creatingEvent || isCreatePending
                   ? tr("predictions.creatingEvent", "Creating...")
@@ -505,10 +796,10 @@ export default function PredictionsPage() {
       </GlassCard>
 
       {/* Active / Resolved Tabs */}
-      <div className="flex gap-2">
+      <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
         <button
           onClick={() => setActiveTab("active")}
-          className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${
+          className={`shrink-0 min-h-11 px-4 sm:px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${
             activeTab === "active"
               ? "bg-neon-green/20 text-neon-green border border-neon-green/30"
               : "bg-dark-700 text-gray-400 border border-dark-500"
@@ -518,7 +809,7 @@ export default function PredictionsPage() {
         </button>
         <button
           onClick={() => setActiveTab("resolved")}
-          className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${
+          className={`shrink-0 min-h-11 px-4 sm:px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${
             activeTab === "resolved"
               ? "bg-neon-purple/20 text-neon-purple border border-neon-purple/30"
               : "bg-dark-700 text-gray-400 border border-dark-500"
@@ -528,7 +819,7 @@ export default function PredictionsPage() {
         </button>
         <button
           onClick={() => setActiveTab("voted")}
-          className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${
+          className={`shrink-0 min-h-11 px-4 sm:px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${
             activeTab === "voted"
               ? "bg-neon-cyan/20 text-neon-cyan border border-neon-cyan/30"
               : "bg-dark-700 text-gray-400 border border-dark-500"
@@ -538,8 +829,66 @@ export default function PredictionsPage() {
         </button>
       </div>
 
+      <GlassCard className="space-y-2 p-3" glow="cyan" hover={false}>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-gray-400">{tr("predictions.voteFeeTier", "Vote fee tier")}:</span>
+          {(["basic", "pro", "whale"] as const).map((tier) => (
+            <button
+              key={tier}
+              onClick={() => setVoteTier(tier)}
+              className={`px-3 py-1.5 rounded-lg text-xs border transition ${
+                voteTier === tier
+                  ? "border-neon-cyan bg-neon-cyan/15 text-neon-cyan"
+                  : "border-dark-500 bg-dark-700 text-gray-300"
+              }`}
+            >
+              {tier.toUpperCase()}
+            </button>
+          ))}
+          <span className="text-xs font-mono text-neon-gold">
+            {tr("predictions.currentVoteFee", "Current vote fee")}:{" "}
+            {voteTier === "basic" ? VOTE_TIERS.basic : voteTier === "pro" ? VOTE_TIERS.pro : whaleVoteAmount} BNB
+          </span>
+        </div>
+        {voteTier === "whale" && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-gray-400">{tr("predictions.whaleAmount", "Whale amount")}:</span>
+            <input
+              value={whaleVoteAmount}
+              onChange={(e) => setWhaleVoteAmount(e.target.value)}
+              className="bg-dark-700 border border-dark-500 rounded-lg px-2 py-1.5 text-xs text-white w-32"
+              placeholder="0.05"
+            />
+            <span className="text-[11px] text-gray-500">
+              {tr("predictions.whaleAmountHint", "Minimum 0.05 BNB. Any higher amount is allowed.")}
+            </span>
+          </div>
+        )}
+        <div className="rounded-lg border border-neon-cyan/20 bg-neon-cyan/5 px-2.5 py-2 text-xs">
+          <div className="flex flex-wrap items-center gap-3 text-gray-300">
+            <span>
+              {tr("predictions.voteMultiplier", "Multiplier")}:{" "}
+              <span className="font-mono text-neon-cyan">{voteTierMultiplier.toFixed(2)}x</span>
+            </span>
+            <span>
+              {tr("predictions.expectedPointsIfCorrect", "If correct")}:{" "}
+              <span className="font-mono text-neon-gold">+{expectedPointsCorrect} {t("common.pts")}</span>
+            </span>
+            <span>
+              {tr("predictions.pointsIfWrong", "If wrong")}:{" "}
+              <span className="font-mono text-gray-400">+0 {t("common.pts")}</span>
+            </span>
+          </div>
+          <div className="mt-1 text-[11px] text-gray-500">
+            {tr("predictions.votePointsCalculator", "Base points = 50 x multiplier. Correct prediction gives +100% bonus (x2).")}
+            {voteTier === "whale" ? ` ${tr("predictions.whaleFormulaLabel", "Whale multiplier: 10 x sqrt(amount / 0.05).")}` : ""}
+            {expectedPointsBase > 0 ? ` ${tr("predictions.basePointsLabel", "Base")}: ${expectedPointsBase} ${t("common.pts")}.` : ""}
+          </div>
+        </div>
+      </GlassCard>
+
       {/* Category Tabs */}
-      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+      <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
         {CAT_KEYS.map((cat) => (
           <button
             key={cat}
@@ -555,12 +904,12 @@ export default function PredictionsPage() {
         ))}
       </div>
 
-      <div className="flex gap-2">
+      <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
         {(["ALL", "AI", "USER"] as const).map((src) => (
           <button
             key={src}
             onClick={() => setSourceFilter(src)}
-            className={`px-3 py-2 rounded-xl text-xs font-semibold transition ${
+            className={`shrink-0 min-h-10 px-3 py-2 rounded-xl text-xs font-semibold transition ${
               sourceFilter === src
                 ? "bg-neon-purple/20 border border-neon-purple/40 text-neon-purple"
                 : "bg-dark-700 border border-dark-500 text-gray-400"
@@ -597,12 +946,23 @@ export default function PredictionsPage() {
           </p>
         </GlassCard>
       ) : (
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           <AnimatePresence mode="popLayout">
             {filtered.map((pred, i) => {
               const deadline = new Date(pred.deadline);
               const isExpired = deadline < new Date();
               const totalVotes = (pred.totalVotesYes || 0) + (pred.totalVotesNo || 0);
+              const startTimeIso =
+                pred.eventStartAtUtc ||
+                pred.expectedResolveAtUtc ||
+                pred.verifyAfter ||
+                pred.deadline ||
+                "";
+              const isOwnUserEvent = Boolean(
+                pred.isUserEvent
+                && address
+                && String(pred.creator || "").toLowerCase() === address.toLowerCase()
+              );
 
               return (
                 <motion.div
@@ -634,7 +994,7 @@ export default function PredictionsPage() {
                     )}
 
                     {/* Category + Countdown */}
-                    <div className="flex items-center justify-between mb-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                       <span className="text-xs px-2 py-1 rounded-full bg-dark-600 text-gray-400">
                         <span className="inline-flex items-center gap-1"><AppIcon name={CAT_ICONS[pred.category]} className="w-3.5 h-3.5" /> {t(`categories.${pred.category}`)}</span>
                       </span>
@@ -643,9 +1003,7 @@ export default function PredictionsPage() {
                           {tr("predictions.userEventBadge", "User Event")}
                         </span>
                       )}
-                      {!pred.resolved && !isExpired && (
-                        <CountdownTimer deadline={pred.deadline} />
-                      )}
+                      {!pred.resolved && !isExpired && <CountdownTimer deadline={pred.deadline} />}
                       {!pred.resolved && isExpired && (
                         <span className="text-xs text-neon-gold animate-pulse font-mono">
                           ⏳ {t("predictions.resolving")}
@@ -654,7 +1012,7 @@ export default function PredictionsPage() {
                     </div>
 
                     {/* Title */}
-                    <h3 className="text-sm font-medium text-gray-100 mb-3 leading-snug min-h-[2.5rem] pr-6">
+                    <h3 className="text-sm font-medium text-gray-100 mb-3 leading-snug pr-2">
                       {pred.title}
                     </h3>
 
@@ -662,6 +1020,77 @@ export default function PredictionsPage() {
                     {pred.description && (
                       <ExpandableDesc text={pred.description} />
                     )}
+
+                    {/* Timing details in user UTC */}
+                    <div className="mb-3 rounded-xl border border-neon-cyan/20 bg-gradient-to-br from-dark-700/80 to-dark-800/80 p-2.5">
+                      <div className="grid grid-cols-1 gap-1.5">
+                        <div className="flex items-center justify-between rounded-lg border border-dark-500/60 bg-dark-800/60 px-2 py-1.5 text-[11px]">
+                          <span className="inline-flex items-center gap-1 text-gray-400">
+                            <AppIcon name="history" className="h-3.5 w-3.5" />
+                            {tr("predictions.eventStartsAt", "Event starts at")}
+                          </span>
+                          <span className="font-mono text-gray-300">
+                            {startTimeIso
+                              ? formatUserTime(startTimeIso)
+                              : tr("predictions.eventStartTbd", "TBD")}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between rounded-lg border border-dark-500/60 bg-dark-800/60 px-2 py-1.5 text-[11px]">
+                          <span className="inline-flex items-center gap-1 text-gray-400">
+                            <AppIcon name="hourglass" className="h-3.5 w-3.5" />
+                            {tr("predictions.voteClosesAt", "Voting closes at")}
+                          </span>
+                          <span className="font-mono text-gray-300">{formatUserTime(pred.deadline)}</span>
+                        </div>
+                        <div className="flex items-center justify-between rounded-lg border border-dark-500/60 bg-dark-800/60 px-2 py-1.5 text-[11px]">
+                          <span className="inline-flex items-center gap-1 text-gray-400">
+                            <AppIcon name="check" className="h-3.5 w-3.5" />
+                            {tr("predictions.verifyAt", "Verification at")}
+                          </span>
+                          <span className="font-mono text-gray-300">{formatUserTime(pred.verifyAfter || pred.deadline)}</span>
+                        </div>
+                      </div>
+                      {!pred.resolved && (
+                        <div className="mt-2 grid grid-cols-1 gap-1 sm:grid-cols-2">
+                          <div className="flex items-center justify-between rounded-lg border border-neon-gold/20 bg-neon-gold/5 px-2 py-1.5 text-[11px]">
+                            <span className="text-gray-500">{tr("predictions.voteCloseIn", "Voting closes in")}</span>
+                            <CountdownTimer deadline={pred.deadline} compact />
+                          </div>
+                          <div className="flex items-center justify-between rounded-lg border border-neon-purple/20 bg-neon-purple/5 px-2 py-1.5 text-[11px]">
+                            <span className="text-gray-500">{tr("predictions.verifyIn", "Verification in")}</span>
+                            <CountdownTimer deadline={pred.verifyAfter || pred.deadline} compact />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Share with referral tracking */}
+                    <div className="mb-3 flex flex-wrap gap-2">
+                      <button
+                        onClick={() => shareEvent("telegram", pred)}
+                        className="px-3 py-1.5 rounded-lg text-[11px] bg-neon-cyan/10 border border-neon-cyan/30 text-neon-cyan hover:bg-neon-cyan/20 transition"
+                      >
+                        <span className="inline-flex items-center gap-1"><AppIcon name="send" className="w-3.5 h-3.5" /> {tr("predictions.shareTelegram", "Telegram")}</span>
+                      </button>
+                      <button
+                        onClick={() => shareEvent("x", pred)}
+                        className="px-3 py-1.5 rounded-lg text-[11px] bg-neon-purple/10 border border-neon-purple/30 text-neon-purple hover:bg-neon-purple/20 transition"
+                      >
+                        <span className="inline-flex items-center gap-1"><AppIcon name="x" className="w-3.5 h-3.5" /> {tr("predictions.shareX", "X")}</span>
+                      </button>
+                      <button
+                        onClick={() => shareEvent("discord", pred)}
+                        className="px-3 py-1.5 rounded-lg text-[11px] bg-neon-gold/10 border border-neon-gold/30 text-neon-gold hover:bg-neon-gold/20 transition"
+                      >
+                        <span className="inline-flex items-center gap-1"><AppIcon name="link" className="w-3.5 h-3.5" /> {tr("predictions.shareDiscord", "Discord")}</span>
+                      </button>
+                      <button
+                        onClick={() => copyEventLink(pred)}
+                        className="px-3 py-1.5 rounded-lg text-[11px] bg-dark-700 border border-dark-500 text-gray-300 hover:border-neon-cyan/40 hover:text-neon-cyan transition"
+                      >
+                        <span className="inline-flex items-center gap-1"><AppIcon name="chain" className="w-3.5 h-3.5" /> {tr("predictions.shareCopyLink", "Copy Link")}</span>
+                      </button>
+                    </div>
 
                     {/* AI Probability Gauge */}
                     <div className="mb-3">
@@ -735,22 +1164,38 @@ export default function PredictionsPage() {
 
                     {/* Vote Buttons (active + not expired + connected) */}
                     {!pred.resolved && !isExpired && isConnected && (
-                      <div className="grid grid-cols-2 gap-2 mt-2">
-                        <button
-                          onClick={() => handleVote(pred.eventId, true)}
-                          disabled={isVotePending || isCheckInPending || isCheckInConfirming}
-                          className="py-2.5 rounded-xl bg-neon-green/10 border border-neon-green/30 text-neon-green text-sm font-bold hover:bg-neon-green/20 transition disabled:opacity-50"
-                        >
-                        👍 {t("predictions.agree")}
-                      </button>
-                      <button
-                        onClick={() => handleVote(pred.eventId, false)}
-                        disabled={isVotePending || isCheckInPending || isCheckInConfirming}
-                        className="py-2.5 rounded-xl bg-neon-red/10 border border-neon-red/30 text-neon-red text-sm font-bold hover:bg-neon-red/20 transition disabled:opacity-50"
-                      >
-                        👎 {t("predictions.disagree")}
+                      isOwnUserEvent ? (
+                        <p className="text-xs text-gray-400 text-center mt-2">
+                          {tr("predictions.creatorCannotVoteOwn", "You cannot vote on your own event")}
+                        </p>
+                      ) : typeof pred.userPrediction === "boolean" ? (
+                        <p className="text-xs text-neon-cyan text-center mt-2">
+                          {tr("predictions.alreadyVotedCard", "You already voted on this event")}
+                        </p>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-2 mt-2">
+                          <button
+                            onClick={() => handleVote(pred.eventId, true)}
+                            disabled={isVotePending || isCheckInPending || isCheckInConfirming}
+                            className="min-h-11 py-2.5 rounded-xl bg-neon-green/10 border border-neon-green/30 text-neon-green text-sm font-bold hover:bg-neon-green/20 transition disabled:opacity-50"
+                          >
+                          <div className="leading-tight">
+                            <div>👍 {t("predictions.agree")}</div>
+                            <div className="text-[10px] font-mono text-neon-green/80">{voteButtonRewardHint}</div>
+                          </div>
                         </button>
-                      </div>
+                        <button
+                          onClick={() => handleVote(pred.eventId, false)}
+                          disabled={isVotePending || isCheckInPending || isCheckInConfirming}
+                          className="min-h-11 py-2.5 rounded-xl bg-neon-red/10 border border-neon-red/30 text-neon-red text-sm font-bold hover:bg-neon-red/20 transition disabled:opacity-50"
+                        >
+                          <div className="leading-tight">
+                            <div>👎 {t("predictions.disagree")}</div>
+                            <div className="text-[10px] font-mono text-neon-red/80">{voteButtonRewardHint}</div>
+                          </div>
+                          </button>
+                        </div>
+                      )
                     )}
 
                     {/* Connect prompt */}
@@ -787,7 +1232,12 @@ export default function PredictionsPage() {
               <p className="text-sm text-gray-400 mb-4">
                 {tr("predictions.checkInModalSubtitle", "You must complete today's check-in before voting. Choose a tier:")}
               </p>
-              <div className="grid grid-cols-3 gap-2 mb-4">
+              {checkedToday && (
+                <p className="text-xs text-neon-cyan mb-3">
+                  {tr("predictions.checkInAlreadyToday", "You already completed check-in today")}
+                </p>
+              )}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4">
                 {CHECKIN_TIERS.map((tier, idx) => (
                   <button
                     key={tier.key}
@@ -804,13 +1254,15 @@ export default function PredictionsPage() {
               </div>
               <button
                 onClick={handleCheckInFromModal}
-                disabled={isCheckInPending || isCheckInConfirming}
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-neon-cyan to-neon-purple text-dark-900 font-bold disabled:opacity-50"
+                disabled={checkedToday || isCheckInPending || isCheckInConfirming}
+                className="w-full min-h-11 py-3 rounded-xl bg-gradient-to-r from-neon-cyan to-neon-purple text-dark-900 font-bold disabled:opacity-50"
               >
                 {isCheckInPending
                   ? tr("checkin.confirming", "Confirm in wallet...")
                   : isCheckInConfirming
                     ? tr("checkin.processing", "Processing on-chain...")
+                    : checkedToday
+                      ? tr("predictions.checkInAlreadyToday", "You already completed check-in today")
                     : t("predictions.checkInModalAction", { amount: CHECKIN_TIERS[selectedTier].amount })}
               </button>
             </motion.div>

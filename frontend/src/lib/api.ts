@@ -24,6 +24,12 @@ function langParamWithOverride(base: string, lang?: string): string {
   return `${base}${sep}lang=${lang}`;
 }
 
+function withAddressParam(base: string, address?: string): string {
+  if (!address) return base;
+  const sep = base.includes("?") ? "&" : "?";
+  return `${base}${sep}address=${encodeURIComponent(address)}`;
+}
+
 async function fetchAPI(path: string, options?: RequestInit) {
   const res = await fetch(`${API_URL}${path}`, {
     ...options,
@@ -34,10 +40,13 @@ async function fetchAPI(path: string, options?: RequestInit) {
 
 export const api = {
   getStats: () => fetchAPI("/api/stats"),
+  getActivity: (limit = 50) => fetchAPI(`/api/stats/activity?limit=${limit}`),
   getTgeForecast: () => fetchAPI("/api/stats/tge-forecast"),
   getContracts: () => fetchAPI("/api/stats/contracts"),
-  getPredictions: (lang?: string) => fetchAPI(langParamWithOverride("/api/predictions", lang)),
-  getResolvedPredictions: (lang?: string) => fetchAPI(langParamWithOverride("/api/predictions/resolved", lang)),
+  getPredictions: (lang?: string, address?: string) =>
+    fetchAPI(withAddressParam(langParamWithOverride("/api/predictions", lang), address)),
+  getResolvedPredictions: (lang?: string, address?: string) =>
+    fetchAPI(withAddressParam(langParamWithOverride("/api/predictions/resolved", lang), address)),
   getAllPredictions: (lang?: string) => fetchAPI(langParamWithOverride("/api/predictions/all", lang)),
   getUserVotedPredictions: (address: string, lang?: string) =>
     fetchAPI(langParamWithOverride(`/api/predictions/voted/${address}`, lang)),
@@ -47,6 +56,7 @@ export const api = {
     category: string;
     deadlineMs: number;
     sourcePolicy: string;
+    creator?: string;
   }) =>
     fetchAPI("/api/predictions/user/validate", {
       method: "POST",
@@ -72,9 +82,20 @@ export const api = {
   getReferralStats: (address: string) => fetchAPI(`/api/user/${address}/referral-stats`),
   getCreatorStats: (address: string) => fetchAPI(`/api/user/${address}/creator-stats`),
   getOnboardingStatus: (address: string) => fetchAPI(`/api/user/${address}/onboarding`),
-  registerReferral: (address: string, referrerCode: string) =>
+  registerReferral: (
+    address: string,
+    referrerCode: string,
+    attribution?: {
+      utmSource?: string;
+      utmMedium?: string;
+      utmCampaign?: string;
+      utmContent?: string;
+      eventId?: number;
+      landingPath?: string;
+    }
+  ) =>
     fetchAPI(`/api/user/${address}/referral`, {
       method: "POST",
-      body: JSON.stringify({ referrerCode }),
+      body: JSON.stringify({ referrerCode, attribution }),
     }),
 };

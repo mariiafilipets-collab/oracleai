@@ -7,9 +7,10 @@ import { motion } from "framer-motion";
 import toast from "react-hot-toast";
 import GlassCard from "@/components/GlassCard";
 import { useContractAddresses } from "@/hooks/useContracts";
-import { PointsABI, ReferralABI } from "@/lib/contracts";
+import { PointsABI, PredictionABI, ReferralABI } from "@/lib/contracts";
 import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
+import { formatInOffset, getEffectiveOffsetMinutes, useTimezone } from "@/lib/timezone";
 import AppIcon from "@/components/icons/AppIcon";
 
 const BADGES = [
@@ -26,6 +27,8 @@ const BADGES = [
 export default function ProfilePage() {
   const { address, isConnected } = useAccount();
   const { t } = useI18n();
+  const { mode: tzMode, fixedOffsetMinutes } = useTimezone();
+  const userOffsetMinutes = getEffectiveOffsetMinutes(tzMode, fixedOffsetMinutes);
   const tr = (key: string, fallback: string, params?: Record<string, string | number>) => {
     const val = t(key, params);
     return val === key ? fallback : val;
@@ -36,11 +39,22 @@ export default function ProfilePage() {
   const [userData, setUserData] = useState<any>(null);
   const [referralStats, setReferralStats] = useState<any>(null);
   const [creatorStats, setCreatorStats] = useState<any>(null);
+  const [platformVoteFeesBnb, setPlatformVoteFeesBnb] = useState(0);
+  const [platformVoteBreakdown, setPlatformVoteBreakdown] = useState<Record<string, number>>({
+    prizes: 0,
+    treasury: 0,
+    referrals: 0,
+    burn: 0,
+    stakers: 0,
+  });
   const { writeContract, data: withdrawHash, isPending: withdrawing } = useWriteContract();
   const { isSuccess: withdrawSuccess } = useWaitForTransactionReceipt({ hash: withdrawHash });
+  const { writeContract: writeCreatorClaim, data: creatorClaimHash, isPending: creatorClaiming } = useWriteContract();
+  const { isSuccess: creatorClaimSuccess } = useWaitForTransactionReceipt({ hash: creatorClaimHash });
 
   const pointsAddress = addresses?.Points as `0x${string}` | undefined;
   const referralAddress = addresses?.Referral as `0x${string}` | undefined;
+  const predictionAddress = addresses?.Prediction as `0x${string}` | undefined;
 
   const { data: userPoints } = useReadContract({
     address: pointsAddress,
@@ -73,6 +87,13 @@ export default function ProfilePage() {
     args: address ? [address] : undefined,
     query: { enabled: !!address && !!referralAddress },
   });
+  const { data: creatorClaimableRaw } = useReadContract({
+    address: predictionAddress,
+    abi: PredictionABI,
+    functionName: "creatorClaimableWei",
+    args: address ? [address] : undefined,
+    query: { enabled: !!address && !!predictionAddress },
+  });
 
   useEffect(() => {
     if (!address) return;
@@ -96,6 +117,20 @@ export default function ProfilePage() {
     api.getCreatorStats(address).then((res) => {
       if (res.success) setCreatorStats(res.data);
     }).catch(() => {});
+
+    api.getStats().then((res) => {
+      if (!res?.success) return;
+      const raw = BigInt(String(res?.data?.totalVoteFeesCollected || "0"));
+      setPlatformVoteFeesBnb(parseFloat(formatEther(raw)));
+      const split = res?.data?.voteFeesBreakdownWei || {};
+      setPlatformVoteBreakdown({
+        prizes: parseFloat(formatEther(BigInt(String(split.prizes || "0")))),
+        treasury: parseFloat(formatEther(BigInt(String(split.treasury || "0")))),
+        referrals: parseFloat(formatEther(BigInt(String(split.referrals || "0")))),
+        burn: parseFloat(formatEther(BigInt(String(split.burn || "0")))),
+        stakers: parseFloat(formatEther(BigInt(String(split.stakers || "0")))),
+      });
+    }).catch(() => {});
   }, [address]);
 
   useEffect(() => {
@@ -103,6 +138,11 @@ export default function ProfilePage() {
       toast.success(tr("profile.refWithdrawSuccess", "Referral earnings withdrawn"));
     }
   }, [withdrawSuccess, tr]);
+  useEffect(() => {
+    if (creatorClaimSuccess) {
+      toast.success(tr("profile.creatorClaimSuccess", "Creator rewards withdrawn"));
+    }
+  }, [creatorClaimSuccess, tr]);
 
   if (!isConnected) {
     return (
@@ -122,6 +162,7 @@ export default function ProfilePage() {
   const totalPredictions = Number(up?.totalPredictions ?? up?.[6] ?? 0);
   const refCount = directReferrals ? (directReferrals as any[]).length : 0;
   const pendingBnb = pendingRefEarnings ? parseFloat(formatEther(pendingRefEarnings as bigint)) : 0;
+  const creatorClaimableBnb = creatorClaimableRaw ? parseFloat(formatEther(creatorClaimableRaw as bigint)) : 0;
 
   const badgeData = {
     totalCheckIns,
@@ -214,18 +255,27 @@ export default function ProfilePage() {
       args: [],
     });
   };
+  const handleClaimCreatorRewards = () => {
+    if (!predictionAddress) return;
+    writeCreatorClaim({
+      address: predictionAddress,
+      abi: PredictionABI,
+      functionName: "claimCreatorFees",
+      args: [],
+    });
+  };
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-heading font-bold">
+    <div className="space-y-5 sm:space-y-6">
+      <h1 className="text-2xl sm:text-3xl font-heading font-bold">
         <span className="gradient-cyan">{t("profile.title")}</span>
       </h1>
 
       {/* Oracle Score + Stats */}
-      <div className="grid lg:grid-cols-3 gap-6">
+      <div className="grid lg:grid-cols-3 gap-4 sm:gap-6">
         {/* Oracle Score */}
-        <GlassCard hover={false} className="flex flex-col items-center justify-center py-8">
-          <div className="relative w-32 h-32 mb-4">
+        <GlassCard hover={false} className="flex flex-col items-center justify-center py-6 sm:py-8">
+          <div className="relative w-28 h-28 sm:w-32 sm:h-32 mb-3 sm:mb-4">
             <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
               <circle cx="50" cy="50" r="42" fill="none" stroke="#1e2438" strokeWidth="8" />
               <motion.circle
@@ -244,7 +294,7 @@ export default function ProfilePage() {
               </defs>
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-2xl font-bold font-mono text-white">{oracleScore}</span>
+              <span className="text-xl sm:text-2xl font-bold font-mono text-white">{oracleScore}</span>
               <span className="text-xs text-gray-500">{t("profile.score")}</span>
             </div>
           </div>
@@ -255,7 +305,7 @@ export default function ProfilePage() {
         </GlassCard>
 
         {/* Stats Grid */}
-        <div className="lg:col-span-2 grid grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2 grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           {[
             { label: t("stats.totalPoints"), value: totalPoints.toLocaleString(), icon: "points", color: "text-neon-gold" },
             { label: t("stats.weeklyPoints"), value: weeklyPoints.toLocaleString(), icon: "chart", color: "text-neon-cyan" },
@@ -269,7 +319,7 @@ export default function ProfilePage() {
               color: "text-neon-gold",
             },
           ].map((stat, i) => (
-            <GlassCard key={i} hover={false} className="p-4 text-center">
+            <GlassCard key={i} hover={false} className="p-3.5 sm:p-4 text-center">
               <div className="text-xl mb-1 flex justify-center"><AppIcon name={stat.icon as any} className="w-5 h-5" /></div>
               <div className={`text-lg font-bold font-mono ${stat.color}`}>{stat.value}</div>
               <div className="text-xs text-gray-500">{stat.label}</div>
@@ -278,8 +328,32 @@ export default function ProfilePage() {
         </div>
       </div>
 
+      <div className="grid sm:grid-cols-2 gap-3">
+        <GlassCard hover={false} className="p-4">
+          <div className="text-xs text-gray-500 mb-1">{tr("profile.voteFeesCollected", "Vote fees collected (platform)")}</div>
+          <div className="text-lg font-mono text-neon-cyan">{platformVoteFeesBnb.toFixed(6)} BNB</div>
+        </GlassCard>
+        <GlassCard hover={false} className="p-4">
+          <div className="text-xs text-gray-500 mb-1">{tr("profile.voteFeesDistributed", "Vote fees distributed (platform)")}</div>
+          <div className="text-lg font-mono text-neon-gold">{platformVoteFeesBnb.toFixed(6)} BNB</div>
+          <div className="text-[11px] text-gray-500 mt-1">
+            {tr("profile.voteFeesDistributedHint", "Distribution is executed during each vote transaction.")}
+          </div>
+        </GlassCard>
+      </div>
+      <GlassCard hover={false} className="p-4">
+        <div className="text-xs text-gray-500 mb-2">{tr("profile.voteFeesBreakdown", "Vote fees breakdown (platform)")}</div>
+        <div className="grid sm:grid-cols-5 gap-2 text-xs">
+          <div className="text-gray-300">{t("checkin.fees.prizes")}: <span className="font-mono text-neon-cyan">{platformVoteBreakdown.prizes.toFixed(6)} BNB</span></div>
+          <div className="text-gray-300">{t("checkin.fees.treasury")}: <span className="font-mono text-neon-cyan">{platformVoteBreakdown.treasury.toFixed(6)} BNB</span></div>
+          <div className="text-gray-300">{t("checkin.fees.referrals")}: <span className="font-mono text-neon-cyan">{platformVoteBreakdown.referrals.toFixed(6)} BNB</span></div>
+          <div className="text-gray-300">{t("checkin.fees.burn")}: <span className="font-mono text-neon-cyan">{platformVoteBreakdown.burn.toFixed(6)} BNB</span></div>
+          <div className="text-gray-300">{t("checkin.fees.stakers")}: <span className="font-mono text-neon-cyan">{platformVoteBreakdown.stakers.toFixed(6)} BNB</span></div>
+        </div>
+      </GlassCard>
+
       {/* Referral Section */}
-      <GlassCard hover={false}>
+      <GlassCard hover={false} className="p-4 sm:p-6">
         <h2 className="text-lg font-heading font-bold flex items-center gap-2 mb-4">
           <AppIcon name="globe" className="w-5 h-5 text-neon-cyan" /> {t("profile.referralProgram")}
           <span className="text-xs text-gray-500 font-normal">{t("profile.sixLevels")}</span>
@@ -287,7 +361,7 @@ export default function ProfilePage() {
         <div className="flex flex-col lg:flex-row gap-4">
           <div className="flex-1">
             <label className="text-xs text-gray-500 mb-2 block">{t("profile.yourCode")}</label>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <input
                 readOnly
                 value={referralCode}
@@ -295,13 +369,13 @@ export default function ProfilePage() {
               />
               <button
                 onClick={copyReferralLink}
-                className="px-6 py-3 rounded-xl bg-neon-cyan/10 border border-neon-cyan/30 text-neon-cyan font-bold text-sm hover:bg-neon-cyan/20 transition"
+                className="min-h-11 px-6 py-3 rounded-xl bg-neon-cyan/10 border border-neon-cyan/30 text-neon-cyan font-bold text-sm hover:bg-neon-cyan/20 transition w-full sm:w-auto"
               >
                 {t("common.copyLink")}
               </button>
             </div>
           </div>
-          <div className="flex gap-6 items-center">
+          <div className="flex gap-6 items-center justify-between sm:justify-start">
             <div className="text-center">
               <div className="text-2xl font-bold font-mono text-neon-cyan">{refCount}</div>
               <div className="text-xs text-gray-500">{t("profile.directRefs")}</div>
@@ -314,7 +388,7 @@ export default function ProfilePage() {
             </div>
           </div>
         </div>
-        <div className="mt-4 flex items-center justify-between gap-3 p-3 rounded-xl bg-dark-700/40 border border-dark-500/50">
+        <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 rounded-xl bg-dark-700/40 border border-dark-500/50">
           <div>
             <div className="text-xs text-gray-500">{tr("profile.availableToWithdraw", "Available to withdraw")}</div>
             <div className="text-sm font-mono text-neon-green">{pendingBnb.toFixed(6)} BNB</div>
@@ -322,7 +396,7 @@ export default function ProfilePage() {
           <button
             onClick={handleWithdrawRefEarnings}
             disabled={withdrawing || pendingBnb <= 0}
-            className="px-4 py-2 rounded-lg bg-neon-green/15 border border-neon-green/30 text-neon-green text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-neon-green/25 transition"
+            className="min-h-11 px-4 py-2 rounded-lg bg-neon-green/15 border border-neon-green/30 text-neon-green text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-neon-green/25 transition w-full sm:w-auto"
           >
             {withdrawing
               ? tr("profile.withdrawing", "Withdrawing...")
@@ -335,7 +409,7 @@ export default function ProfilePage() {
       </GlassCard>
 
       {/* Referral Analytics */}
-      <GlassCard hover={false}>
+      <GlassCard hover={false} className="p-4 sm:p-6">
         <h2 className="text-lg font-heading font-bold flex items-center gap-2 mb-4">
           <AppIcon name="chart" className="w-5 h-5 text-neon-cyan" /> {tr("profile.referralAnalytics", "Referral Analytics")}
         </h2>
@@ -381,7 +455,7 @@ export default function ProfilePage() {
                 <div key={u.address} className="p-3 rounded-xl bg-dark-700/50 border border-dark-500/50 flex items-center justify-between">
                   <div>
                     <div className="text-sm text-gray-200 font-mono">{shortAddress(u.address)}</div>
-                    <div className="text-xs text-gray-500">{new Date(u.joinedAt).toLocaleDateString()}</div>
+                    <div className="text-xs text-gray-500">{formatInOffset(u.joinedAt, userOffsetMinutes)}</div>
                   </div>
                   <div className="text-right">
                     <div className="text-sm text-neon-cyan font-mono">{(u.totalPoints || 0).toLocaleString()} {t("common.pts")}</div>
@@ -394,10 +468,46 @@ export default function ProfilePage() {
             </div>
           </div>
         </div>
+
+        <div className="mt-5 grid lg:grid-cols-3 gap-4">
+          <div className="p-3 rounded-xl bg-dark-700/40 border border-dark-500/50">
+            <h4 className="text-xs text-gray-400 mb-2">{tr("profile.shareBySource", "Registrations by source")}</h4>
+            <div className="space-y-1">
+              {(referralStats?.shareAttribution?.bySource || []).length ? (referralStats.shareAttribution.bySource as any[]).map((row, idx) => (
+                <div key={`${row.key}-${idx}`} className="flex items-center justify-between text-xs">
+                  <span className="text-gray-300">{String(row.key || "").toUpperCase()}</span>
+                  <span className="font-mono text-neon-cyan">{Number(row.count || 0)}</span>
+                </div>
+              )) : <p className="text-xs text-gray-500">{tr("profile.noShareStats", "No share attribution data yet")}</p>}
+            </div>
+          </div>
+          <div className="p-3 rounded-xl bg-dark-700/40 border border-dark-500/50">
+            <h4 className="text-xs text-gray-400 mb-2">{tr("profile.shareByCampaign", "Registrations by campaign")}</h4>
+            <div className="space-y-1">
+              {(referralStats?.shareAttribution?.byCampaign || []).length ? (referralStats.shareAttribution.byCampaign as any[]).map((row, idx) => (
+                <div key={`${row.key}-${idx}`} className="flex items-center justify-between text-xs gap-2">
+                  <span className="text-gray-300 truncate">{String(row.key || "")}</span>
+                  <span className="font-mono text-neon-purple shrink-0">{Number(row.count || 0)}</span>
+                </div>
+              )) : <p className="text-xs text-gray-500">{tr("profile.noShareStats", "No share attribution data yet")}</p>}
+            </div>
+          </div>
+          <div className="p-3 rounded-xl bg-dark-700/40 border border-dark-500/50">
+            <h4 className="text-xs text-gray-400 mb-2">{tr("profile.shareByEvent", "Registrations by event")}</h4>
+            <div className="space-y-1">
+              {(referralStats?.shareAttribution?.byEvent || []).length ? (referralStats.shareAttribution.byEvent as any[]).map((row, idx) => (
+                <div key={`${row.key}-${idx}`} className="flex items-center justify-between text-xs">
+                  <span className="text-gray-300">#{String(row.key || "")}</span>
+                  <span className="font-mono text-neon-gold">{Number(row.count || 0)}</span>
+                </div>
+              )) : <p className="text-xs text-gray-500">{tr("profile.noShareStats", "No share attribution data yet")}</p>}
+            </div>
+          </div>
+        </div>
       </GlassCard>
 
       {/* Social Creatives */}
-      <GlassCard hover={false}>
+      <GlassCard hover={false} className="p-4 sm:p-6">
         <h2 className="text-lg font-heading font-bold flex items-center gap-2 mb-4">
           <AppIcon name="megaphone" className="w-5 h-5 text-neon-cyan" /> {tr("profile.socialCreatives", "Social Media Creatives")}
         </h2>
@@ -418,22 +528,22 @@ export default function ProfilePage() {
                 <p className="mt-3 text-sm text-gray-100 break-words">{preset.text}</p>
                 <p className="mt-2 text-xs text-neon-cyan break-all">{trackedLink}</p>
               </div>
-              <div className="mt-2 flex flex-wrap gap-2 justify-end">
+              <div className="mt-2 flex flex-wrap gap-2 justify-start sm:justify-end">
                 <button
                   onClick={() => copyCreative(fullText)}
-                  className="px-4 py-2 rounded-lg bg-neon-cyan/10 border border-neon-cyan/30 text-neon-cyan text-xs font-bold hover:bg-neon-cyan/20 transition"
+                  className="min-h-10 px-4 py-2 rounded-lg bg-neon-cyan/10 border border-neon-cyan/30 text-neon-cyan text-xs font-bold hover:bg-neon-cyan/20 transition w-full sm:w-auto"
                 >
                   {tr("profile.copyCreative", "Copy Creative")}
                 </button>
                 <button
                   onClick={() => copyCreative(trackedLink)}
-                  className="px-4 py-2 rounded-lg bg-neon-purple/10 border border-neon-purple/30 text-neon-purple text-xs font-bold hover:bg-neon-purple/20 transition"
+                  className="min-h-10 px-4 py-2 rounded-lg bg-neon-purple/10 border border-neon-purple/30 text-neon-purple text-xs font-bold hover:bg-neon-purple/20 transition w-full sm:w-auto"
                 >
                   {tr("profile.copyTrackedLink", "Copy UTM Link")}
                 </button>
                 <button
                   onClick={() => shareCreative(preset.source, preset.text, trackedLink)}
-                  className="px-4 py-2 rounded-lg bg-neon-gold/10 border border-neon-gold/30 text-neon-gold text-xs font-bold hover:bg-neon-gold/20 transition"
+                  className="min-h-10 px-4 py-2 rounded-lg bg-neon-gold/10 border border-neon-gold/30 text-neon-gold text-xs font-bold hover:bg-neon-gold/20 transition w-full sm:w-auto"
                 >
                   {tr("profile.shareNow", "Share Now")}
                 </button>
@@ -445,7 +555,7 @@ export default function ProfilePage() {
       </GlassCard>
 
       {/* Creator Dashboard */}
-      <GlassCard hover={false}>
+      <GlassCard hover={false} className="p-4 sm:p-6">
         <h2 className="text-lg font-heading font-bold flex items-center gap-2 mb-4">
           <AppIcon name="prediction" className="w-5 h-5 text-neon-cyan" /> {tr("profile.creatorDashboard", "Creator Dashboard")}
         </h2>
@@ -477,17 +587,43 @@ export default function ProfilePage() {
           {" · "}
           {tr("profile.creatorTotalVotes", "Total votes")}:
           <span className="ml-1 text-neon-cyan font-mono">{creatorStats?.totalVotes ?? 0}</span>
+          {" · "}
+          {tr("profile.creatorVoteFee", "Vote fee")}:
+          <span className="ml-1 text-neon-cyan font-mono">
+            {creatorStats?.voteFeeWei ? `${parseFloat(formatEther(BigInt(creatorStats.voteFeeWei))).toFixed(4)} BNB` : "-"}
+          </span>
+          {" · "}
+          {tr("profile.creatorShare", "Creator share")}:
+          <span className="ml-1 text-neon-gold font-mono">{Number(creatorStats?.creatorShareBps || 5000) / 100}%</span>
+        </div>
+        <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 rounded-xl bg-dark-700/40 border border-dark-500/50">
+          <div>
+            <div className="text-xs text-gray-500">{tr("profile.creatorAvailableToWithdraw", "Creator rewards available")}</div>
+            <div className="text-sm font-mono text-neon-gold">{creatorClaimableBnb.toFixed(6)} BNB</div>
+            <div className="text-[11px] text-gray-500 mt-1">
+              {tr("profile.creatorRulesHint", "Rewards unlock after valid resolution, minimum voter threshold, and verified creator status.")}
+            </div>
+          </div>
+          <button
+            onClick={handleClaimCreatorRewards}
+            disabled={creatorClaiming || creatorClaimableBnb <= 0}
+            className="min-h-11 px-4 py-2 rounded-lg bg-neon-gold/15 border border-neon-gold/30 text-neon-gold text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-neon-gold/25 transition w-full sm:w-auto"
+          >
+            {creatorClaiming
+              ? tr("profile.creatorWithdrawing", "Withdrawing...")
+              : tr("profile.creatorWithdraw", "Withdraw Creator Rewards")}
+          </button>
         </div>
         <div className="space-y-2 max-h-64 overflow-y-auto">
           {creatorStats?.latestEvents?.length ? creatorStats.latestEvents.map((evt: any) => {
             const totalVotes = Number(evt.totalVotesYes || 0) + Number(evt.totalVotesNo || 0);
             return (
-              <div key={evt.eventId} className="p-3 rounded-xl bg-dark-700/50 border border-dark-500/50 flex items-center justify-between gap-2">
+              <div key={evt.eventId} className="p-3 rounded-xl bg-dark-700/50 border border-dark-500/50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <div className="min-w-0">
                   <p className="text-sm text-gray-200 truncate">#{evt.eventId} · {evt.title}</p>
-                  <p className="text-xs text-gray-500">{evt.category} · {new Date(evt.deadline).toLocaleString()}</p>
+                  <p className="text-xs text-gray-500">{evt.category} · {formatInOffset(evt.deadline, userOffsetMinutes)}</p>
                 </div>
-                <div className="text-right shrink-0">
+                <div className="text-left sm:text-right shrink-0">
                   <div className={`text-xs font-bold ${evt.resolved ? "text-neon-purple" : "text-neon-green"}`}>
                     {evt.resolved ? tr("common.resolved", "Resolved") : tr("common.active", "active")}
                   </div>
@@ -502,7 +638,7 @@ export default function ProfilePage() {
       </GlassCard>
 
       {/* Badges */}
-      <GlassCard hover={false}>
+      <GlassCard hover={false} className="p-4 sm:p-6">
         <h2 className="text-lg font-heading font-bold flex items-center gap-2 mb-4">
           <AppIcon name="medal" className="w-5 h-5 text-neon-gold" /> {t("profile.badges")}
         </h2>
@@ -528,7 +664,7 @@ export default function ProfilePage() {
       </GlassCard>
 
       {/* Check-in History */}
-      <GlassCard hover={false}>
+      <GlassCard hover={false} className="p-4 sm:p-6">
         <h2 className="text-lg font-heading font-bold flex items-center gap-2 mb-4">
           <AppIcon name="history" className="w-5 h-5 text-neon-cyan" /> {t("profile.history")}
         </h2>
@@ -539,7 +675,7 @@ export default function ProfilePage() {
             {history.map((item: any, i: number) => (
               <div
                 key={i}
-                className="flex items-center justify-between p-3 rounded-xl bg-dark-700/50 border border-dark-500/50"
+                className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 p-3 rounded-xl bg-dark-700/50 border border-dark-500/50"
               >
                 <div>
                   <span
@@ -559,6 +695,9 @@ export default function ProfilePage() {
                   <span className="text-sm font-mono text-neon-green">+{item.points} {t("common.pts")}</span>
                   <span className="text-xs text-gray-500 ml-2">
                     <AppIcon name="streak" className="w-3.5 h-3.5 inline text-neon-gold" />{item.streak}
+                  </span>
+                  <span className="block text-[11px] text-gray-600 mt-1 font-mono">
+                    {formatInOffset(item.timestamp, userOffsetMinutes)}
                   </span>
                 </div>
               </div>

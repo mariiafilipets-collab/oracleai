@@ -1,0 +1,43 @@
+name: Agent Task Request
+description: Request work for the AI team autopilot
+title: "[agent] "
+labels: ["agent-task"]
+body:
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objective
+      description: What should be delivered?
+      placeholder: Implement feature X for users Y.
+    validations:
+      required: true
+  - type: dropdown
+    id: role
+    attributes:
+      label: Primary role
+      options:
+        - ChiefEngineer
+        - BlockchainEngineer
+        - FullstackEngineer
+        - QAEngineer
+        - MarketingLead
+        - DesignLead
+    validations:
+      required: true
+  - type: checkboxes
+    id: allow
+    attributes:
+      label: Allowed actions
+      options:
+        - label: Code changes
+        - label: CI/CD changes
+        - label: Contract deployment
+        - label: Social content publishing
+  - type: textarea
+    id: done
+    attributes:
+      label: Definition of done
+      description: Measurable completion criteria.
+      placeholder: Tests pass, PR merged, deployment green, post published.
+    validations:
+      required: true

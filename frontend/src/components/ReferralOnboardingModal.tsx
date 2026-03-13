@@ -11,6 +11,22 @@ function getRefFromQuery(): string {
   return (new URLSearchParams(window.location.search).get("ref") || "").trim().toUpperCase();
 }
 
+function getAttributionFromQuery() {
+  if (typeof window === "undefined") return undefined;
+  const qs = new URLSearchParams(window.location.search);
+  const eventIdRaw = Number(qs.get("eventId") || 0);
+  const payload = {
+    utmSource: (qs.get("utm_source") || "").trim(),
+    utmMedium: (qs.get("utm_medium") || "").trim(),
+    utmCampaign: (qs.get("utm_campaign") || "").trim(),
+    utmContent: (qs.get("utm_content") || "").trim(),
+    eventId: Number.isFinite(eventIdRaw) && eventIdRaw > 0 ? eventIdRaw : undefined,
+    landingPath: window.location.pathname + window.location.search,
+  };
+  if (!payload.utmSource && !payload.utmCampaign && !payload.eventId) return undefined;
+  return payload;
+}
+
 function isCentralWallet(address?: string): boolean {
   const configured = (process.env.NEXT_PUBLIC_CENTRAL_WALLET || "").trim().toLowerCase();
   return !!address && !!configured && address.toLowerCase() === configured;
@@ -77,7 +93,7 @@ export default function ReferralOnboardingModal() {
     }
     setLoading(true);
     try {
-      const res = await api.registerReferral(address, finalCode);
+      const res = await api.registerReferral(address, finalCode, getAttributionFromQuery());
       if (!res?.success) {
         toast.error(res?.error || tr("referralOnboarding.invalidCode", "Invalid referral code"));
         return;
