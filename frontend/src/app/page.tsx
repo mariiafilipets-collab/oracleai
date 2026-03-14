@@ -16,6 +16,7 @@ import { useAppStore } from "@/lib/store";
 import { useI18n } from "@/lib/i18n";
 import { formatInOffset, getEffectiveOffsetMinutes, useTimezone } from "@/lib/timezone";
 import AppIcon from "@/components/icons/AppIcon";
+import QuestPanel from "@/components/QuestPanel";
 
 const TIERS = [
   { key: "basic", amount: "0.0015", multiplier: "1x", color: "text-gray-400", pts: "100" },
@@ -435,6 +436,9 @@ export default function HomePage() {
           </div>
         </GlassCard>
       </div>
+
+      {/* Quests */}
+      <QuestPanel />
     </div>
   );
 }

@@ -12,6 +12,7 @@ import { api } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import { formatInOffset, getEffectiveOffsetMinutes, useTimezone } from "@/lib/timezone";
 import AppIcon from "@/components/icons/AppIcon";
+import QuestPanel from "@/components/QuestPanel";
 
 const BADGES = [
   { id: "firstCheckin", icon: "target", threshold: (d: any) => d.totalCheckIns >= 1 },
@@ -705,6 +706,9 @@ export default function ProfilePage() {
           </div>
         )}
       </GlassCard>
+
+      {/* Quests */}
+      <QuestPanel />
     </div>
   );
 }
