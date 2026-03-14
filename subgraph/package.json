@@ -1,0 +1,17 @@
+{
+  "name": "oracleai-subgraph",
+  "version": "1.0.0",
+  "description": "OracleAI Predict — The Graph subgraph for BSC Testnet",
+  "scripts": {
+    "codegen": "graph codegen",
+    "build": "graph codegen && graph build",
+    "deploy:studio": "graph deploy oracleai-predict --studio",
+    "deploy:hosted": "graph deploy --node https://api.thegraph.com/deploy/ oracleai/oracleai-predict",
+    "create:local": "graph create --node http://localhost:8020/ oracleai/oracleai-predict",
+    "deploy:local": "graph deploy --node http://localhost:8020/ --ipfs http://localhost:5001 oracleai/oracleai-predict"
+  },
+  "dependencies": {
+    "@graphprotocol/graph-cli": "^0.71.0",
+    "@graphprotocol/graph-ts": "^0.35.1"
+  }
+}

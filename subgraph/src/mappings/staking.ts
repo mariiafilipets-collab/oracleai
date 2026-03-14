@@ -1,33 +1,10 @@
 import { BigInt, Bytes } from "@graphprotocol/graph-ts";
+import {
+  Staked,
+  UnstakeRequested,
+  Unstaked,
+} from "../../generated/Staking/Staking";
 import { User, StakeEvent, ProtocolMetrics } from "../../generated/schema";
-
-// Note: These event types would be generated from the Staking ABI.
-// For now we define handler signatures matching the subgraph.yaml.
-// Actual event classes come from `graph codegen`.
-
-class StakedEvent {
-  params: StakedParams;
-  transaction: TxInfo;
-  logIndex: BigInt;
-  block: BlockInfo;
-}
-class StakedParams { user: Bytes; amount: BigInt; }
-class UnstakeRequestedEvent {
-  params: UnstakeRequestedParams;
-  transaction: TxInfo;
-  logIndex: BigInt;
-  block: BlockInfo;
-}
-class UnstakeRequestedParams { user: Bytes; amount: BigInt; }
-class UnstakedEvent {
-  params: UnstakedParams;
-  transaction: TxInfo;
-  logIndex: BigInt;
-  block: BlockInfo;
-}
-class UnstakedParams { user: Bytes; amount: BigInt; }
-class TxInfo { hash: Bytes; }
-class BlockInfo { timestamp: BigInt; number: BigInt; }
 
 function getOrCreateUser(address: Bytes, timestamp: BigInt): User {
   let user = User.load(address);
@@ -79,7 +56,7 @@ function getTier(amount: BigInt): i32 {
   return 0;
 }
 
-export function handleStaked(event: StakedEvent): void {
+export function handleStaked(event: Staked): void {
   let id = event.transaction.hash.concatI32(event.logIndex.toI32());
   let stake = new StakeEvent(id);
   let user = getOrCreateUser(event.params.user, event.block.timestamp);
@@ -101,7 +78,7 @@ export function handleStaked(event: StakedEvent): void {
   metrics.save();
 }
 
-export function handleUnstakeRequested(event: UnstakeRequestedEvent): void {
+export function handleUnstakeRequested(event: UnstakeRequested): void {
   let id = event.transaction.hash.concatI32(event.logIndex.toI32());
   let stake = new StakeEvent(id);
   let user = getOrCreateUser(event.params.user, event.block.timestamp);
@@ -113,7 +90,7 @@ export function handleUnstakeRequested(event: UnstakeRequestedEvent): void {
   stake.save();
 }
 
-export function handleUnstaked(event: UnstakedEvent): void {
+export function handleUnstaked(event: Unstaked): void {
   let id = event.transaction.hash.concatI32(event.logIndex.toI32());
   let stake = new StakeEvent(id);
   let user = getOrCreateUser(event.params.user, event.block.timestamp);

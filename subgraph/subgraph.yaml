@@ -4,7 +4,7 @@ schema:
 dataSources:
   - kind: ethereum
     name: CheckIn
-    network: bsc-testnet
+    network: chapel
     source:
       address: "0xFa7b9AC470CF93866D725d4F45356B09456E8c64"
       abi: CheckIn
@@ -27,7 +27,7 @@ dataSources:
 
   - kind: ethereum
     name: Prediction
-    network: bsc-testnet
+    network: chapel
     source:
       address: "0xAfC6158f83b42707D9589e374fB4188052f2d25e"
       abi: Prediction
@@ -57,7 +57,7 @@ dataSources:
 
   - kind: ethereum
     name: Staking
-    network: bsc-testnet
+    network: chapel
     source:
       address: "0x51fBd334319E8bb601883223d4Ce681Ce6251B12"
       abi: Staking
@@ -74,7 +74,7 @@ dataSources:
         - name: Staking
           file: ../contracts/artifacts/contracts/Staking.sol/Staking.json
       eventHandlers:
-        - event: Staked(indexed address,uint256)
+        - event: Staked(indexed address,uint256,string)
           handler: handleStaked
         - event: UnstakeRequested(indexed address,uint256)
           handler: handleUnstakeRequested
@@ -84,7 +84,7 @@ dataSources:
 
   - kind: ethereum
     name: PrizePoolV2
-    network: bsc-testnet
+    network: chapel
     source:
       address: "0x3546771AEED588Ecdf62BE1785A8fEDac568722B"
       abi: PrizePoolV2
@@ -103,13 +103,13 @@ dataSources:
       eventHandlers:
         - event: EpochStarted(indexed uint256,bytes32,uint256)
           handler: handleEpochStarted
-        - event: PrizeClaimed(indexed uint256,indexed address,uint256,uint256)
+        - event: PrizeClaimed(indexed uint256,indexed uint256,indexed address,uint256)
           handler: handlePrizeClaimed
       file: ./src/mappings/prizepool.ts
 
   - kind: ethereum
     name: PredictionNFT
-    network: bsc-testnet
+    network: chapel
     source:
       address: "0x35375A2D6C5ca01Afb7a88b7aB44651ceacc4591"
       abi: PredictionNFT
@@ -133,7 +133,7 @@ dataSources:
 
   - kind: ethereum
     name: OracleGovernance
-    network: bsc-testnet
+    network: chapel
     source:
       address: "0x7f75c4B99E7AD7F5027f928b0244f476FcF8DB94"
       abi: OracleGovernance
@@ -162,7 +162,7 @@ dataSources:
 
   - kind: ethereum
     name: InsurancePool
-    network: bsc-testnet
+    network: chapel
     source:
       address: "0x03412E10B200BD7a1BB2F8Ab78a23603777E2d38"
       abi: InsurancePool

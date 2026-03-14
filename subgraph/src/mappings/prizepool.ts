@@ -35,7 +35,7 @@ export function handlePrizeClaimed(event: PrizeClaimed): void {
   let id = event.transaction.hash.concatI32(event.logIndex.toI32());
   let claim = new PrizeClaim(id);
   claim.epoch = event.params.epoch.toString();
-  claim.claimant = event.params.claimant;
+  claim.claimant = event.params.account;
   claim.amount = event.params.amount;
   claim.index = event.params.index;
   claim.timestamp = event.block.timestamp;
