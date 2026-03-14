@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useAccount, useWriteContract, useWaitForTransactionReceipt, useReadContract } from "wagmi";
 import { formatEther, parseEther } from "viem";
 import { motion, AnimatePresence } from "framer-motion";
@@ -44,29 +44,34 @@ function formatSeconds(total: number) {
   return `${m}m`;
 }
 
-function CountdownTimer({ deadline, compact = false }: { deadline: string; compact?: boolean }) {
-  const [timeLeft, setTimeLeft] = useState("");
-
+// Shared tick hook — one setInterval for ALL countdowns instead of one per card
+function useSharedTick(intervalMs = 1000) {
+  const [tick, setTick] = useState(0);
   useEffect(() => {
-    const update = () => {
-      const diff = new Date(deadline).getTime() - Date.now();
-      if (diff <= 0) {
-        setTimeLeft("⏳");
-        return;
-      }
-      const h = Math.floor(diff / 3600000);
-      const m = Math.floor((diff % 3600000) / 60000);
-      const s = Math.floor((diff % 60000) / 1000);
-      setTimeLeft(h > 0 ? `${h}h ${m}m ${s}s` : `${m}m ${s}s`);
-    };
-    update();
-    const timer = setInterval(update, 1000);
-    return () => clearInterval(timer);
-  }, [deadline]);
+    const id = setInterval(() => setTick((t) => t + 1), intervalMs);
+    return () => clearInterval(id);
+  }, [intervalMs]);
+  return tick;
+}
 
-  const isUrgent =
-    new Date(deadline).getTime() - Date.now() < 30 * 60 * 1000 &&
-    new Date(deadline).getTime() - Date.now() > 0;
+const TickContext = React.createContext(0);
+
+function CountdownTimer({ deadline, compact = false }: { deadline: string; compact?: boolean }) {
+  const tick = React.useContext(TickContext);
+  const diff = new Date(deadline).getTime() - Date.now();
+  let timeLeft: string;
+  if (diff <= 0) {
+    timeLeft = "⏳";
+  } else {
+    const h = Math.floor(diff / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    const s = Math.floor((diff % 60000) / 1000);
+    timeLeft = h > 0 ? `${h}h ${m}m ${s}s` : `${m}m ${s}s`;
+  }
+  // suppress lint — tick is used implicitly to trigger re-render
+  void tick;
+
+  const isUrgent = diff < 30 * 60 * 1000 && diff > 0;
 
   return (
     <span className={`font-mono ${compact ? "text-[11px]" : "text-xs"} ${isUrgent ? "text-neon-red animate-pulse" : "text-neon-gold"}`}>
@@ -105,6 +110,8 @@ export default function PredictionsPage() {
   const [votedPredictions, setVotedPredictions] = useState<any[]>([]);
   const [referralCode, setReferralCode] = useState("");
   const [lastSubmittedVote, setLastSubmittedVote] = useState<{ eventId: number; prediction: boolean } | null>(null);
+  const [visibleCount, setVisibleCount] = useState(12);
+  const tick = useSharedTick(1000);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
   const requestSeqRef = useRef(0);
   const predictionsRef = useRef<any[]>([]);
@@ -373,6 +380,9 @@ export default function PredictionsPage() {
   useEffect(() => {
     predictionsRef.current = predictions;
   }, [predictions]);
+
+  // Reset visible count when filters change
+  useEffect(() => { setVisibleCount(12); }, [activeTab, activeCategory, sourceFilter]);
 
   useEffect(() => {
     if (!address) {
@@ -645,21 +655,23 @@ export default function PredictionsPage() {
     };
   }, [votedByEventId]);
 
-  const activePredictions = predictions.filter((p) => p._status === "active").map(attachVoteMeta);
-  const resolvedPredictions = predictions.filter((p) => p._status === "resolved").map(attachVoteMeta);
-  const displayList =
-    activeTab === "active"
-      ? activePredictions
-      : activeTab === "resolved"
-        ? resolvedPredictions
-        : votedPredictions;
-  const byCategory =
-    activeCategory === "ALL" ? displayList : displayList.filter((p) => p.category === activeCategory);
-  const filtered = byCategory.filter((p) => {
-    if (sourceFilter === "ALL") return true;
-    if (sourceFilter === "AI") return !p.isUserEvent;
-    return Boolean(p.isUserEvent);
-  });
+  const activePredictions = useMemo(() => predictions.filter((p) => p._status === "active").map(attachVoteMeta), [predictions, attachVoteMeta]);
+  const resolvedPredictions = useMemo(() => predictions.filter((p) => p._status === "resolved").map(attachVoteMeta), [predictions, attachVoteMeta]);
+  const filtered = useMemo(() => {
+    const displayList =
+      activeTab === "active"
+        ? activePredictions
+        : activeTab === "resolved"
+          ? resolvedPredictions
+          : votedPredictions;
+    const byCategory =
+      activeCategory === "ALL" ? displayList : displayList.filter((p) => p.category === activeCategory);
+    return byCategory.filter((p) => {
+      if (sourceFilter === "ALL") return true;
+      if (sourceFilter === "AI") return !p.isUserEvent;
+      return Boolean(p.isUserEvent);
+    });
+  }, [activeTab, activePredictions, resolvedPredictions, votedPredictions, activeCategory, sourceFilter]);
 
   const formatUserTime = useCallback(
     (iso: string) => formatInOffset(iso, userOffsetMinutes),
@@ -946,9 +958,10 @@ export default function PredictionsPage() {
           </p>
         </GlassCard>
       ) : (
+        <TickContext.Provider value={tick}>
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-          <AnimatePresence mode="popLayout">
-            {filtered.map((pred, i) => {
+          <AnimatePresence>
+            {filtered.slice(0, visibleCount).map((pred, i) => {
               const deadline = new Date(pred.deadline);
               const isExpired = deadline < new Date();
               const totalVotes = (pred.totalVotesYes || 0) + (pred.totalVotesNo || 0);
@@ -967,10 +980,9 @@ export default function PredictionsPage() {
               return (
                 <motion.div
                   key={pred.eventId}
-                  layout
-                  initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.9 }}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
                   transition={{ delay: i * 0.04 }}
                 >
                   <GlassCard
@@ -1099,11 +1111,9 @@ export default function PredictionsPage() {
                         <span className="font-mono text-neon-cyan">{pred.aiProbability}%</span>
                       </div>
                       <div className="w-full h-2 bg-dark-600 rounded-full overflow-hidden">
-                        <motion.div
-                          initial={{ width: 0 }}
-                          animate={{ width: `${pred.aiProbability}%` }}
-                          transition={{ duration: 0.8 }}
-                          className={`h-full rounded-full ${
+                        <div
+                          style={{ width: `${pred.aiProbability}%` }}
+                          className={`h-full rounded-full transition-all duration-700 ${
                             pred.resolved
                               ? pred.outcome
                                 ? "bg-gradient-to-r from-neon-green to-emerald-400"
@@ -1210,6 +1220,17 @@ export default function PredictionsPage() {
             })}
           </AnimatePresence>
         </div>
+        {filtered.length > visibleCount && (
+          <div className="flex justify-center mt-4">
+            <button
+              onClick={() => setVisibleCount((c) => c + 12)}
+              className="px-6 py-2.5 rounded-xl text-sm font-medium bg-dark-700 border border-neon-cyan/30 text-neon-cyan hover:bg-neon-cyan/10 transition"
+            >
+              Show More ({filtered.length - visibleCount} remaining)
+            </button>
+          </div>
+        )}
+        </TickContext.Provider>
       )}
 
       <AnimatePresence>
