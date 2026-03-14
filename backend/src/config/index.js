@@ -14,7 +14,7 @@ export default {
   rpcFallbackUrl: process.env.RPC_FALLBACK_URL || "",
   deploymentNetwork,
   centralWallet: (process.env.CENTRAL_WALLET || "").toLowerCase(),
-  // Separate admin API key — falls back to DEPLOYER_PRIVATE_KEY for backwards compat
+  // Dedicated admin API key — required for admin endpoints (never use deployer key)
   adminApiKey: process.env.ADMIN_API_KEY || "",
   // CORS whitelist — comma-separated origins; empty = allow all (dev only)
   corsOrigins: process.env.CORS_ORIGINS || "",

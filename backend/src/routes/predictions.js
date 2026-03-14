@@ -49,9 +49,12 @@ function normalizeAutoCategory(category, title, description = "") {
 function isAdminAuthorized(req) {
   const key = String(req.header("x-admin-key") || "").trim();
   if (!key) return false;
-  // Prefer dedicated admin API key; fall back to deployer key for backwards compat
-  const adminKey = config.adminApiKey || config.deployerKey;
-  return Boolean(adminKey) && key === String(adminKey).trim();
+  // Use dedicated admin API key only — never fall back to deployer private key
+  if (!config.adminApiKey) {
+    console.warn("[Auth] ADMIN_API_KEY is not set — admin endpoints are disabled");
+    return false;
+  }
+  return key === String(config.adminApiKey).trim();
 }
 
 async function ensureSchedulerStarted() {
