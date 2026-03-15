@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "postinstall": "hardhat compile --quiet || true",
     "compile": "hardhat compile",
     "test": "hardhat test",
     "node": "hardhat node",

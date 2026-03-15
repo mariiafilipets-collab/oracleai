@@ -29,6 +29,33 @@ let client = null;
 let aiPauseUntil = 0;
 const AI_PAUSE_MS_ON_CREDIT_ERROR = 10 * 60 * 1000;
 
+/** Extract first valid JSON object from AI response text (handles markdown, explanatory text, truncated responses). */
+function extractJSON(text) {
+  if (!text || typeof text !== "string") return null;
+  // 1. Try direct parse first
+  try { return JSON.parse(text); } catch {}
+  // 2. Try to find JSON object in the text
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    try { return JSON.parse(jsonMatch[0]); } catch {}
+    // 3. If JSON is truncated (unterminated string), try to fix it
+    let candidate = jsonMatch[0];
+    // Close unterminated strings and object
+    if (!candidate.endsWith("}")) {
+      // Try adding closing quote + }
+      candidate = candidate.replace(/,?\s*$/, '') + '"}';
+      try { return JSON.parse(candidate); } catch {}
+    }
+  }
+  // 4. Try regex extraction for our specific verdict schema
+  const verdictMatch = text.match(/["']?verdict["']?\s*:\s*["'](YES|NO)["']/i);
+  const reasonMatch = text.match(/["']?reasoning["']?\s*:\s*["']([^"']*?)["']/i);
+  if (verdictMatch) {
+    return { verdict: verdictMatch[1].toUpperCase(), reasoning: reasonMatch?.[1] || "Extracted from malformed response" };
+  }
+  return null;
+}
+
 /** OpenRouter Structured Outputs schema: array of up to 5 prediction events (root object with "predictions" key). */
 const PREDICTIONS_RESPONSE_FORMAT = {
   type: "json_schema",
@@ -1574,14 +1601,15 @@ Return: {"verdict":"YES"|"NO","reasoning":"specific fact"}`,
       let lastErr = null;
       for (let attempt = 1; attempt <= RESOLVE_RETRIES; attempt++) {
         try {
-          let judgment = await ask(resolveModel, resolverMessages, 0.1, 500, "resolve");
+          const resolveOpts = { response_format: { type: "json_object" } };
+          let judgment = await ask(resolveModel, resolverMessages, 0.1, 500, "resolve", resolveOpts);
           if (!judgment && config.openrouterFallback && config.openrouterFallback !== resolveModel) {
-            judgment = await ask(config.openrouterFallback, resolverMessages, 0.1, 500, "resolve");
+            judgment = await ask(config.openrouterFallback, resolverMessages, 0.1, 500, "resolve", resolveOpts);
           }
           if (!judgment) throw new Error("Empty resolver response");
-          parsed = JSON.parse(judgment);
+          parsed = extractJSON(judgment);
           if (!parsed || (parsed.verdict !== "YES" && parsed.verdict !== "NO")) {
-            throw new Error("Invalid resolver verdict");
+            throw new Error("Invalid resolver verdict: " + String(judgment).slice(0, 120));
           }
           break;
         } catch (err) {

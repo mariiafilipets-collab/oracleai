@@ -30,14 +30,26 @@ function loadAddresses() {
 
 const BSC_TESTNET = { chainId: 97, name: "bsc-testnet" };
 
+const BSC_TESTNET_FALLBACK_RPCS = [
+  "https://bsc-testnet-rpc.publicnode.com",
+  "https://bsc-testnet.publicnode.com",
+  "https://data-seed-prebsc-1-s1.bnbchain.org:8545",
+  "https://data-seed-prebsc-2-s1.bnbchain.org:8545",
+  "https://data-seed-prebsc-1-s2.bnbchain.org:8545",
+];
+
 async function connectRpc() {
-  const urls = [config.rpcUrl].concat(config.rpcFallbackUrl ? [config.rpcFallbackUrl] : []);
+  const urls = [config.rpcUrl]
+    .concat(config.rpcFallbackUrl ? [config.rpcFallbackUrl] : [])
+    .concat(config.deploymentNetwork === "bscTestnet" ? BSC_TESTNET_FALLBACK_RPCS : []);
+  // Deduplicate
+  const seen = new Set();
+  const unique = urls.filter(u => u && !seen.has(u) && seen.add(u));
   const network = config.deploymentNetwork === "bscTestnet" ? BSC_TESTNET : undefined;
-  for (const url of urls) {
-    if (!url) continue;
+  for (const url of unique) {
     try {
       const p = new ethers.JsonRpcProvider(url, network);
-      await p.getBlockNumber();
+      await Promise.race([p.getBlockNumber(), new Promise((_, rej) => setTimeout(() => rej(new Error("RPC timeout")), 8000))]);
       console.log("[Blockchain] RPC connected:", url.replace(/\/\/[^@]+@/, "//***@"));
       return p;
     } catch (err) {
