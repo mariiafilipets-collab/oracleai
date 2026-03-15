@@ -313,7 +313,7 @@ export default function PredictionsPage() {
       const active = activeRes.success ? activeRes.data || [] : [];
       const resolved = resolvedRes.success ? resolvedRes.data || [] : [];
       const next = [
-        ...active.map((p: any) => ({ ...p, _status: "active" })),
+        ...active.map((p: any) => ({ ...p, _status: p._status || "active" })),
         ...resolved.map((p: any) => ({ ...p, _status: "resolved" })),
       ];
       // Preserve local vote state until backend poll/index catches up.
@@ -655,7 +655,7 @@ export default function PredictionsPage() {
     };
   }, [votedByEventId]);
 
-  const activePredictions = useMemo(() => predictions.filter((p) => p._status === "active").map(attachVoteMeta), [predictions, attachVoteMeta]);
+  const activePredictions = useMemo(() => predictions.filter((p) => p._status === "active" || p._status === "pending").map(attachVoteMeta), [predictions, attachVoteMeta]);
   const resolvedPredictions = useMemo(() => predictions.filter((p) => p._status === "resolved").map(attachVoteMeta), [predictions, attachVoteMeta]);
   const filtered = useMemo(() => {
     const displayList =

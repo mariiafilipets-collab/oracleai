@@ -18,7 +18,7 @@ const CATEGORY_NAMES = ["SPORTS", "POLITICS", "ECONOMY", "CRYPTO", "CLIMATE"];
 
 function inferCategoryFromText(text) {
   const t = String(text || "").toLowerCase();
-  if (/\b(vs|versus|match|fixture|derby|league|cup|goal|score|scorer|assist|football|soccer|basketball|tennis|hockey|ufc|f1|motogp|grand prix|gp|verstappen|hamilton|nba|nfl|mlb|nhl|beat|defeat|defeats|defeated|lose to|lost to|arsenal|manchester|man utd|manchester united|liverpool|chelsea|tottenham|real madrid|barcelona|atletico|bayern|psg|juventus|inter|milan|burnley|bournemouth|aston villa|crystal palace|leeds|nottingham forest|west ham|newcastle)\b/.test(t)) return "SPORTS";
+  if (/\b(vs|versus|match|fixture|derby|league|cup|goal|score|scorer|assist|football|soccer|basketball|tennis|hockey|ufc|f1|motogp|grand prix|gp|verstappen|hamilton|nba|nfl|mlb|nhl|beat|defeat|defeats|defeated|lose to|lost to|serie a|la liga|bundesliga|ligue 1|premier league|champions league|arsenal|manchester|man utd|manchester united|liverpool|chelsea|tottenham|real madrid|barcelona|atletico|bayern|psg|juventus|inter|milan|burnley|bournemouth|aston villa|crystal palace|leeds|nottingham forest|west ham|newcastle|roma|as roma|napoli|lazio|fiorentina|atalanta|como|cagliari|genoa|lecce|udinese|verona|monza|parma|empoli|venezia|torino|bologna|dortmund|leverkusen|wolfsburg|frankfurt|marseille|lyon|lille|monaco|villarreal|sevilla|betis|sociedad|celtic|rangers|porto|benfica|ajax|brighton|wolves|brentford|fulham|everton|spurs)\b/.test(t)) return "SPORTS";
   if (/\b(election|president|parliament|sanction|summit|ceasefire|government|minister|vote)\b/.test(t)) return "POLITICS";
   if (/\b(cpi|inflation|gdp|fed|ecb|interest rate|jobs report|earnings|dow|nasdaq|s&p|gold|oil)\b/.test(t)) return "ECONOMY";
   if (/\b(bitcoin|btc|ethereum|eth|solana|xrp|crypto|token|etf|on-chain|wallet|binance|coinbase)\b/.test(t)) return "CRYPTO";
@@ -29,10 +29,11 @@ function inferCategoryFromText(text) {
 function inferCategoryStrong(text) {
   const t = String(text || "").toLowerCase();
   // Require unambiguous sports keywords; "beat"/"match"/"score" alone are too generic
-  if (/\b(defeat|defeats|defeated|lose to|lost to|vs|versus|fixture|derby|league|cup|goal|goalkeeper|arsenal|manchester|man utd|liverpool|chelsea|tottenham|real madrid|barcelona|atletico|bayern|psg|juventus|inter|milan|burnley|bournemouth|aston villa|west ham|newcastle|everton|nba|nfl|mlb|nhl|ufc|mma|f1|formula 1)\b/.test(t)) return "SPORTS";
-  if (/\b(beat)\b/.test(t) && /\b(arsenal|manchester|man utd|liverpool|chelsea|tottenham|real madrid|barcelona|atletico|bayern|psg|juventus|inter|milan|burnley|bournemouth|aston villa|west ham|newcastle|everton|spurs)\b/.test(t)) return "SPORTS";
-  if (/\b(tornado|hail|hurricane|earthquake|wildfire|flood|heatwave|temperature|weather|climate|rainfall|cyclone|storm)\b/.test(t)) return "CLIMATE";
-  if (/\b(election|parliament|congress|senate|president|ceasefire|sanction|summit|government|minister|white house|vote)\b/.test(t)) return "POLITICS";
+  // Premier League, Serie A, La Liga, Bundesliga, Ligue 1, and other major clubs
+  if (/\b(defeat|defeats|defeated|lose to|lost to|vs|versus|fixture|derby|league|cup|goal|goalkeeper|serie a|la liga|bundesliga|ligue 1|premier league|champions league|europa league|conference league|copa del rey|fa cup|carabao|arsenal|manchester|man utd|liverpool|chelsea|tottenham|real madrid|barcelona|atletico|bayern|psg|juventus|inter|milan|burnley|bournemouth|aston villa|west ham|newcastle|everton|crystal palace|wolves|wolverhampton|brentford|fulham|brighton|nottingham forest|leicester|ipswich|southampton|leeds|roma|as roma|napoli|lazio|fiorentina|atalanta|como|cagliari|genoa|lecce|udinese|verona|monza|parma|empoli|venezia|torino|sassuolo|sampdoria|bologna|dortmund|leverkusen|wolfsburg|frankfurt|mainz|freiburg|stuttgart|hoffenheim|marseille|lyon|lille|monaco|nice|rennes|lens|villarreal|sevilla|betis|sociedad|bilbao|valencia|celta|celtic|rangers|porto|benfica|sporting|ajax|feyenoord|galatasaray|fenerbahce|besiktas|nba|nfl|mlb|nhl|ufc|mma|f1|formula 1)\b/.test(t)) return "SPORTS";
+  if (/\b(beat|win)\b/.test(t) && /\b(arsenal|manchester|man utd|liverpool|chelsea|tottenham|real madrid|barcelona|atletico|bayern|psg|juventus|inter|milan|burnley|bournemouth|aston villa|west ham|newcastle|everton|spurs|roma|napoli|lazio|fiorentina|atalanta|como|cagliari|dortmund|leverkusen|marseille|lyon|villarreal|sevilla|porto|benfica|celtic|ajax|brighton|wolves|brentford|fulham|crystal palace)\b/.test(t)) return "SPORTS";
+  if (/\b(tornado|hail|hurricane|earthquake|wildfire|flood|heatwave|temperature|weather|climate|rainfall|cyclone|storm|blizzard|typhoon|drought)\b/.test(t)) return "CLIMATE";
+  if (/\b(election|parliament|congress|senate|president|ceasefire|sanction|summit|government|minister|white house|vote|troops|military|war powers|shutdown)\b/.test(t)) return "POLITICS";
   if (/\b(cpi|inflation|gdp|fed|ecb|interest rate|jobs report|payrolls|dow|nasdaq|s&p|gold|oil|brent|wti|bond|yield)\b/.test(t)) return "ECONOMY";
   if (/\b(bitcoin|btc|ethereum|eth|solana|xrp|crypto|token|etf|on-chain|wallet|binance|coinbase)\b/.test(t)) return "CRYPTO";
   return "";
@@ -94,7 +95,7 @@ function isNearDuplicateTitle(a, b) {
   let inter = 0;
   for (const t of aSet) if (bSet.has(t)) inter++;
   const uni = aSet.size + bSet.size - inter;
-  return uni > 0 ? inter / uni >= 0.82 : false;
+  return uni > 0 ? inter / uni >= 0.72 : false;
 }
 
 function extractDateKey(title) {
@@ -139,7 +140,11 @@ function normalizeTeamChunk(text) {
 
 function sportsFixtureSignature(title) {
   const s = String(title || "");
-  let m = s.match(/will\s+(.+?)\s+(?:beat|defeat|win(?:\s+against)?|lose to)\s+(.+?)(?:\s+on\s+|\s+by\s+|\?|$)/i);
+  let m = s.match(/will\s+(.+?)\s+(?:beat|defeat|win(?:\s+against)?|lose to)\s+(.+?)(?:\s+in\s+their|\s+on\s+|\s+by\s+|\?|$)/i);
+  if (!m) {
+    // "win their X match against Y" pattern
+    m = s.match(/will\s+(.+?)\s+win\s+their\s+\S+(?:\s+\S+)?\s+match\s+against\s+(.+?)(?:\s+on\s+|\s+by\s+|\?|$)/i);
+  }
   if (!m) {
     m = s.match(/will\s+(.+?)\s+(?:vs\.?|versus)\s+(.+?)(?:\s+on\s+|\s+by\s+|\?|$)/i);
   }
@@ -429,11 +434,21 @@ async function withTranslation(events, lang) {
   return localized;
 }
 
-// Active (unresolved, not expired)
+// Active + pending resolution (unresolved events)
 router.get("/", async (req, res) => {
   try {
-    let events = await PredictionEvent.find({ resolved: false, deadline: { $gt: new Date() } })
-      .sort({ deadline: 1 }).lean();
+    const now = new Date();
+    // Include events pending resolution (past deadline but not yet resolved, up to 7 days old)
+    const pendingCutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    let events = await PredictionEvent.find({
+      resolved: false,
+      deadline: { $gt: pendingCutoff },
+    }).sort({ deadline: 1 }).lean();
+    // Mark active vs pending
+    events = events.map((evt) => ({
+      ...evt,
+      _status: new Date(evt.deadline) > now ? "active" : "pending",
+    }));
     events = await attachUserVotes(events, req.query.address);
     events = recategorizeByTitle(events);
     events = ensureDetailedDescriptions(events);
@@ -608,6 +623,71 @@ router.post("/admin/purge-all", async (req, res) => {
         afterGenerated,
       },
     });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Admin: comprehensive cleanup — fix categories, archive orphans, remove DB duplicates
+router.post("/admin/cleanup", async (req, res) => {
+  try {
+    if (!isAdminAuthorized(req)) {
+      return res.status(403).json({ success: false, error: "Forbidden" });
+    }
+
+    const report = { categoriesFixed: 0, orphansArchived: 0, duplicatesArchived: 0, details: [] };
+
+    // 1. Fix categories in MongoDB
+    const unresolved = await PredictionEvent.find({ resolved: false }).lean();
+    for (const evt of unresolved) {
+      if (evt.isUserEvent) continue;
+      const strong = inferCategoryStrong(evt.title || "");
+      if (strong && String(evt.category || "").toUpperCase() !== strong) {
+        await PredictionEvent.updateOne({ _id: evt._id }, { $set: { category: strong } });
+        report.categoriesFixed++;
+        report.details.push(`eventId ${evt.eventId}: ${evt.category} → ${strong} ("${(evt.title || "").slice(0, 60)}")`);
+      }
+    }
+
+    // 2. Archive orphaned events (eventId > chain count)
+    const { Prediction } = getContracts();
+    if (Prediction) {
+      let chainCount;
+      try { chainCount = Number(await Prediction.eventCount()); } catch { chainCount = 0; }
+      if (chainCount > 0) {
+        const orphans = await PredictionEvent.find({
+          resolved: false,
+          eventId: { $gt: chainCount },
+        }).lean();
+        for (const o of orphans) {
+          await PredictionEvent.updateOne(
+            { _id: o._id },
+            { $set: { resolved: true, outcome: false, aiReasoning: "Archived: event not on chain (orphaned)." } }
+          );
+          report.orphansArchived++;
+          report.details.push(`eventId ${o.eventId}: orphaned (chain count=${chainCount})`);
+        }
+      }
+    }
+
+    // 3. Remove duplicates from unresolved — keep earliest eventId
+    const active = await PredictionEvent.find({ resolved: false }).sort({ eventId: 1 }).lean();
+    const kept = [];
+    for (const evt of active) {
+      const isDupe = kept.some((k) => isNearDuplicateEvent(k, evt));
+      if (isDupe) {
+        await PredictionEvent.updateOne(
+          { _id: evt._id },
+          { $set: { resolved: true, outcome: false, aiReasoning: `Archived: duplicate of earlier event.` } }
+        );
+        report.duplicatesArchived++;
+        report.details.push(`eventId ${evt.eventId}: duplicate ("${(evt.title || "").slice(0, 60)}")`);
+      } else {
+        kept.push(evt);
+      }
+    }
+
+    return res.json({ success: true, data: report });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }

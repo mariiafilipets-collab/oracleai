@@ -778,17 +778,18 @@ function inferCategoryFromText(text) {
 function inferCategoryStrong(text) {
   const t = String(text || "").toLowerCase();
   // Require unambiguous sports keywords; "beat"/"match"/"score" alone are too generic
-  if (/\b(defeat|defeats|defeated|lose to|lost to|vs|versus|fixture|derby|league|cup|goal|goalkeeper|arsenal|manchester|man utd|liverpool|chelsea|tottenham|real madrid|barcelona|atletico|bayern|psg|juventus|inter|milan|burnley|bournemouth|aston villa|west ham|newcastle|everton|nba|nfl|mlb|nhl|ufc|mma|f1|formula 1)\b/.test(t)) {
+  // Premier League, Serie A, La Liga, Bundesliga, Ligue 1, and other major clubs
+  if (/\b(defeat|defeats|defeated|lose to|lost to|vs|versus|fixture|derby|league|cup|goal|goalkeeper|serie a|la liga|bundesliga|ligue 1|premier league|champions league|europa league|conference league|copa del rey|fa cup|carabao|arsenal|manchester|man utd|liverpool|chelsea|tottenham|real madrid|barcelona|atletico|bayern|psg|juventus|inter|milan|burnley|bournemouth|aston villa|west ham|newcastle|everton|crystal palace|wolves|wolverhampton|brentford|fulham|brighton|nottingham forest|leicester|ipswich|southampton|leeds|roma|as roma|napoli|lazio|fiorentina|atalanta|como|cagliari|genoa|lecce|udinese|verona|monza|parma|empoli|venezia|torino|sassuolo|sampdoria|bologna|dortmund|leverkusen|wolfsburg|frankfurt|mainz|freiburg|stuttgart|hoffenheim|marseille|lyon|lille|monaco|nice|rennes|lens|villarreal|sevilla|betis|sociedad|bilbao|valencia|celta|celtic|rangers|porto|benfica|sporting|ajax|feyenoord|galatasaray|fenerbahce|besiktas|nba|nfl|mlb|nhl|ufc|mma|f1|formula 1)\b/.test(t)) {
     return "SPORTS";
   }
-  // "beat" is SPORTS only when followed by a team-like word (not "expectations", "estimates", etc.)
-  if (/\b(beat)\b/.test(t) && /\b(arsenal|manchester|man utd|liverpool|chelsea|tottenham|real madrid|barcelona|atletico|bayern|psg|juventus|inter|milan|burnley|bournemouth|aston villa|west ham|newcastle|everton|spurs)\b/.test(t)) {
+  // "beat"/"win" is SPORTS only when co-occurring with a known team
+  if (/\b(beat|win)\b/.test(t) && /\b(arsenal|manchester|man utd|liverpool|chelsea|tottenham|real madrid|barcelona|atletico|bayern|psg|juventus|inter|milan|burnley|bournemouth|aston villa|west ham|newcastle|everton|spurs|roma|napoli|lazio|fiorentina|atalanta|como|cagliari|dortmund|leverkusen|marseille|lyon|villarreal|sevilla|porto|benfica|celtic|ajax|brighton|wolves|brentford|fulham|crystal palace)\b/.test(t)) {
     return "SPORTS";
   }
-  if (/\b(tornado|hail|hurricane|earthquake|wildfire|flood|heatwave|temperature|weather|climate|rainfall|cyclone|storm)\b/.test(t)) {
+  if (/\b(tornado|hail|hurricane|earthquake|wildfire|flood|heatwave|temperature|weather|climate|rainfall|cyclone|storm|blizzard|typhoon|drought)\b/.test(t)) {
     return "CLIMATE";
   }
-  if (/\b(election|parliament|congress|senate|president|ceasefire|sanction|summit|government|minister|white house|vote)\b/.test(t)) {
+  if (/\b(election|parliament|congress|senate|president|ceasefire|sanction|summit|government|minister|white house|vote|troops|military|war powers|shutdown)\b/.test(t)) {
     return "POLITICS";
   }
   if (/\b(cpi|inflation|gdp|fed|ecb|interest rate|jobs report|payrolls|dow|nasdaq|s&p|gold|oil|brent|wti|bond|yield)\b/.test(t)) {
