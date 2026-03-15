@@ -23,6 +23,13 @@ contracts/.env
 # production env (NEVER commit — contains private keys and secrets)
 oracleai.env
 
+# contract build artifacts (auto-generated)
+contracts/artifacts/
+contracts/cache/
+
+# test results
+test-results/
+
 # local tooling state
 .vercel/
 frontend/.vercel/

@@ -894,6 +894,9 @@ router.post("/user/validate", async (req, res) => {
 // Ingest one on-chain user event into Mongo right after tx confirmation
 router.post("/user/ingest", async (req, res) => {
   try {
+    if (!isAdminAuthorized(req)) {
+      return res.status(403).json({ success: false, error: "Forbidden" });
+    }
     const eventId = Number(req.body?.eventId || 0);
     if (!Number.isFinite(eventId) || eventId <= 0) {
       return res.status(400).json({ success: false, error: "Invalid eventId" });
@@ -962,9 +965,12 @@ router.post("/user/ingest", async (req, res) => {
   }
 });
 
-// Manual generate
+// Manual generate (admin only)
 router.post("/generate", async (req, res) => {
   try {
+    if (!isAdminAuthorized(req)) {
+      return res.status(403).json({ success: false, error: "Forbidden" });
+    }
     const predictions = await generateDailyPredictions();
     const activeTitles = await PredictionEvent.find({ resolved: false, deadline: { $gt: new Date() } })
       .select("title category")
@@ -1044,18 +1050,24 @@ router.post("/generate", async (req, res) => {
 // Manual resolve
 router.post("/:eventId/resolve", async (req, res) => {
   try {
-    const { eventId } = req.params;
+    if (!isAdminAuthorized(req)) {
+      return res.status(403).json({ success: false, error: "Forbidden" });
+    }
+    const eventId = parseInt(req.params.eventId);
+    if (!Number.isFinite(eventId) || eventId <= 0) {
+      return res.status(400).json({ success: false, error: "Invalid eventId" });
+    }
     const { outcome } = req.body;
     const { Prediction } = getContracts();
     let finished = true;
     if (Prediction) {
-      const tx = await Prediction.resolveEvent(parseInt(eventId), !!outcome);
+      const tx = await Prediction.resolveEvent(eventId, !!outcome);
       await tx.wait();
-      const on = await Prediction["getEvent(uint256)"](BigInt(parseInt(eventId)));
+      const on = await Prediction["getEvent(uint256)"](BigInt(eventId));
       finished = Boolean(on?.resolved);
     }
     await PredictionEvent.updateOne(
-      { eventId: parseInt(eventId) },
+      { eventId },
       finished
         ? { resolved: true, resolvePending: false, outcome: !!outcome }
         : { resolved: false, resolvePending: true, outcome: null, aiReasoning: "Resolution in progress (batched on-chain)." }

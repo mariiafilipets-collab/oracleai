@@ -59,9 +59,9 @@ export default function QuestPanel() {
     setClaiming(questId);
     try {
       const res = await api.claimQuestReward(address, questId);
-      if (res.success) {
-        toast.success(`Claimed ${res.data.rewardPoints} points!`);
-        trackEvent("quest_claimed", { questId, points: res.data.rewardPoints });
+      if (res.success && res.data) {
+        toast.success(`Claimed ${res.data.rewardPoints ?? 0} points!`);
+        trackEvent("quest_claimed", { questId, points: res.data.rewardPoints ?? 0 });
         fetchQuests();
       } else {
         toast.error(res.error || "Claim failed");
