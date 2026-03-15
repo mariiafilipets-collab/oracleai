@@ -120,10 +120,21 @@ function extractDateKey(title) {
   return "";
 }
 
+const TEAM_ALIASES = {
+  "man utd": "manchester united", "man united": "manchester united", "man city": "manchester city",
+  "spurs": "tottenham", "wolves": "wolverhampton",
+  "inter": "inter milan", "ac milan": "milan",
+  "real": "real madrid", "barca": "barcelona", "atleti": "atletico madrid",
+  "dortmund": "borussia dortmund", "bayern": "bayern munich", "leverkusen": "bayer leverkusen",
+};
+
 function normalizeTeamChunk(text) {
-  return String(text || "")
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, " ")
+  let s = String(text || "").toLowerCase().replace(/[^a-z0-9\s]/g, " ").trim();
+  // Apply team aliases before tokenization
+  for (const [alias, canonical] of Object.entries(TEAM_ALIASES)) {
+    if (s.includes(alias)) { s = s.replace(alias, canonical); break; }
+  }
+  return s
     .split(/\s+/)
     .map((x) => x.trim())
     .filter((x) =>
@@ -131,6 +142,7 @@ function normalizeTeamChunk(text) {
       ![
         "will", "the", "this", "match", "game", "today", "tonight", "on", "by", "at", "and", "or",
         "beat", "defeat", "defeats", "defeated", "win", "wins", "won", "against", "vs", "versus",
+        "their", "in", "a", "an", "for", "premier", "league", "serie", "la", "liga",
       ].includes(x) &&
       !/^\d+$/.test(x)
     )
@@ -157,6 +169,18 @@ function sportsFixtureSignature(title) {
   return `${sides[0]}|${sides[1]}|${dateKey || "na"}`;
 }
 
+const POLITICS_SUBJECTS = [
+  { key: "PAXTON_TX", re: /\b(ken paxton|paxton).+\b(senate|primary|texas|tx)\b/i },
+  { key: "VA_ELECTION", re: /\b(virginia|va)\b.+\b(election|special election|house district)\b/i },
+  { key: "GOV_SHUTDOWN", re: /\b(government shutdown|shutdown)\b/i },
+  { key: "DHS_MULLIN", re: /\b(mullin|dhs secretary)\b/i },
+  { key: "WAR_POWERS", re: /\b(war powers|kaine)\b/i },
+  { key: "SAVE_ACT", re: /\b(save act|save america)\b/i },
+  { key: "IRAN_TROOPS", re: /\b(iran|ground troops)\b/i },
+  { key: "TSA_FUNDING", re: /\b(tsa funding|homeland security funding)\b/i },
+  { key: "FBI_PATEL", re: /\b(kash patel|fbi director)\b/i },
+];
+
 function genericCategorySignature(title, category) {
   const c = String(category || "").toUpperCase();
   const norm = normalizeTitle(title);
@@ -172,17 +196,22 @@ function genericCategorySignature(title, category) {
     { key: "US_CPI", re: /\b(cpi|inflation)\b/i },
   ];
   const topic = topicAliases.find((x) => x.re.test(String(title || "")))?.key || "";
+  const dateKey = extractDateKey(title) || "na";
   const tokens = norm
     .split(/\s+/)
     .filter(Boolean)
     .filter((t) => t.length > 2)
     .slice(0, 10);
-  const dateKey = extractDateKey(title) || "na";
   const nums = Array.from(new Set((String(title || "").match(/\d+(?:\.\d+)?/g) || []).slice(0, 3)));
   const numKey = nums.join(",") || "na";
   if (c === "ECONOMY" || c === "CRYPTO") {
     if (topic) return `${c}|${topic}|${dateKey}`;
     return `${c}|${dateKey}|${numKey}|${tokens.slice(0, 5).join(" ")}`;
+  }
+  // POLITICS: subject-based dedup (same subject + same date window = duplicate)
+  if (c === "POLITICS") {
+    const subj = POLITICS_SUBJECTS.find((x) => x.re.test(String(title || "")));
+    if (subj) return `POLITICS|${subj.key}|${dateKey}`;
   }
   return `${c}|${dateKey}|${tokens.slice(0, 6).join(" ")}`;
 }
